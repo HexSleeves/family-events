@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Family Events{% endblock %} - Family Events</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
         /* ── Skeleton animation ── */
@@ -17,6 +22,10 @@
             background-size: 200% 100%;
             animation: shimmer 1.4s ease-in-out infinite;
             border-radius: 4px;
+        }
+        .dark .skeleton {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 37%, #374151 63%);
+            background-size: 200% 100%;
         }
         .skeleton-text {
             height: 0.75rem;
@@ -93,24 +102,46 @@
             pointer-events: none;
             transition: opacity 150ms;
         }
+        .dark .skeleton-overlay {
+            background: #1f2937;
+        }
         .htmx-request .skeleton-overlay {
             opacity: 1;
             pointer-events: auto;
         }
     </style>
+    <script>
+        // Auto theme: respect user pref or system
+        (function() {
+            {% if current_user and current_user.theme == 'auto' %}
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            }
+            {% endif %}
+        })();
+    </script>
 </head>
-<body class="bg-gray-50 text-gray-900 leading-relaxed" hx-indicator="#global-progress">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 leading-relaxed transition-colors" hx-indicator="#global-progress">
     {# Global progress bar #}
     <div id="global-progress"><div class="bar"></div></div>
 
-    <header class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-4 mb-6">
+    <header class="bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-700 dark:to-purple-700 text-white py-4 mb-6">
         <div class="max-w-4xl mx-auto px-4 flex items-center gap-4">
-            <h1 class="text-xl font-bold">🌟 Family Events</h1>
-            <nav class="ml-auto flex gap-2">
+            <a href="/" class="text-xl font-bold hover:opacity-90 transition">🌟 Family Events</a>
+            <nav class="ml-auto flex gap-2 items-center">
                 <a href="/" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🏠 Dashboard</a>
                 <a href="/events" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📅 Events</a>
                 <a href="/weekend" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🎉 Weekend</a>
                 <a href="/sources" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📡 Sources</a>
+                {% if current_user %}
+                <span class="mx-1 text-white/40">|</span>
+                <a href="/profile" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">👤 {{ current_user.display_name }}</a>
+                <a href="/logout" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">↩ Logout</a>
+                {% else %}
+                <span class="mx-1 text-white/40">|</span>
+                <a href="/login" class="px-3 py-1.5 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition">Log In</a>
+                <a href="/signup" class="px-3 py-1.5 rounded-md bg-white/30 hover:bg-white/40 text-sm font-medium transition">Sign Up</a>
+                {% endif %}
             </nav>
         </div>
     </header>

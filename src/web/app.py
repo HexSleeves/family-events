@@ -3,22 +3,31 @@
 from __future__ import annotations
 
 import json
+import os
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from src.db.database import Database
-from src.db.models import InterestProfile, Source
+from src.db.models import Constraints, InterestProfile, Source
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService
 from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import extract_domain, is_builtin_domain
+from src.web.auth import (
+    get_current_user,
+    hash_password,
+    login_session,
+    logout_session,
+    verify_password,
+)
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -32,6 +41,218 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Family Events", lifespan=lifespan)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me-in-prod"),
+    session_cookie="session",
+    max_age=60 * 60 * 24 * 30,  # 30 days
+)
+
+
+async def _ctx(request: Request, **extra: object) -> dict:
+    """Build base template context with current user."""
+    user = await get_current_user(request, db)
+    return {"request": request, "current_user": user, **extra}
+
+
+# ----- Auth Pages -----
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    user = await get_current_user(request, db)
+    if user:
+        return RedirectResponse("/profile", status_code=302)
+    return templates.TemplateResponse("login.html", await _ctx(request))
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(request: Request):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", ""))
+
+    user = await db.get_user_by_email(email)
+    if not user or not verify_password(password, user.password_hash):
+        return templates.TemplateResponse(
+            "login.html",
+            {**await _ctx(request), "error": "Invalid email or password."},
+        )
+
+    login_session(request, user)
+    return RedirectResponse("/profile", status_code=302)
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    user = await get_current_user(request, db)
+    if user:
+        return RedirectResponse("/profile", status_code=302)
+    return templates.TemplateResponse("signup.html", await _ctx(request))
+
+
+@app.post("/signup", response_class=HTMLResponse)
+async def signup_submit(request: Request):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    display_name = str(form.get("display_name", "")).strip()
+    password = str(form.get("password", ""))
+    confirm = str(form.get("confirm_password", ""))
+
+    errors: list[str] = []
+    if not email or "@" not in email:
+        errors.append("Valid email is required.")
+    if not display_name:
+        errors.append("Display name is required.")
+    if len(password) < 6:
+        errors.append("Password must be at least 6 characters.")
+    if password != confirm:
+        errors.append("Passwords don't match.")
+    if not errors and await db.get_user_by_email(email):
+        errors.append("An account with this email already exists.")
+
+    if errors:
+        return templates.TemplateResponse(
+            "signup.html",
+            {**await _ctx(request), "errors": errors, "email": email, "display_name": display_name},
+        )
+
+    from src.db.models import User
+
+    user = User(
+        email=email,
+        display_name=display_name,
+        password_hash=hash_password(password),
+    )
+    await db.create_user(user)
+    login_session(request, user)
+    return RedirectResponse("/profile", status_code=302)
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    logout_session(request)
+    return RedirectResponse("/", status_code=302)
+
+
+# ----- Profile Page -----
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    sources = await db.get_user_sources(user.id)
+    return templates.TemplateResponse(
+        "profile.html",
+        {**await _ctx(request), "sources": sources},
+    )
+
+
+@app.post("/api/profile/location", response_class=HTMLResponse)
+async def api_update_location(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("Unauthorized", status_code=401)
+    form = await request.form()
+    home_city = str(form.get("home_city", "Lafayette")).strip()
+    pref_raw = str(form.get("preferred_cities", "")).strip()
+    preferred = [c.strip() for c in pref_raw.split(",") if c.strip()]
+    if not preferred:
+        preferred = [home_city]
+    await db.update_user(user.id, home_city=home_city, preferred_cities=preferred)
+    return HTMLResponse(
+        '<div class="text-green-600 font-semibold text-sm">✅ Location updated</div>'
+    )
+
+
+@app.post("/api/profile/preferences", response_class=HTMLResponse)
+async def api_update_preferences(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("Unauthorized", status_code=401)
+    form = await request.form()
+    loves = [x.strip() for x in str(form.get("loves", "")).split(",") if x.strip()]
+    likes = [x.strip() for x in str(form.get("likes", "")).split(",") if x.strip()]
+    dislikes = [x.strip() for x in str(form.get("dislikes", "")).split(",") if x.strip()]
+    nap_time = str(form.get("nap_time", "13:00-15:00")).strip()
+    bedtime = str(form.get("bedtime", "19:30")).strip()
+    budget = float(form.get("budget", 30.0))
+    max_drive = int(form.get("max_drive", 45))
+
+    profile = InterestProfile(
+        loves=loves or user.interest_profile.loves,
+        likes=likes or user.interest_profile.likes,
+        dislikes=dislikes or user.interest_profile.dislikes,
+        constraints=Constraints(
+            max_drive_time_minutes=max_drive,
+            preferred_cities=user.preferred_cities,
+            home_city=user.home_city,
+            nap_time=nap_time,
+            bedtime=bedtime,
+            budget_per_event=budget,
+        ),
+    )
+    await db.update_user(user.id, interest_profile=profile)
+    return HTMLResponse(
+        '<div class="text-green-600 font-semibold text-sm">✅ Preferences updated</div>'
+    )
+
+
+@app.post("/api/profile/theme", response_class=HTMLResponse)
+async def api_update_theme(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("Unauthorized", status_code=401)
+    form = await request.form()
+    theme = str(form.get("theme", "auto")).strip()
+    if theme not in ("light", "dark", "auto"):
+        theme = "auto"
+    await db.update_user(user.id, theme=theme)
+    return HTMLResponse('<div class="text-green-600 font-semibold text-sm">✅ Theme updated</div>')
+
+
+@app.post("/api/profile/notifications", response_class=HTMLResponse)
+async def api_update_notifications(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("Unauthorized", status_code=401)
+    form = await request.form()
+    channels = form.getlist("channels")
+    if not channels:
+        channels = ["console"]
+    await db.update_user(user.id, notification_channels=[str(c) for c in channels])
+    return HTMLResponse(
+        '<div class="text-green-600 font-semibold text-sm">✅ Notification settings updated</div>'
+    )
+
+
+@app.post("/api/profile/password", response_class=HTMLResponse)
+async def api_update_password(request: Request):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("Unauthorized", status_code=401)
+    form = await request.form()
+    current = str(form.get("current_password", ""))
+    new_pw = str(form.get("new_password", ""))
+    confirm = str(form.get("confirm_password", ""))
+    if not verify_password(current, user.password_hash):
+        return HTMLResponse(
+            '<div class="text-red-600 font-semibold text-sm">❌ Current password is incorrect</div>'
+        )
+    if len(new_pw) < 6:
+        return HTMLResponse(
+            '<div class="text-red-600 font-semibold text-sm">❌ New password must be at least 6 characters</div>'
+        )
+    if new_pw != confirm:
+        return HTMLResponse(
+            '<div class="text-red-600 font-semibold text-sm">❌ Passwords don\'t match</div>'
+        )
+    await db.update_user(user.id, password_hash=hash_password(new_pw))
+    return HTMLResponse(
+        '<div class="text-green-600 font-semibold text-sm">✅ Password changed</div>'
+    )
 
 
 # ----- Pages -----
@@ -51,14 +272,14 @@ async def dashboard(request: Request):
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {
-            "request": request,
-            "total": total,
-            "tagged": tagged,
-            "untagged": untagged,
-            "sources": sources,
-            "top_events": top_events,
-        },
+        await _ctx(
+            request,
+            total=total,
+            tagged=tagged,
+            untagged=untagged,
+            sources=sources,
+            top_events=top_events,
+        ),
     )
 
 
@@ -89,22 +310,22 @@ async def events_page(
     total_pages = max(1, (total + per_page - 1) // per_page)
     filters = await db.get_filter_options()
 
-    ctx = {
-        "request": request,
-        "events": events,
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
-        "q": q,
-        "city": city,
-        "source": source,
-        "tagged": tagged,
-        "score_min": score_min_int,
-        "sort": sort,
-        "cities": filters["cities"],
-        "sources": filters["sources"],
-    }
+    ctx = await _ctx(
+        request,
+        events=events,
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        q=q,
+        city=city,
+        source=source,
+        tagged=tagged,
+        score_min=score_min_int,
+        sort=sort,
+        cities=filters["cities"],
+        sources=filters["sources"],
+    )
 
     # HTMX partial: only return the table + pagination fragment
     if request.headers.get("HX-Request"):
@@ -131,7 +352,7 @@ async def event_detail(request: Request, event_id: str):
 
     return templates.TemplateResponse(
         "event_detail.html",
-        {"request": request, "event": event, "raw_data": raw_data},
+        await _ctx(request, event=event, raw_data=raw_data),
     )
 
 
@@ -156,14 +377,14 @@ async def weekend_page(request: Request):
 
     return templates.TemplateResponse(
         "weekend.html",
-        {
-            "request": request,
-            "saturday": saturday,
-            "sunday": sunday,
-            "weather": weather,
-            "ranked": ranked,
-            "message": message,
-        },
+        await _ctx(
+            request,
+            saturday=saturday,
+            sunday=sunday,
+            weather=weather,
+            ranked=ranked,
+            message=message,
+        ),
     )
 
 
@@ -176,7 +397,7 @@ async def sources_page(request: Request):
     builtin_stats = await db.get_filter_options()
     return templates.TemplateResponse(
         "sources.html",
-        {"request": request, "sources": sources, "builtin_stats": builtin_stats},
+        await _ctx(request, sources=sources, builtin_stats=builtin_stats),
     )
 
 
@@ -193,7 +414,7 @@ async def source_detail(request: Request, source_id: str):
         recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
     return templates.TemplateResponse(
         "source_detail.html",
-        {"request": request, "source": source, "recipe": recipe, "events": events_from_source},
+        await _ctx(request, source=source, recipe=recipe, events=events_from_source),
     )
 
 
@@ -286,7 +507,14 @@ async def api_add_source(request: Request):
     domain = extract_domain(url)
     if not name:
         name = domain.replace(".", " ").title()
-    source = Source(name=name, url=url, domain=domain, status="analyzing")
+    user = await get_current_user(request, db)
+    source = Source(
+        name=name,
+        url=url,
+        domain=domain,
+        status="analyzing",
+        user_id=user.id if user else None,
+    )
     await db.create_source(source)
 
     # Analyze in-line (for now; could be background task later)

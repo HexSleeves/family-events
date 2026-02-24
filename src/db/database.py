@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 from datetime import UTC, datetime, timedelta
@@ -9,7 +10,7 @@ from typing import Any
 
 import aiosqlite
 
-from .models import Event, EventTags, Source
+from .models import Event, EventTags, InterestProfile, Source, User
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "family_events.db")
 
@@ -60,11 +61,29 @@ CREATE TABLE IF NOT EXISTS sources (
 );
 """
 
+_CREATE_USERS_TABLE = """
+CREATE TABLE IF NOT EXISTS users (
+    id                    TEXT PRIMARY KEY,
+    email                 TEXT NOT NULL UNIQUE,
+    display_name          TEXT NOT NULL,
+    password_hash         TEXT NOT NULL,
+    home_city             TEXT NOT NULL DEFAULT 'Lafayette',
+    preferred_cities      TEXT NOT NULL DEFAULT '["Lafayette", "Baton Rouge"]',
+    theme                 TEXT NOT NULL DEFAULT 'auto',
+    notification_channels TEXT NOT NULL DEFAULT '["console"]',
+    interest_profile      TEXT NOT NULL DEFAULT '{}',
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL
+);
+"""
+
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);",
     "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source, source_id);",
     "CREATE INDEX IF NOT EXISTS idx_events_city ON events(location_city);",
     "CREATE INDEX IF NOT EXISTS idx_events_tags ON events(tags) WHERE tags IS NULL;",
+    "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);",
+    "CREATE INDEX IF NOT EXISTS idx_sources_user_id ON sources(user_id);",
 ]
 
 
@@ -83,6 +102,20 @@ def _row_to_event(row: aiosqlite.Row) -> Event:
     d["end_time"] = datetime.fromisoformat(str(d["end_time"])) if d["end_time"] else None
     d["scraped_at"] = datetime.fromisoformat(str(d["scraped_at"]))
     return Event.model_validate(d)
+
+
+def _row_to_user(row: aiosqlite.Row) -> User:
+    """Convert a database row to a User model."""
+    d = dict(row)
+    d["preferred_cities"] = json.loads(str(d["preferred_cities"]))
+    d["notification_channels"] = json.loads(str(d["notification_channels"]))
+    raw_profile = json.loads(str(d["interest_profile"])) if d["interest_profile"] else {}
+    d["interest_profile"] = (
+        InterestProfile.model_validate(raw_profile) if raw_profile else InterestProfile()
+    )
+    d["created_at"] = datetime.fromisoformat(str(d["created_at"]))
+    d["updated_at"] = datetime.fromisoformat(str(d["updated_at"]))
+    return User.model_validate(d)
 
 
 def _row_to_source(row: aiosqlite.Row) -> Source:
@@ -142,6 +175,10 @@ class Database:
         await self._db.execute("PRAGMA foreign_keys=ON;")
         await self._db.execute(_CREATE_EVENTS_TABLE)
         await self._db.execute(_CREATE_SOURCES_TABLE)
+        await self._db.execute(_CREATE_USERS_TABLE)
+        # Add user_id column to sources if missing (migration)
+        with contextlib.suppress(Exception):
+            await self._db.execute("ALTER TABLE sources ADD COLUMN user_id TEXT")
         for idx_sql in _CREATE_INDEXES:
             await self._db.execute(idx_sql)
         await self._db.commit()
@@ -393,11 +430,11 @@ class Database:
         await self.db.execute(
             """
             INSERT INTO sources (
-                id, name, url, domain, builtin, recipe_json,
+                id, name, url, domain, user_id, builtin, recipe_json,
                 enabled, status, last_scraped_at, last_event_count,
                 last_error, created_at, updated_at
             ) VALUES (
-                :id, :name, :url, :domain, :builtin, :recipe_json,
+                :id, :name, :url, :domain, :user_id, :builtin, :recipe_json,
                 :enabled, :status, :last_scraped_at, :last_event_count,
                 :last_error, :created_at, :updated_at
             )
@@ -407,6 +444,7 @@ class Database:
                 "name": source.name,
                 "url": source.url,
                 "domain": source.domain,
+                "user_id": source.user_id,
                 "builtin": int(source.builtin),
                 "recipe_json": source.recipe_json,
                 "enabled": int(source.enabled),
@@ -539,6 +577,93 @@ class Database:
             {"id": event_id},
         )
         await self.db.commit()
+
+    # ------------------------------------------------------------------
+    # Users CRUD
+    # ------------------------------------------------------------------
+
+    async def create_user(self, user: User) -> str:
+        """Insert a new user. Returns the user id."""
+        await self.db.execute(
+            """
+            INSERT INTO users (
+                id, email, display_name, password_hash,
+                home_city, preferred_cities, theme,
+                notification_channels, interest_profile,
+                created_at, updated_at
+            ) VALUES (
+                :id, :email, :display_name, :password_hash,
+                :home_city, :preferred_cities, :theme,
+                :notification_channels, :interest_profile,
+                :created_at, :updated_at
+            )
+            """,
+            {
+                "id": user.id,
+                "email": user.email,
+                "display_name": user.display_name,
+                "password_hash": user.password_hash,
+                "home_city": user.home_city,
+                "preferred_cities": json.dumps(user.preferred_cities),
+                "theme": user.theme,
+                "notification_channels": json.dumps(user.notification_channels),
+                "interest_profile": json.dumps(user.interest_profile.model_dump()),
+                "created_at": user.created_at.isoformat(),
+                "updated_at": user.updated_at.isoformat(),
+            },
+        )
+        await self.db.commit()
+        return user.id
+
+    async def get_user(self, user_id: str) -> User | None:
+        """Get a user by id."""
+        async with self.db.execute("SELECT * FROM users WHERE id = :id", {"id": user_id}) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_user(row) if row else None
+
+    async def get_user_by_email(self, email: str) -> User | None:
+        """Get a user by email address."""
+        async with self.db.execute(
+            "SELECT * FROM users WHERE email = :email", {"email": email.lower().strip()}
+        ) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_user(row) if row else None
+
+    async def update_user(self, user_id: str, **fields: Any) -> None:
+        """Update specific fields on a user."""
+        allowed = {
+            "display_name",
+            "home_city",
+            "preferred_cities",
+            "theme",
+            "notification_channels",
+            "interest_profile",
+            "password_hash",
+        }
+        now = datetime.now(tz=UTC).isoformat()
+        sets = ["updated_at = :now"]
+        params: dict[str, Any] = {"now": now, "id": user_id}
+        for key, val in fields.items():
+            if key not in allowed:
+                continue
+            if key in ("preferred_cities", "notification_channels"):
+                val = json.dumps(val)
+            elif key == "interest_profile":
+                val = json.dumps(val.model_dump() if hasattr(val, "model_dump") else val)
+            sets.append(f"{key} = :{key}")
+            params[key] = val
+        sql = f"UPDATE users SET {', '.join(sets)} WHERE id = :id"
+        await self.db.execute(sql, params)
+        await self.db.commit()
+
+    async def get_user_sources(self, user_id: str) -> list[Source]:
+        """Get sources belonging to a specific user."""
+        async with self.db.execute(
+            "SELECT * FROM sources WHERE user_id = :uid ORDER BY created_at DESC",
+            {"uid": user_id},
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_source(r) for r in rows]
 
     # ------------------------------------------------------------------
     # Context manager support

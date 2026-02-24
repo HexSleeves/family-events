@@ -2,9 +2,9 @@
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
 
-<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm">
     <h2 class="text-xl font-bold text-gray-900">{{ event.title }}</h2>
-    <div class="text-gray-500 text-sm mt-2">
+    <div class="text-gray-500 dark:text-gray-400 dark:text-gray-500 text-sm mt-2">
         📍 {{ event.location_name }}, {{ event.location_city }} ·
         📅 {{ event.start_time.strftime("%A, %B %d at %-I:%M %p") }}{% if event.end_time %} - {{ event.end_time.strftime("%-I:%M %p") }}{% endif %} ·
         💵 {{ "Free" if event.is_free else "$" ~ (event.price_min or "?") }} ·
@@ -31,7 +31,7 @@
 {% set tags = event.tags %}
 {% include "partials/_tags_grid.html" %}
 
-<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm">
     <h3 class="font-semibold text-gray-900 mb-3">Raw Data</h3>
     <pre class="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap">{{ raw_data }}</pre>
 </div>

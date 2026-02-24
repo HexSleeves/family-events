@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+
+<div class="space-y-6">
+    <h2 class="text-xl font-bold">👤 Profile &mdash; {{ current_user.display_name }}</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">{{ current_user.email }} &middot; Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
+
+    {# ── Theme ── #}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="font-semibold mb-3">🎨 Appearance</h3>
+        <form hx-post="/api/profile/theme" hx-target="#theme-result" hx-swap="innerHTML" class="flex items-center gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="theme" value="light" {% if current_user.theme == 'light' %}checked{% endif %}
+                    class="accent-indigo-500" />
+                <span class="text-sm">☀️ Light</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="theme" value="dark" {% if current_user.theme == 'dark' %}checked{% endif %}
+                    class="accent-indigo-500" />
+                <span class="text-sm">🌙 Dark</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="theme" value="auto" {% if current_user.theme == 'auto' %}checked{% endif %}
+                    class="accent-indigo-500" />
+                <span class="text-sm">💻 System</span>
+            </label>
+            <button type="submit"
+                class="ml-auto px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                Save
+            </button>
+            <div id="theme-result" class="text-sm"></div>
+        </form>
+    </section>
+
+    {# ── Location ── #}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="font-semibold mb-3">📍 Location</h3>
+        <form hx-post="/api/profile/location" hx-target="#location-result" hx-swap="innerHTML" class="space-y-3">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Home City</label>
+                    <input type="text" name="home_city" value="{{ current_user.home_city }}"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Preferred Cities <span class="text-gray-400">(comma-separated)</span></label>
+                    <input type="text" name="preferred_cities" value="{{ current_user.preferred_cities | join(', ') }}"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    Save Location
+                </button>
+                <div id="location-result" class="text-sm"></div>
+            </div>
+        </form>
+    </section>
+
+    {# ── Child Preferences ── #}
+    {% set p = current_user.interest_profile %}
+    {% set c = p.constraints %}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="font-semibold mb-3">🧩 Child Preferences</h3>
+        <form hx-post="/api/profile/preferences" hx-target="#prefs-result" hx-swap="innerHTML" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">❤️ Loves <span class="text-gray-400">(comma-separated)</span></label>
+                    <input type="text" name="loves" value="{{ p.loves | join(', ') }}"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">👍 Likes</label>
+                    <input type="text" name="likes" value="{{ p.likes | join(', ') }}"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">👎 Dislikes</label>
+                    <input type="text" name="dislikes" value="{{ p.dislikes | join(', ') }}"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">💤 Nap Time</label>
+                    <input type="text" name="nap_time" value="{{ c.nap_time }}" placeholder="13:00-15:00"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">🌙 Bedtime</label>
+                    <input type="text" name="bedtime" value="{{ c.bedtime }}" placeholder="19:30"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">💰 Budget per event ($)</label>
+                    <input type="number" name="budget" value="{{ c.budget_per_event }}" min="0" step="5"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">🚗 Max drive (min)</label>
+                    <input type="number" name="max_drive" value="{{ c.max_drive_time_minutes }}" min="5" step="5"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    Save Preferences
+                </button>
+                <div id="prefs-result" class="text-sm"></div>
+            </div>
+        </form>
+    </section>
+
+    {# ── Notification Channels ── #}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="font-semibold mb-3">🔔 Notifications</h3>
+        <form hx-post="/api/profile/notifications" hx-target="#notif-result" hx-swap="innerHTML" class="space-y-3">
+            <div class="flex flex-wrap gap-4">
+                {% for ch in ['console', 'sms', 'telegram', 'email'] %}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="channels" value="{{ ch }}"
+                        {% if ch in current_user.notification_channels %}checked{% endif %}
+                        class="accent-indigo-500 rounded" />
+                    <span class="text-sm capitalize">{{ ch }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    Save Notifications
+                </button>
+                <div id="notif-result" class="text-sm"></div>
+            </div>
+        </form>
+    </section>
+
+    {# ── Your Sources ── #}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">📡 Your Sources</h3>
+            <a href="/sources" class="text-xs text-indigo-500 hover:text-indigo-600 font-medium">Manage all &rarr;</a>
+        </div>
+        {% if sources %}
+        <div class="space-y-2">
+            {% for s in sources %}
+            <div class="flex items-center gap-3 text-sm">
+                <span class="{% if s.status == 'active' %}text-green-500{% elif s.status == 'failed' %}text-red-500{% else %}text-gray-400{% endif %}">●</span>
+                <a href="/source/{{ s.id }}" class="font-medium hover:text-indigo-500 transition">{{ s.name }}</a>
+                <span class="text-gray-400 text-xs">{{ s.domain }}</span>
+                <span class="ml-auto text-xs px-2 py-0.5 rounded-full
+                    {% if s.status == 'active' %}bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300
+                    {% elif s.status == 'failed' %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300
+                    {% else %}bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300{% endif %}
+                ">{{ s.status }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400">No sources added yet. <a href="/sources" class="text-indigo-500 hover:text-indigo-600">Add one</a>.</p>
+        {% endif %}
+    </section>
+
+    {# ── Change Password ── #}
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="font-semibold mb-3">🔒 Change Password</h3>
+        <form hx-post="/api/profile/password" hx-target="#pw-result" hx-swap="innerHTML" class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
+                    <input type="password" name="current_password" required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">New Password</label>
+                    <input type="password" name="new_password" required minlength="6"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Confirm New Password</label>
+                    <input type="password" name="confirm_password" required minlength="6"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold cursor-pointer transition">
+                    Change Password
+                </button>
+                <div id="pw-result" class="text-sm"></div>
+            </div>
+        </form>
+    </section>
+</div>
+
+{% endblock %}

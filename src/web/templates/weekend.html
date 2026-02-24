@@ -3,7 +3,7 @@
 {% block content %}
 
 <h2 class="text-lg font-semibold mb-2">🎉 Weekend Plan: {{ saturday.strftime("%b %d") }} - {{ sunday.strftime("%b %d") }}</h2>
-<p class="text-gray-500 text-sm mb-6">
+<p class="text-gray-500 dark:text-gray-400 dark:text-gray-500 text-sm mb-6">
     {{ weather.saturday.icon }} Sat {{ "%.0f" | format(weather.saturday.temp_high_f) }}°F ·
     {{ weather.sunday.icon }} Sun {{ "%.0f" | format(weather.sunday.temp_high_f) }}°F
 </p>

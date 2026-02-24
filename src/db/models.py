@@ -114,6 +114,25 @@ class InterestProfile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# User - a user account
+# ---------------------------------------------------------------------------
+
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    display_name: str
+    password_hash: str
+    home_city: str = "Lafayette"
+    preferred_cities: list[str] = Field(default_factory=lambda: ["Lafayette", "Baton Rouge"])
+    theme: Literal["light", "dark", "auto"] = "auto"
+    notification_channels: list[str] = Field(default_factory=lambda: ["console"])
+    interest_profile: InterestProfile = Field(default_factory=InterestProfile)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+
+
+# ---------------------------------------------------------------------------
 # Source - a user-defined scraping source
 # ---------------------------------------------------------------------------
 
@@ -123,6 +142,7 @@ class Source(BaseModel):
     name: str
     url: str
     domain: str
+    user_id: str | None = None
     builtin: bool = False
     recipe_json: str | None = None  # JSON string of ScrapeRecipe
     enabled: bool = True

@@ -22,7 +22,7 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 
 ## Project Structure
 
-```
+```bash
 family-events/
 ├── pyproject.toml              # deps, ruff config, ty config
 ├── .env / .env.example         # API keys (OpenAI, weather, Twilio, Telegram, Resend)
@@ -80,7 +80,8 @@ family-events/
 ## Key Data Models (src/db/models.py)
 
 ### Event
-```
+
+```bash
 id, source, source_url, source_id (dedup key),
 title, description, location_name, location_address, location_city,
 latitude, longitude, start_time, end_time, is_recurring, recurrence_rule,
@@ -89,7 +90,8 @@ tags (EventTags | None), attended (bool)
 ```
 
 ### EventTags (LLM-generated)
-```
+
+```bash
 toddler_score (0-10), age_min/max_recommended,
 indoor_outdoor, noise_level, crowd_level, energy_level,
 stroller_friendly, parking_available, bathroom_accessible,
@@ -100,7 +102,8 @@ parent_attention_required, meltdown_risk
 ```
 
 ### InterestProfile
-```
+
+```bash
 loves: [animals, playground, water_play, music, trains, art_messy]
 likes: [nature_walks, story_time, dancing]
 dislikes: [loud_crowds, sitting_still_long, dark_spaces]
@@ -109,7 +112,7 @@ constraints: home_city=Lafayette, nap 1-3pm, bedtime 7:30pm, $30 budget, 45min d
 
 ## Scoring Algorithm (src/ranker/scoring.py)
 
-```
+```bash
 score = toddler_score * 3.0
       + interest_match * 2.5
       + weather_compat * 2.0
@@ -123,6 +126,7 @@ score = toddler_score * 3.0
 
 Single `events` table with `UNIQUE(source, source_id)` for dedup.
 Key methods:
+
 - `upsert_event` - insert or update event by (source, source_id)
 - `search_events` - paginated search with filters (q, city, source, tagged, score_min, sort)
 - `get_events_for_weekend` - events for a given Saturday/Sunday
@@ -135,6 +139,7 @@ Key methods:
 ## Web UI (src/web/)
 
 ### Frontend Architecture
+
 - **Jinja2** templates with `{% extends "base.html" %}` inheritance
 - **HTMX** for all interactivity (no custom JavaScript)
   - Search: `hx-get` with `keyup changed delay:300ms` debounce
@@ -150,12 +155,14 @@ Key methods:
   - Action status: spinner + skeleton bar
 
 ### Pages (return HTML)
+
 - `GET /` - Dashboard (stats, action buttons with spinners, top 5 events)
 - `GET /events` - Paginated events table with search, filters, sort (25/page)
 - `GET /event/{id}` - Event detail with AI tags grid, raw data, attend button
 - `GET /weekend` - Ranked weekend picks with weather, notification preview
 
 ### API Endpoints (return HTML snippets for HTMX)
+
 - `POST /api/scrape` - Run scrapers, returns success HTML snippet
 - `POST /api/tag` - Tag events, returns success HTML snippet
 - `POST /api/notify` - Send notification, returns success HTML snippet
@@ -163,6 +170,7 @@ Key methods:
 - `GET /api/events` - JSON event list (used by CLI)
 
 ### HTMX Partial Rendering
+
 The `/events` route detects `HX-Request` header and returns only the
 `_events_table.html` partial (table + pagination) instead of the full page.
 This enables instant search/filter/pagination without full page reloads.
@@ -181,6 +189,6 @@ This enables instant search/filter/pagination without full page reloads.
 ## Environment
 
 - Running on exe.dev VM (noon-disk.exe.xyz)
-- Port 8000 exposed via exe.dev HTTPS proxy: https://noon-disk.exe.xyz:8000/
+- Port 8000 exposed via exe.dev HTTPS proxy: <https://noon-disk.exe.xyz:8000/>
 - systemd services: `family-events` (web) and `family-events-cron` (scheduler)
 - `.env` has API keys (OPENAI_API_KEY, WEATHER_API_KEY, etc.)

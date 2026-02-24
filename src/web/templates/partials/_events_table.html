@@ -15,18 +15,18 @@
 </div>
 
 {# Table #}
-<div class="bg-white rounded-xl shadow-sm overflow-x-auto">
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto">
     <table class="w-full border-collapse">
         <thead>
             <tr class="bg-gray-50">
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Date</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Time</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Event</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">City</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Source</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Score</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Categories</th>
-                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200"></th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Date</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Time</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Event</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">City</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Source</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Score</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700">Categories</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 dark:text-gray-500 text-xs uppercase border-b border-gray-200 dark:border-gray-700"></th>
             </tr>
         </thead>
         <tbody>
@@ -34,7 +34,7 @@
                 {% include "partials/_event_row.html" %}
             {% else %}
                 <tr>
-                    <td colspan="8" class="text-center py-8 text-gray-400 text-sm">No events match your filters.</td>
+                    <td colspan="8" class="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">No events match your filters.</td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -48,7 +48,7 @@
         {# Previous #}
         {% if page > 1 %}
         <button hx-get="/events?{{ _qs }}&page={{ page - 1 }}" {{ _hx_common }}
-            class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >← Prev</button>
         {% endif %}
 
@@ -84,7 +84,7 @@
         {# Next #}
         {% if page < total_pages %}
         <button hx-get="/events?{{ _qs }}&page={{ page + 1 }}" {{ _hx_common }}
-            class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >Next →</button>
         {% endif %}
     </div>
