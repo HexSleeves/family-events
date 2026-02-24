@@ -259,13 +259,17 @@
       }
     </style>
     <script>
-      // Auto theme: respect user pref or system
+      // Apply theme immediately to prevent FOUC
       (function() {
-          {% if current_user and current_user.theme == 'auto' %}
-          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-              changeTheme('dark');
+          var theme = '{{ current_user.theme if current_user else "auto" }}';
+          if (theme === 'auto') {
+              if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                  document.documentElement.classList.add('dark');
+              } else {
+                  document.documentElement.classList.remove('dark');
+              }
           }
-          {% endif %}
+          // dark/light handled by server-rendered class on <html>
       })();
     </script>
   </head>
@@ -479,23 +483,35 @@
         }
 
         function changeTheme(theme) {
-          document.documentElement.classList.remove("dark", "light", "auto");
-          document.documentElement.classList.add(theme);
+          theme = theme || "auto";
+          // Resolve auto to actual preference
+          var resolved = theme;
+          if (theme === "auto") {
+            resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark" : "light";
+          }
+          if (resolved === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+          // Store current mode so the system listener knows whether to act
+          document.documentElement.dataset.theme = theme;
         }
+
+        // Listen for OS theme changes (only applies when user chose 'auto')
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
+          if (document.documentElement.dataset.theme === "auto") {
+            changeTheme("auto");
+          }
+        });
 
         if (!window._toastListenersAttached) {
           window._toastListenersAttached = true;
 
-          document.body.addEventListener("showToast", function (e) {
-            var d = e.detail || {};
-            showToast(d.message || "Done", d.variant || "success", d.duration);
-          });
-
-          document.body.addEventListener("changeTheme", function (e) {
-            var d = e.detail || {};
-            changeTheme(d.theme || "auto");
-          });
-
+          // Single handler: parse HX-Trigger header from every HTMX response.
+          // We don't use HTMX's auto-dispatched custom events because they
+          // don't fire reliably with hx-swap="none" in HTMX 2.0.
           document.body.addEventListener("htmx:afterRequest", function (e) {
             var xhr = e.detail.xhr;
             if (!xhr) return;
@@ -505,11 +521,10 @@
               var parsed = JSON.parse(trigger);
               if (parsed.showToast) {
                 var d = parsed.showToast;
-                showToast(
-                  d.message || "Done",
-                  d.variant || "success",
-                  d.duration,
-                );
+                showToast(d.message || "Done", d.variant || "success", d.duration);
+              }
+              if (parsed.changeTheme) {
+                changeTheme(parsed.changeTheme.theme || "auto");
               }
             } catch (err) {
               /* not JSON, ignore */

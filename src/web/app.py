@@ -49,13 +49,27 @@ def _toast(
     )
 
 
-def _change_theme(theme: str):
-    """Return an HTMLResponse that triggers a theme change via HX-Trigger."""
-    payload = json.dumps({"changeTheme": {"theme": theme}})
+def _change_theme(theme: str) -> HTMLResponse:
+    """Return an HTMLResponse that triggers a theme change + toast via HX-Trigger."""
+    label = {"light": "Light", "dark": "Dark", "auto": "System"}.get(theme, theme)
+    payload = json.dumps(
+        {
+            "changeTheme": {"theme": theme},
+            "showToast": {"message": f"Theme set to {label}", "variant": "success"},
+        }
+    )
     return HTMLResponse(
         content="",
         status_code=200,
         headers={"HX-Trigger": payload},
+    )
+
+def _null_response() -> HTMLResponse:
+    """Return an HTMLResponse that does nothing."""
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": json.dumps({})},
     )
 
 
@@ -231,7 +245,10 @@ async def api_update_theme(request: Request):
     if not user:
         return HTMLResponse("Unauthorized", status_code=401)
     form = await request.form()
-    theme = str(form.get("theme", "auto")).strip()
+    user_theme = user.theme
+    theme = str(form.get("theme", user_theme)).strip()
+    if theme == user_theme:
+        return _null_response()
     if theme not in ("light", "dark", "auto"):
         theme = "auto"
     await db.update_user(user.id, theme=theme)
