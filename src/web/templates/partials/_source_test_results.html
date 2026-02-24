@@ -1,0 +1,18 @@
+{# HTMX partial: test scrape results #}
+{% if count == 0 %}
+<div class="text-orange-600 text-sm font-semibold">⚠️ No events found. Recipe may need updating.</div>
+{% else %}
+<div class="text-green-600 text-sm font-semibold mb-2">✅ Found {{ count }} events:</div>
+<div class="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+    {% for event in events[:10] %}
+    <div class="text-xs">
+        <span class="text-gray-400">{{ event.start_time.strftime("%m/%d") }}</span>
+        <span class="font-medium">{{ event.title[:80] }}</span>
+        {% if event.location_name %}<span class="text-gray-400">· {{ event.location_name }}</span>{% endif %}
+    </div>
+    {% endfor %}
+    {% if count > 10 %}
+    <div class="text-xs text-gray-400">... and {{ count - 10 }} more</div>
+    {% endif %}
+</div>
+{% endif %}

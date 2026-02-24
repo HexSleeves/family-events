@@ -12,10 +12,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.db.database import Database
-from src.db.models import InterestProfile
+from src.db.models import InterestProfile, Source
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService
+from src.scrapers.analyzer import PageAnalyzer
+from src.scrapers.recipe import ScrapeRecipe
+from src.scrapers.router import extract_domain, is_builtin_domain
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -164,6 +167,36 @@ async def weekend_page(request: Request):
     )
 
 
+# ----- Sources Pages -----
+
+
+@app.get("/sources", response_class=HTMLResponse)
+async def sources_page(request: Request):
+    sources = await db.get_all_sources()
+    builtin_stats = await db.get_filter_options()
+    return templates.TemplateResponse(
+        "sources.html",
+        {"request": request, "sources": sources, "builtin_stats": builtin_stats},
+    )
+
+
+@app.get("/source/{source_id}", response_class=HTMLResponse)
+async def source_detail(request: Request, source_id: str):
+    source = await db.get_source(source_id)
+    if not source:
+        return HTMLResponse("Source not found", status_code=404)
+    events_from_source, _ = await db.search_events(
+        days=90, source=f"custom:{source_id}", per_page=10
+    )
+    recipe = None
+    if source.recipe_json:
+        recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
+    return templates.TemplateResponse(
+        "source_detail.html",
+        {"request": request, "source": source, "recipe": recipe, "events": events_from_source},
+    )
+
+
 # ----- API Endpoints (return HTML snippets for HTMX) -----
 
 
@@ -219,3 +252,127 @@ async def api_events():
         }
         for e in events
     ]
+
+
+# ----- Source API Endpoints -----
+
+
+@app.post("/api/sources", response_class=HTMLResponse)
+async def api_add_source(request: Request):
+    form = await request.form()
+    url = str(form.get("url", "")).strip()
+    name = str(form.get("name", "")).strip()
+    if not url:
+        return HTMLResponse(
+            '<div class="text-red-600 font-semibold">\u274c Please enter a URL</div>'
+        )
+
+    # Check for built-in domain
+    if is_builtin_domain(url):
+        return HTMLResponse(
+            '<div class="text-blue-600 font-semibold">'
+            "\u2705 We already have built-in support for this site!</div>"
+        )
+
+    # Check for duplicate
+    existing = await db.get_source_by_url(url)
+    if existing:
+        return HTMLResponse(
+            '<div class="text-orange-600 font-semibold">'
+            "\u26a0\ufe0f This URL has already been added</div>"
+        )
+
+    # Create source
+    domain = extract_domain(url)
+    if not name:
+        name = domain.replace(".", " ").title()
+    source = Source(name=name, url=url, domain=domain, status="analyzing")
+    await db.create_source(source)
+
+    # Analyze in-line (for now; could be background task later)
+    try:
+        analyzer = PageAnalyzer()
+        recipe = await analyzer.analyze(url)
+        await db.update_source_recipe(
+            source.id,
+            recipe.model_dump_json(),
+            status="active" if recipe.confidence >= 0.3 else "failed",
+        )
+        return HTMLResponse(
+            f'<div class="text-green-600 font-semibold">'
+            f"\u2705 Source added! Strategy: {recipe.strategy}, "
+            f"confidence: {recipe.confidence:.0%}</div>"
+            f"<script>setTimeout(()=>location.reload(),1000)</script>"
+        )
+    except Exception as e:
+        await db.update_source_status(source.id, status="failed", error=str(e))
+        return HTMLResponse(
+            f'<div class="text-red-600 font-semibold">\u274c Analysis failed: {e}</div>'
+        )
+
+
+@app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
+async def api_reanalyze(source_id: str):
+    source = await db.get_source(source_id)
+    if not source:
+        return HTMLResponse("Not found", status_code=404)
+    await db.update_source_status(source_id, status="analyzing")
+    try:
+        analyzer = PageAnalyzer()
+        recipe = await analyzer.analyze(source.url)
+        await db.update_source_recipe(
+            source_id,
+            recipe.model_dump_json(),
+            status="active" if recipe.confidence >= 0.3 else "failed",
+        )
+        return HTMLResponse(
+            f'<div class="text-green-600 font-semibold">'
+            f"\u2705 Re-analyzed! Confidence: {recipe.confidence:.0%}</div>"
+            f"<script>setTimeout(()=>location.reload(),1000)</script>"
+        )
+    except Exception as e:
+        await db.update_source_status(source_id, status="failed", error=str(e))
+        return HTMLResponse(
+            f'<div class="text-red-600 font-semibold">\u274c Analysis failed: {e}</div>'
+        )
+
+
+@app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
+async def api_test_source(request: Request, source_id: str):
+    source = await db.get_source(source_id)
+    if not source or not source.recipe_json:
+        return HTMLResponse("No recipe to test", status_code=400)
+    try:
+        from src.scrapers.generic import GenericScraper
+
+        recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
+        scraper = GenericScraper(url=source.url, source_id=source.id, recipe=recipe)
+        events = await scraper.scrape()
+        return templates.TemplateResponse(
+            "partials/_source_test_results.html",
+            {"request": request, "events": events, "count": len(events)},
+        )
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="text-red-600 font-semibold">\u274c Test failed: {e}</div>'
+        )
+
+
+@app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)
+async def api_toggle_source(source_id: str):
+    enabled = await db.toggle_source(source_id)
+    state = "enabled" if enabled else "disabled"
+    icon = "\u2705" if enabled else "\u23f8\ufe0f"
+    return HTMLResponse(
+        f'<div class="text-green-600 font-semibold">{icon} Source {state}</div>'
+        f"<script>setTimeout(()=>location.reload(),500)</script>"
+    )
+
+
+@app.delete("/api/sources/{source_id}", response_class=HTMLResponse)
+async def api_delete_source(source_id: str):
+    await db.delete_source(source_id)
+    return HTMLResponse(
+        '<div class="text-green-600 font-semibold">\u2705 Source deleted</div>'
+        '<script>setTimeout(()=>location.href="/sources",500)</script>'
+    )

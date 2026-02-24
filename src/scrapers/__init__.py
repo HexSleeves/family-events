@@ -4,8 +4,10 @@ from .allevents import AllEventsScraper
 from .base import BaseScraper
 from .brec import BrecScraper
 from .eventbrite import EventbriteScraper
+from .generic import GenericScraper
 from .lafayette import LafayetteScraper
 from .library import LibraryScraper
+from .router import BUILTIN_DOMAINS, extract_domain, get_builtin_scraper, is_builtin_domain
 
 ALL_SCRAPERS: list[type[BaseScraper]] = [
     LafayetteScraper,
@@ -17,10 +19,15 @@ ALL_SCRAPERS: list[type[BaseScraper]] = [
 
 __all__ = [
     "ALL_SCRAPERS",
+    "BUILTIN_DOMAINS",
     "AllEventsScraper",
     "BaseScraper",
     "BrecScraper",
     "EventbriteScraper",
+    "GenericScraper",
     "LafayetteScraper",
     "LibraryScraper",
+    "extract_domain",
+    "get_builtin_scraper",
+    "is_builtin_domain",
 ]

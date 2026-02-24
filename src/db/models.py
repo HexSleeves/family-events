@@ -111,3 +111,24 @@ class InterestProfile(BaseModel):
         default_factory=lambda: ["loud_crowds", "sitting_still_long", "dark_spaces"]
     )
     constraints: Constraints = Field(default_factory=Constraints)
+
+
+# ---------------------------------------------------------------------------
+# Source - a user-defined scraping source
+# ---------------------------------------------------------------------------
+
+
+class Source(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    url: str
+    domain: str
+    builtin: bool = False
+    recipe_json: str | None = None  # JSON string of ScrapeRecipe
+    enabled: bool = True
+    status: Literal["pending", "analyzing", "active", "stale", "failed", "disabled"] = "pending"
+    last_scraped_at: datetime | None = None
+    last_event_count: int = 0
+    last_error: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))

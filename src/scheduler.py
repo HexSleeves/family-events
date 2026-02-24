@@ -13,8 +13,10 @@ from src.ranker.weather import WeatherService
 from src.scrapers.allevents import AllEventsScraper
 from src.scrapers.brec import BrecScraper
 from src.scrapers.eventbrite import EventbriteScraper
+from src.scrapers.generic import GenericScraper
 from src.scrapers.lafayette import LafayetteScraper
 from src.scrapers.library import LibraryScraper
+from src.scrapers.recipe import ScrapeRecipe
 from src.tagger.llm import EventTagger
 
 ALL_SCRAPERS = [
@@ -27,13 +29,15 @@ ALL_SCRAPERS = [
 
 
 async def run_scrape(db: Database | None = None) -> int:
-    """Run all scrapers and store results. Returns count of events upserted."""
+    """Run all scrapers (built-in + user-defined) and store results."""
     own_db = db is None
     if own_db:
         db = Database()
         await db.connect()
 
     total = 0
+
+    # 1. Built-in scrapers
     for scraper in ALL_SCRAPERS:
         try:
             print(f"\n{'=' * 40}")
@@ -46,6 +50,31 @@ async def run_scrape(db: Database | None = None) -> int:
             print(f"  ✓ {len(events)} events from {scraper.source_name}")
         except Exception as e:
             print(f"  ✗ {scraper.source_name} error: {e}")
+
+    # 2. User-defined sources
+    sources = await db.get_enabled_sources()
+    for source in sources:
+        try:
+            if not source.recipe_json:
+                continue
+            recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
+            scraper = GenericScraper(
+                url=source.url,
+                source_id=source.id,
+                recipe=recipe,
+            )
+            print(f"\n{'=' * 40}")
+            print(f"Scraping custom: {source.name}")
+            print(f"{'=' * 40}")
+            events = await scraper.scrape()
+            for event in events:
+                await db.upsert_event(event)
+            await db.update_source_status(source.id, count=len(events))
+            total += len(events)
+            print(f"  ✓ {len(events)} events from {source.name}")
+        except Exception as e:
+            print(f"  ✗ {source.name} error: {e}")
+            await db.update_source_status(source.id, error=str(e))
 
     if own_db:
         await db.close()

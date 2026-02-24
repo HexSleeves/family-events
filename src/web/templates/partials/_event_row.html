@@ -7,7 +7,8 @@
     </td>
     <td class="text-left py-2.5 px-2.5 border-b border-gray-200 text-sm">{{ event.location_city }}</td>
     <td class="text-left py-2.5 px-2.5 border-b border-gray-200 text-sm">
-        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">{{ event.source }}</span>
+        {% set source_label = event.source.replace("custom:", "") if event.source.startswith("custom:") else event.source %}
+        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">{{ source_label[:20] }}</span>
     </td>
     <td class="text-left py-2.5 px-2.5 border-b border-gray-200 text-sm">
         {% if event.tags %}

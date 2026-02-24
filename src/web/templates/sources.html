@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Sources{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">📡 Event Sources</h2>
+</div>
+
+{# Add source form #}
+<form
+    hx-post="/api/sources"
+    hx-target="#add-result"
+    hx-swap="innerHTML"
+    hx-indicator="#add-spinner"
+    class="bg-white rounded-xl p-4 shadow-sm mb-6 flex gap-3 items-end"
+>
+    <div class="flex-1">
+        <label class="text-xs text-gray-500 font-medium mb-1 block">URL</label>
+        <input type="url" name="url" required placeholder="https://example.com/events"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+    </div>
+    <div class="w-48">
+        <label class="text-xs text-gray-500 font-medium mb-1 block">Name (optional)</label>
+        <input type="text" name="name" placeholder="Auto-detected"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+    </div>
+    <button type="submit"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition">
+        + Add Source
+        <span id="add-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+</form>
+<div id="add-result" class="mb-4"></div>
+
+{# Custom sources #}
+{% if sources %}
+<h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Custom Sources ({{ sources | length }})</h3>
+{% for source in sources %}
+    {% include "partials/_source_card.html" %}
+{% endfor %}
+{% else %}
+<div class="bg-white rounded-xl p-8 shadow-sm text-center text-gray-400 mb-6">
+    No custom sources yet. Add a URL above to get started.
+</div>
+{% endif %}
+
+{# Built-in sources (read-only) #}
+<h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Built-in Sources</h3>
+<div class="bg-white rounded-xl p-4 shadow-sm space-y-2 text-sm">
+    <div class="flex items-center gap-2">🔧 <span class="font-medium">BREC Parks</span> <span class="text-gray-400">brec.org</span></div>
+    <div class="flex items-center gap-2">🔧 <span class="font-medium">Eventbrite</span> <span class="text-gray-400">eventbrite.com</span></div>
+    <div class="flex items-center gap-2">🔧 <span class="font-medium">AllEvents</span> <span class="text-gray-400">allevents.in</span></div>
+    <div class="flex items-center gap-2">🔧 <span class="font-medium">Lafayette Venues</span> <span class="text-gray-400">moncuspark.org, acadianacenterforthearts.org, lafayettesciencemuseum.org</span></div>
+    <div class="flex items-center gap-2">🔧 <span class="font-medium">Libraries</span> <span class="text-gray-400">lafayettela.libcal.com, ebrpl.libcal.com</span></div>
+</div>
+
+{% endblock %}

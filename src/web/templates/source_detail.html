@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ source.name }}{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+    <a href="/sources" class="text-sm text-indigo-600 hover:text-indigo-800">← All Sources</a>
+</div>
+
+<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+    <h2 class="text-xl font-bold text-gray-900">{{ source.name }}</h2>
+    <div class="text-gray-500 text-sm mt-1">
+        <a href="{{ source.url }}" target="_blank" class="text-indigo-600 hover:underline">{{ source.url }}</a>
+    </div>
+    <div class="flex gap-2 mt-3">
+        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold
+            {{ 'bg-green-100 text-green-800' if source.status == 'active' else
+               'bg-orange-100 text-orange-800' if source.status == 'stale' else
+               'bg-red-100 text-red-800' if source.status == 'failed' else
+               'bg-gray-100 text-gray-700' }}">
+            {{ source.status }}
+        </span>
+        {% if source.last_event_count %}
+        <span class="text-sm text-gray-500">{{ source.last_event_count }} events</span>
+        {% endif %}
+        {% if source.last_scraped_at %}
+        <span class="text-sm text-gray-500">Last scraped: {{ source.last_scraped_at.strftime("%b %d at %-I:%M%p") }}</span>
+        {% endif %}
+    </div>
+    <div class="flex gap-2 mt-4">
+        <button hx-post="/api/sources/{{ source.id }}/test" hx-target="#detail-result" hx-swap="innerHTML" hx-indicator="this"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold cursor-pointer transition">
+            🧪 Test Scrape <span class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+        <button hx-post="/api/sources/{{ source.id }}/analyze" hx-target="#detail-result" hx-swap="innerHTML" hx-indicator="this"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-100 cursor-pointer transition">
+            🔄 Re-analyze <span class="htmx-indicator"><span class="spinner" style="border-color:rgba(0,0,0,.2);border-top-color:#333"></span></span>
+        </button>
+    </div>
+    <div id="detail-result" class="mt-3"></div>
+</div>
+
+{% if recipe %}
+<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+    <h3 class="font-semibold text-gray-900 mb-3">📝 Scraping Recipe</h3>
+    <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+        <div><strong>Strategy:</strong> {{ recipe.strategy }}</div>
+        <div><strong>Confidence:</strong> {{ "%.0f%%" | format(recipe.confidence * 100) }}</div>
+        <div><strong>Analyzed:</strong> {{ recipe.analyzed_at.strftime("%b %d, %Y %-I:%M%p") }}</div>
+        {% if recipe.css %}
+        <div><strong>Container:</strong> <code class="bg-gray-100 px-1 rounded text-xs">{{ recipe.css.event_container }}</code></div>
+        {% endif %}
+    </div>
+    {% if recipe.notes %}
+    <div class="text-gray-500 text-sm">{{ recipe.notes }}</div>
+    {% endif %}
+    {% if recipe.css %}
+    <details class="mt-3">
+        <summary class="text-sm text-indigo-600 cursor-pointer">Show field selectors</summary>
+        <pre class="bg-gray-900 text-gray-200 p-3 rounded-lg mt-2 text-xs overflow-x-auto">{{ recipe.css.model_dump_json(indent=2) }}</pre>
+    </details>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if events %}
+<div class="bg-white rounded-xl p-5 shadow-sm">
+    <h3 class="font-semibold text-gray-900 mb-3">Recent Events ({{ events | length }})</h3>
+    <div class="space-y-2">
+        {% for event in events %}
+        <div class="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
+            <div class="text-xs text-gray-400 w-20">{{ event.start_time.strftime("%m/%d %a") }}</div>
+            <a href="/event/{{ event.id }}" class="text-sm text-indigo-600 hover:underline flex-1">{{ event.title }}</a>
+            {% if event.tags %}
+            <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">{{ event.tags.toddler_score }}/10</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
