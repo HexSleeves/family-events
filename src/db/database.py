@@ -1,0 +1,269 @@
+"""Async SQLite database layer using aiosqlite."""
+
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timedelta
+from typing import Any
+
+import aiosqlite
+
+from .models import Event, EventTags
+
+DATABASE_PATH = os.environ.get("DATABASE_PATH", "family_events.db")
+
+_CREATE_EVENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS events (
+    id              TEXT PRIMARY KEY,
+    source          TEXT NOT NULL,
+    source_url      TEXT NOT NULL,
+    source_id       TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    location_name   TEXT NOT NULL DEFAULT '',
+    location_address TEXT NOT NULL DEFAULT '',
+    location_city   TEXT NOT NULL DEFAULT 'Lafayette',
+    latitude        REAL,
+    longitude       REAL,
+    start_time      TEXT NOT NULL,
+    end_time        TEXT,
+    is_recurring    INTEGER NOT NULL DEFAULT 0,
+    recurrence_rule TEXT,
+    is_free         INTEGER NOT NULL DEFAULT 1,
+    price_min       REAL,
+    price_max       REAL,
+    image_url       TEXT,
+    scraped_at      TEXT NOT NULL,
+    raw_data        TEXT NOT NULL DEFAULT '{}',
+    tags            TEXT,
+    attended        INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(source, source_id)
+);
+"""
+
+_CREATE_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);",
+    "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source, source_id);",
+    "CREATE INDEX IF NOT EXISTS idx_events_city ON events(location_city);",
+    "CREATE INDEX IF NOT EXISTS idx_events_tags ON events(tags) WHERE tags IS NULL;",
+]
+
+
+def _row_to_event(row: aiosqlite.Row) -> Event:
+    """Convert a database row (dict) to an Event model."""
+    d = dict(row)
+    # Booleans stored as 0/1
+    d["is_recurring"] = bool(d["is_recurring"])
+    d["is_free"] = bool(d["is_free"])
+    d["attended"] = bool(d["attended"])
+    # JSON fields
+    d["raw_data"] = json.loads(d["raw_data"]) if d["raw_data"] else {}
+    d["tags"] = (
+        EventTags.model_validate(json.loads(d["tags"])) if d["tags"] else None
+    )
+    # Datetimes stored as ISO strings
+    d["start_time"] = datetime.fromisoformat(d["start_time"])
+    d["end_time"] = (
+        datetime.fromisoformat(d["end_time"]) if d["end_time"] else None
+    )
+    d["scraped_at"] = datetime.fromisoformat(d["scraped_at"])
+    return Event.model_validate(d)
+
+
+def _event_to_params(event: Event) -> dict[str, Any]:
+    """Convert an Event model to a dict of SQLite bind parameters."""
+    return {
+        "id": event.id,
+        "source": event.source,
+        "source_url": event.source_url,
+        "source_id": event.source_id,
+        "title": event.title,
+        "description": event.description,
+        "location_name": event.location_name,
+        "location_address": event.location_address,
+        "location_city": event.location_city,
+        "latitude": event.latitude,
+        "longitude": event.longitude,
+        "start_time": event.start_time.isoformat(),
+        "end_time": event.end_time.isoformat() if event.end_time else None,
+        "is_recurring": int(event.is_recurring),
+        "recurrence_rule": event.recurrence_rule,
+        "is_free": int(event.is_free),
+        "price_min": event.price_min,
+        "price_max": event.price_max,
+        "image_url": event.image_url,
+        "scraped_at": event.scraped_at.isoformat(),
+        "raw_data": json.dumps(event.raw_data),
+        "tags": (
+            json.dumps(event.tags.model_dump()) if event.tags else None
+        ),
+        "attended": int(event.attended),
+    }
+
+
+class Database:
+    """Async SQLite database for family events."""
+
+    def __init__(self, db_path: str | None = None) -> None:
+        self.db_path = db_path or DATABASE_PATH
+        self._db: aiosqlite.Connection | None = None
+
+    async def connect(self) -> None:
+        """Open the database connection, enable WAL mode, and create tables."""
+        self._db = await aiosqlite.connect(self.db_path)
+        self._db.row_factory = aiosqlite.Row
+        await self._db.execute("PRAGMA journal_mode=WAL;")
+        await self._db.execute("PRAGMA foreign_keys=ON;")
+        await self._db.execute(_CREATE_EVENTS_TABLE)
+        for idx_sql in _CREATE_INDEXES:
+            await self._db.execute(idx_sql)
+        await self._db.commit()
+
+    async def close(self) -> None:
+        """Close the database connection."""
+        if self._db:
+            await self._db.close()
+            self._db = None
+
+    @property
+    def db(self) -> aiosqlite.Connection:
+        if self._db is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
+        return self._db
+
+    # ------------------------------------------------------------------
+    # Upsert
+    # ------------------------------------------------------------------
+
+    async def upsert_event(self, event: Event) -> str:
+        """Insert or update an event, keyed on (source, source_id).
+
+        Returns the event id (existing id if already present).
+        """
+        params = _event_to_params(event)
+
+        await self.db.execute(
+            """
+            INSERT INTO events (
+                id, source, source_url, source_id, title, description,
+                location_name, location_address, location_city,
+                latitude, longitude, start_time, end_time,
+                is_recurring, recurrence_rule, is_free,
+                price_min, price_max, image_url,
+                scraped_at, raw_data, tags, attended
+            ) VALUES (
+                :id, :source, :source_url, :source_id, :title, :description,
+                :location_name, :location_address, :location_city,
+                :latitude, :longitude, :start_time, :end_time,
+                :is_recurring, :recurrence_rule, :is_free,
+                :price_min, :price_max, :image_url,
+                :scraped_at, :raw_data, :tags, :attended
+            )
+            ON CONFLICT(source, source_id) DO UPDATE SET
+                source_url      = excluded.source_url,
+                title           = excluded.title,
+                description     = excluded.description,
+                location_name   = excluded.location_name,
+                location_address = excluded.location_address,
+                location_city   = excluded.location_city,
+                latitude        = excluded.latitude,
+                longitude       = excluded.longitude,
+                start_time      = excluded.start_time,
+                end_time        = excluded.end_time,
+                is_recurring    = excluded.is_recurring,
+                recurrence_rule = excluded.recurrence_rule,
+                is_free         = excluded.is_free,
+                price_min       = excluded.price_min,
+                price_max       = excluded.price_max,
+                image_url       = excluded.image_url,
+                scraped_at      = excluded.scraped_at,
+                raw_data        = excluded.raw_data
+            """,
+            params,
+        )
+        await self.db.commit()
+
+        # Return the actual id (may differ if row already existed)
+        async with self.db.execute(
+            "SELECT id FROM events WHERE source = :source AND source_id = :source_id",
+            {"source": event.source, "source_id": event.source_id},
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row["id"]  # type: ignore[index]
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    async def get_events_for_weekend(
+        self, sat_date: str, sun_date: str
+    ) -> list[Event]:
+        """Return events whose start_time falls on the given Saturday or Sunday.
+
+        Dates should be ISO date strings like '2025-07-12'.
+        """
+        async with self.db.execute(
+            """
+            SELECT * FROM events
+            WHERE start_time >= :sat_start
+              AND start_time < :mon_start
+            ORDER BY start_time
+            """,
+            {
+                "sat_start": f"{sat_date}T00:00:00",
+                "mon_start": f"{sun_date}T23:59:59",
+            },
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_event(r) for r in rows]
+
+    async def get_untagged_events(self) -> list[Event]:
+        """Return events that have no AI-generated tags yet."""
+        async with self.db.execute(
+            "SELECT * FROM events WHERE tags IS NULL ORDER BY start_time"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_event(r) for r in rows]
+
+    async def update_event_tags(self, event_id: str, tags: EventTags) -> None:
+        """Set the tags JSON for a specific event."""
+        await self.db.execute(
+            "UPDATE events SET tags = :tags WHERE id = :id",
+            {"tags": json.dumps(tags.model_dump()), "id": event_id},
+        )
+        await self.db.commit()
+
+    async def get_recent_events(self, days: int = 14) -> list[Event]:
+        """Return events with start_time within the next `days` days."""
+        now = datetime.utcnow().isoformat()
+        future = (datetime.utcnow() + timedelta(days=days)).isoformat()
+        async with self.db.execute(
+            """
+            SELECT * FROM events
+            WHERE start_time >= :now AND start_time <= :future
+            ORDER BY start_time
+            """,
+            {"now": now, "future": future},
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_event(r) for r in rows]
+
+    async def mark_attended(self, event_id: str) -> None:
+        """Mark an event as attended."""
+        await self.db.execute(
+            "UPDATE events SET attended = 1 WHERE id = :id",
+            {"id": event_id},
+        )
+        await self.db.commit()
+
+    # ------------------------------------------------------------------
+    # Context manager support
+    # ------------------------------------------------------------------
+
+    async def __aenter__(self) -> "Database":
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        await self.close()

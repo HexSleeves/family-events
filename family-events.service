@@ -1,0 +1,15 @@
+[Unit]
+Description=Family Events Discovery System
+After=network.target
+
+[Service]
+Type=simple
+User=exedev
+WorkingDirectory=/home/exedev/family-events
+ExecStart=/home/exedev/family-events/.venv/bin/python -m src.main serve
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/home/exedev/family-events/.env
+
+[Install]
+WantedBy=multi-user.target
