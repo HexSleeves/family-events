@@ -1,10 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "css:build": "tailwindcss -i src/web/static/input.css -o src/web/static/styles.css --minify",
-    "css:watch": "tailwindcss -i src/web/static/input.css -o src/web/static/styles.css --watch"
+    "css:build": "npx @tailwindcss/cli -i src/web/static/input.css -o src/web/static/styles.css --minify",
+    "css:watch": "npx @tailwindcss/cli -i src/web/static/input.css -o src/web/static/styles.css --watch"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.19"
+    "@tailwindcss/cli": "^4.2.1"
   }
 }

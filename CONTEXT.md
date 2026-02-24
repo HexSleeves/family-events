@@ -13,7 +13,7 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 - **SQLite** (WAL mode, via aiosqlite)
 - **Jinja2** templates with `{% extends %}` / `{% include %}` inheritance
 - **HTMX 2.0.4** for all interactive updates (no custom JS framework)
-- **Tailwind CSS 3.4** production build via CLI (`npm run css:build`), ~26KB minified output
+- **Tailwind CSS 4.2** production build via `@tailwindcss/cli` (`npm run css:build`), ~36KB minified output
 - **httpx** + **BeautifulSoup** (scraping)
 - **OpenAI API** (gpt-4o-mini for tagging, with heuristic fallback)
 - **Pydantic v2** (all data models)
@@ -27,7 +27,6 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 family-events/
 ├── pyproject.toml              # Python deps, ruff config, ty config
 ├── package.json                # Tailwind CSS devDependency + build scripts
-├── tailwind.config.js          # Content paths, darkMode, custom animations
 ├── .env / .env.example         # API keys only (secrets + infra)
 ├── family_events.db            # SQLite database (auto-created)
 ├── family-events.service       # systemd: web server on port 8000
@@ -69,8 +68,8 @@ family-events/
 │       ├── app.py              # FastAPI routes + static mount + helpers (629 lines)
 │       ├── auth.py             # hash_password, verify_password, session helpers
 │       ├── static/
-│       │   ├── input.css         # Tailwind directives + custom CSS (skeletons, progress, toasts, etc.)
-│       │   └── styles.css        # Built output (~26KB minified)
+│       │   ├── input.css         # Tailwind v4 CSS config (@theme, @custom-variant) + custom CSS
+│       │   └── styles.css        # Built output (~36KB minified)
 │       └── templates/          # 20 Jinja2 templates
 │           ├── base.html            # Layout, nav, dark mode, toast JS, HTMX
 │           ├── dashboard.html       # Stats cards, action buttons, top events
@@ -172,7 +171,7 @@ All API success/error messages use toast notifications instead of inline HTML:
 
 ## Theme System
 
-- Tailwind `darkMode: 'class'` — toggled by `class="dark"` on `<html>`
+- Tailwind v4 `@custom-variant dark` — toggled by `class="dark"` on `<html>`
 - User preference stored in `users.theme` (light/dark/auto)
 - **Server-rendered:** `<html class="dark">` when theme is `dark`
 - **Auto theme:** inline `<script>` in `<head>` checks `prefers-color-scheme` and adds/removes `dark` class before paint (no FOUC)
@@ -183,7 +182,7 @@ All API success/error messages use toast notifications instead of inline HTML:
 
 ## Animations
 
-Custom Tailwind animations defined in `tailwind.config.js`:
+Custom Tailwind animations defined in `src/web/static/input.css` via `@theme`:
 
 - `animate-fade-in` (0.4s) — page content wrapper
 - `animate-fade-in-up` (0.45s, 12px) — cards, sections, headings
@@ -199,11 +198,11 @@ Hover micro-interactions: card lift (`-translate-y-0.5` + `shadow-md`), button p
 
 ## CSS Build
 
-- **Source:** `src/web/static/input.css` (Tailwind directives + custom CSS for skeletons, progress bar, spinners, toasts, stagger delays, HTMX transitions, reduced-motion)
-- **Output:** `src/web/static/styles.css` (~26KB minified)
-- **Build:** `npm run css:build` (runs `tailwindcss -i ... -o ... --minify`)
+- **Source:** `src/web/static/input.css` (Tailwind v4 config via `@theme`/`@custom-variant` + custom CSS for skeletons, progress bar, spinners, toasts, stagger delays, HTMX transitions, reduced-motion)
+- **Output:** `src/web/static/styles.css` (~36KB minified)
+- **Build:** `npm run css:build` (runs `@tailwindcss/cli -i ... -o ... --minify`)
 - **Watch:** `npm run css:watch` (dev mode, rebuilds on template changes)
-- **Config:** `tailwind.config.js` scans `src/web/templates/**/*.html`
+- **Detection:** Tailwind v4 auto-detects content from `src/web/templates/**/*.html` (no config file needed)
 - **Served:** FastAPI `StaticFiles` mount at `/static`
 - No Tailwind CDN — no console warnings in production
 
@@ -259,7 +258,7 @@ score = toddler_score * 3.0
 - Tailwind CSS production build (no CDN)
 - `ruff check` and `ruff format` pass clean
 - Server runs on port 8000 via systemd
-- Latest commit: Tailwind production build migration
+- Latest commit: Tailwind CSS v4 upgrade
 
 ## Environment
 

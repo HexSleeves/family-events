@@ -8,16 +8,16 @@
 
 {# Add source form #}
 <form hx-post="/api/sources" hx-swap="none" hx-indicator="#add-spinner"
-    class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mb-6 grid grid-cols-1 sm:grid-cols-[1fr_12rem_auto] gap-3 items-end animate-fade-in-up stagger-1">
+    class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-[1fr_12rem_auto] gap-3 items-end animate-fade-in-up stagger-1">
     <div>
         <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">URL</label>
         <input type="url" name="url" required placeholder="https://example.com/events"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
     </div>
     <div>
         <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">Name (optional)</label>
         <input type="text" name="name" placeholder="Auto-detected"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
     </div>
     <button type="submit"
         class="inline-flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition">
@@ -35,7 +35,7 @@
 {% endfor %}
 {% else %}
 <div
-    class="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm text-center text-gray-400 dark:text-gray-500 mb-6 animate-fade-in-up stagger-2">
+    class="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-xs text-center text-gray-400 dark:text-gray-500 mb-6 animate-fade-in-up stagger-2">
     No custom sources yet. Add a URL above to get started.
 </div>
 {% endif %}
@@ -43,7 +43,7 @@
 {# Built-in sources (read-only) #}
 <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 mt-8">
     Built-in Sources</h3>
-<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm space-y-3 text-sm animate-fade-in-up stagger-3">
+<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs space-y-3 text-sm animate-fade-in-up stagger-3">
     <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">BREC Parks</span> <span
             class="text-gray-400 break-all">brec.org</span></div>
     <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">Eventbrite</span> <span

@@ -224,10 +224,10 @@ The UI uses Tailwind utility classes following a consistent design language:
 
 | Element | Classes |
 |---------|---------|
-| Card | `bg-white rounded-xl p-5 mb-4 shadow-sm` |
+| Card | `bg-white rounded-xl p-5 mb-4 shadow-xs` |
 | Badge (green) | `inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800` |
 | Badge (orange) | `...bg-orange-100 text-orange-800` |
 | Badge (gray) | `...bg-gray-100 text-gray-700` |
 | Primary button | `bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm` |
 | Score number | `text-3xl font-bold text-indigo-500` |
-| Header | `bg-gradient-to-r from-indigo-500 to-purple-500` |
+| Header | `bg-linear-to-r from-indigo-500 to-purple-500` |

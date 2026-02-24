@@ -44,7 +44,7 @@
 
 ### ✅ Dark Mode
 
-- Tailwind `darkMode: 'class'` with per-user theme preference
+- Tailwind v4 `@custom-variant dark` with per-user theme preference
 - Auto mode respects `prefers-color-scheme` with live OS change listener
 - Inline `<head>` script prevents FOUC for auto theme
 - All 20 templates have `dark:` variant classes
@@ -84,11 +84,11 @@
 - HTMX swap fade transitions (.htmx-swapping/.htmx-settling)
 - `prefers-reduced-motion` disables all animations
 
-### ✅ Tailwind Production Build
+### ✅ Tailwind Production Build (v4)
 
-- Tailwind CSS 3.4 via npm, CLI build with `npm run css:build`
+- Tailwind CSS 4.2 via `@tailwindcss/cli`, build with `npm run css:build`
 - `src/web/static/input.css` → `src/web/static/styles.css` (~26KB minified)
-- `tailwind.config.js` with content paths + custom animation keyframes
+- CSS-based config in `input.css` via `@theme` (animations) + `@custom-variant` (dark mode)
 - FastAPI `StaticFiles` mount at `/static`
 - No CDN script tag — no console warnings
 - `npm run css:watch` for development

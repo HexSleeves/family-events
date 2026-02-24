@@ -1,7 +1,7 @@
 {% extends "base.html" %} {% block title %}{{ event.title }}{% endblock %} {%
 block content %}
 
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up">
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-xs animate-fade-in-up">
   <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ event.title }}</h2>
   <div class="text-gray-500 dark:text-gray-400 text-sm mt-2 space-y-1 sm:space-y-0">
     <span>📍 {{ event.location_name }}, {{ event.location_city }}</span>
@@ -33,7 +33,7 @@ block content %}
 
 {% set tags = event.tags %} {% include "partials/_tags_grid.html" %}
 
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up stagger-2">
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-xs animate-fade-in-up stagger-2">
   <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Raw Data</h3>
   <pre class="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap">
 {{ raw_data }}</pre>

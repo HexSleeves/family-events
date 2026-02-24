@@ -1,22 +1,22 @@
 {# Stats bar partial - can be used for HTMX refresh #}
 <div class="flex gap-4 flex-wrap mb-6">
     <div
-        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px] animate-fade-in-up  hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-xs text-center flex-1 min-w-[120px] animate-fade-in-up  hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
         <div class="text-3xl font-bold text-indigo-500">{{ total }}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>
     </div>
     <div
-        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px] animate-fade-in-up stagger-1 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-xs text-center flex-1 min-w-[120px] animate-fade-in-up stagger-1 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
         <div class="text-3xl font-bold text-indigo-500">{{ tagged }}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Tagged</div>
     </div>
     <div
-        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px] animate-fade-in-up stagger-2 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-xs text-center flex-1 min-w-[120px] animate-fade-in-up stagger-2 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
         <div class="text-3xl font-bold text-indigo-500">{{ untagged }}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Untagged</div>
     </div>
     <div
-        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px] animate-fade-in-up stagger-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        class="bg-white dark:bg-gray-800 rounded-xl py-4 px-6 shadow-xs text-center flex-1 min-w-[120px] animate-fade-in-up stagger-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
         <div class="text-3xl font-bold text-indigo-500">{{ sources }}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Sources</div>
     </div>

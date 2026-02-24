@@ -1113,17 +1113,17 @@ async def api_delete_source(source_id: str):
     hx-target="#add-result"
     hx-swap="innerHTML"
     hx-indicator="#add-spinner"
-    class="bg-white rounded-xl p-4 shadow-sm mb-6 flex gap-3 items-end"
+    class="bg-white rounded-xl p-4 shadow-xs mb-6 flex gap-3 items-end"
 >
     <div class="flex-1">
         <label class="text-xs text-gray-500 font-medium mb-1 block">URL</label>
         <input type="url" name="url" required placeholder="https://example.com/events"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
     </div>
     <div class="w-48">
         <label class="text-xs text-gray-500 font-medium mb-1 block">Name (optional)</label>
         <input type="text" name="name" placeholder="Auto-detected"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
     </div>
     <button type="submit"
         class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition">
@@ -1140,14 +1140,14 @@ async def api_delete_source(source_id: str):
     {% include "partials/_source_card.html" %}
 {% endfor %}
 {% else %}
-<div class="bg-white rounded-xl p-8 shadow-sm text-center text-gray-400 mb-6">
+<div class="bg-white rounded-xl p-8 shadow-xs text-center text-gray-400 mb-6">
     No custom sources yet. Add a URL above to get started.
 </div>
 {% endif %}
 
 {# Built-in sources (read-only) #}
 <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 mt-8">Built-in Sources</h3>
-<div class="bg-white rounded-xl p-4 shadow-sm space-y-2 text-sm">
+<div class="bg-white rounded-xl p-4 shadow-xs space-y-2 text-sm">
     <div class="flex items-center gap-2">🔧 <span class="font-medium">BREC Parks</span> <span class="text-gray-400">brec.org</span></div>
     <div class="flex items-center gap-2">🔧 <span class="font-medium">Eventbrite</span> <span class="text-gray-400">eventbrite.com</span></div>
     <div class="flex items-center gap-2">🔧 <span class="font-medium">AllEvents</span> <span class="text-gray-400">allevents.in</span></div>
@@ -1170,7 +1170,7 @@ async def api_delete_source(source_id: str):
     "disabled": {"class": "bg-gray-100 text-gray-500", "icon": "⏸️"},
 } %}
 {% set badge = status_badges.get(source.status, status_badges["pending"]) %}
-<div class="bg-white rounded-xl p-4 shadow-sm mb-3">
+<div class="bg-white rounded-xl p-4 shadow-xs mb-3">
     <div class="flex items-start justify-between">
         <div>
             <div class="flex items-center gap-2">
@@ -1229,7 +1229,7 @@ async def api_delete_source(source_id: str):
     <a href="/sources" class="text-sm text-indigo-600 hover:text-indigo-800">← All Sources</a>
 </div>
 
-<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+<div class="bg-white rounded-xl p-5 mb-4 shadow-xs">
     <h2 class="text-xl font-bold text-gray-900">{{ source.name }}</h2>
     <div class="text-gray-500 text-sm mt-1">
         <a href="{{ source.url }}" target="_blank" class="text-indigo-600 hover:underline">{{ source.url }}</a>
@@ -1263,14 +1263,14 @@ async def api_delete_source(source_id: str):
 </div>
 
 {% if recipe %}
-<div class="bg-white rounded-xl p-5 mb-4 shadow-sm">
+<div class="bg-white rounded-xl p-5 mb-4 shadow-xs">
     <h3 class="font-semibold text-gray-900 mb-3">📝 Scraping Recipe</h3>
     <div class="grid grid-cols-2 gap-2 text-sm mb-3">
         <div><strong>Strategy:</strong> {{ recipe.strategy }}</div>
         <div><strong>Confidence:</strong> {{ "%.0f%%" | format(recipe.confidence * 100) }}</div>
         <div><strong>Analyzed:</strong> {{ recipe.analyzed_at.strftime("%b %d, %Y %-I:%M%p") }}</div>
         {% if recipe.css %}
-        <div><strong>Container:</strong> <code class="bg-gray-100 px-1 rounded text-xs">{{ recipe.css.event_container }}</code></div>
+        <div><strong>Container:</strong> <code class="bg-gray-100 px-1 rounded-sm text-xs">{{ recipe.css.event_container }}</code></div>
         {% endif %}
     </div>
     {% if recipe.notes %}
@@ -1286,7 +1286,7 @@ async def api_delete_source(source_id: str):
 {% endif %}
 
 {% if events %}
-<div class="bg-white rounded-xl p-5 shadow-sm">
+<div class="bg-white rounded-xl p-5 shadow-xs">
     <h3 class="font-semibold text-gray-900 mb-3">Recent Events ({{ events | length }})</h3>
     <div class="space-y-2">
         {% for event in events %}

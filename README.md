@@ -209,7 +209,7 @@ All three must pass clean before committing.
 | Web framework | FastAPI + Uvicorn |
 | Templates | Jinja2 |
 | Frontend interactivity | HTMX 2.0.4 |
-| CSS | Tailwind CSS (CDN) |
+| CSS | Tailwind CSS v4 (CLI build) |
 | Database | SQLite (WAL mode, aiosqlite) |
 | Scraping | httpx + BeautifulSoup4 |
 | AI tagging | OpenAI API (gpt-4o-mini) |

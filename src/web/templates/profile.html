@@ -7,7 +7,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400 animate-fade-in-up stagger-1">{{ current_user.email }} &middot; Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
 
     {# ── Theme ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-2 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-2 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🎨 Appearance</h3>
         <form id="theme-form" hx-post="/api/profile/theme" hx-swap="none" class="flex flex-wrap items-center gap-4"
               data-saved="{{ current_user.theme }}">
@@ -49,19 +49,19 @@
     </section>
 
     {# ── Location ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-3 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-3 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">📍 Location</h3>
         <form hx-post="/api/profile/location" hx-swap="none" class="space-y-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Home City</label>
                     <input type="text" name="home_city" value="{{ current_user.home_city }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Preferred Cities <span class="text-gray-400">(comma-separated)</span></label>
                     <input type="text" name="preferred_cities" value="{{ current_user.preferred_cities | join(', ') }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
             </div>
             <div class="flex items-center gap-3">
@@ -76,46 +76,46 @@
     {# ── Child Preferences ── #}
     {% set p = current_user.interest_profile %}
     {% set c = p.constraints %}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-4 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-4 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🧩 Child Preferences</h3>
         <form hx-post="/api/profile/preferences" hx-swap="none" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">❤️ Loves <span class="text-gray-400">(comma-separated)</span></label>
                     <input type="text" name="loves" value="{{ p.loves | join(', ') }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">👍 Likes</label>
                     <input type="text" name="likes" value="{{ p.likes | join(', ') }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">👎 Dislikes</label>
                     <input type="text" name="dislikes" value="{{ p.dislikes | join(', ') }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">💤 Nap Time</label>
                     <input type="text" name="nap_time" value="{{ c.nap_time }}" placeholder="13:00-15:00"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">🌙 Bedtime</label>
                     <input type="text" name="bedtime" value="{{ c.bedtime }}" placeholder="19:30"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">💰 Budget per event ($)</label>
                     <input type="number" name="budget" value="{{ c.budget_per_event }}" min="0" step="5"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">🚗 Max drive (min)</label>
                     <input type="number" name="max_drive" value="{{ c.max_drive_time_minutes }}" min="5" step="5"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
             </div>
             <div class="flex items-center gap-3">
@@ -128,20 +128,20 @@
     </section>
 
     {# ── Notification Channels ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-5 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-5 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🔔 Notifications</h3>
         <form hx-post="/api/profile/notifications" hx-swap="none" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">📧 Notification Email</label>
                     <input type="email" name="email_to" value="{{ current_user.email_to }}" placeholder="{{ current_user.email }}"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                     <p class="text-xs text-gray-400 mt-1">Where to send weekend plans emails</p>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">👶 Child's Name</label>
                     <input type="text" name="child_name" value="{{ current_user.child_name }}" placeholder="Your Little One"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                     <p class="text-xs text-gray-400 mt-1">Used in notification messages</p>
                 </div>
             </div>
@@ -152,7 +152,7 @@
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="channels" value="{{ ch }}"
                             {% if ch in current_user.notification_channels %}checked{% endif %}
-                            class="accent-indigo-500 rounded" />
+                            class="accent-indigo-500 rounded-sm" />
                         <span class="text-sm capitalize">{{ ch }}</span>
                     </label>
                     {% endfor %}
@@ -168,7 +168,7 @@
     </section>
 
     {# ── Your Sources ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-6 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-6 hover:shadow-md transition-shadow duration-200">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold">📡 Your Sources</h3>
             <a href="/sources" class="text-xs text-indigo-500 hover:text-indigo-600 font-medium">Manage all &rarr;</a>
@@ -194,24 +194,24 @@
     </section>
 
     {# ── Change Password ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-7 hover:shadow-md transition-shadow duration-200">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-xs p-6 animate-fade-in-up stagger-7 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🔒 Change Password</h3>
         <form hx-post="/api/profile/password" hx-swap="none" class="space-y-3">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Password</label>
                     <input type="password" name="current_password" required
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">New Password</label>
                     <input type="password" name="new_password" required minlength="6"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Confirm New Password</label>
                     <input type="password" name="confirm_password" required minlength="6"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
                 </div>
             </div>
             <div class="flex items-center gap-3">

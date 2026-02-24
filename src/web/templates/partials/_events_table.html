@@ -16,7 +16,7 @@ hx-indicator="#events-results-wrapper"
 </div>
 
 {# ── Desktop table (hidden on mobile) ── #}
-<div class="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto">
+<div class="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-xs overflow-x-auto">
     <table class="w-full border-collapse">
         <thead>
             <tr class="bg-gray-50 dark:bg-gray-700/50">
@@ -63,7 +63,7 @@ hx-indicator="#events-results-wrapper"
 <div class="md:hidden space-y-3">
     {% for event in events %}
     <a href="/event/{{ event.id }}"
-        class="block bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 animate-fade-in-up stagger-{{ [loop.index0, 9] | min }}">
+        class="block bg-white dark:bg-gray-800 rounded-xl shadow-xs p-4 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 animate-fade-in-up stagger-{{ [loop.index0, 9] | min }}">
         <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
                 <h3 class="font-semibold text-sm text-gray-900 dark:text-white truncate">{{ event.title[:70] }}</h3>
