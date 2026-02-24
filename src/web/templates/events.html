@@ -1,98 +1,84 @@
 {% extends "base.html" %}
-{% block title %}Events{% endblock %}
+{% block title %}Browse Events{% endblock %}
 {% block content %}
 
-<h2 class="text-lg font-semibold mb-4 animate-fade-in-up">📅 All Events ({{ total }})</h2>
+<div class="animate-fade-in">
+  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">All Events <span class="text-[var(--color-faint)] font-normal">({{ total }})</span></h1>
 
-{# ── Search + Filters ── #}
-<form id="events-form" hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
-    hx-trigger="submit, change from:.auto-submit" hx-indicator="#events-results-wrapper"
-    class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs mb-4 space-y-3 animate-fade-in-up stagger-1">
+  {# ═══ FILTER BAR ═══ #}
+  <form id="events-form" hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
+      hx-trigger="submit, change from:.auto-submit" hx-indicator="#events-results-wrapper"
+      class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 space-y-3">
+
     {# Search bar #}
     <div class="relative">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search events..."
-            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-            hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
-            hx-trigger="keyup changed delay:300ms" hx-include="#events-form" hx-indicator="#events-results-wrapper" />
-        <svg class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor"
-            viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input type="text" name="q" value="{{ q }}" placeholder="Search events..."
+          class="w-full pl-10 pr-4 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+          hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
+          hx-trigger="keyup changed delay:300ms" hx-include="#events-form" hx-indicator="#events-results-wrapper" />
     </div>
 
-    {# Filter row #}
-    <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end">
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">City</label>
-            <select name="city"
-                class="auto-submit border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-400">
-                <option value="">All Cities</option>
-                {% for c in cities %}
-                <option value="{{ c }}" {{ 'selected' if city==c }}>{{ c }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Source</label>
-            <select name="source"
-                class="auto-submit border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-400">
-                <option value="">All Sources</option>
-                {% for s in sources %}
-                <option value="{{ s }}" {{ 'selected' if source==s }}>{{ s }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Tagged</label>
-            <select name="tagged"
-                class="auto-submit border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-400">
-                <option value="">All</option>
-                <option value="yes" {{ 'selected' if tagged=='yes' }}>Tagged</option>
-                <option value="no" {{ 'selected' if tagged=='no' }}>Untagged</option>
-            </select>
-        </div>
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Min
-                Score</label>
-            <select name="score_min"
-                class="auto-submit border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-400">
-                <option value="">Any</option>
-                {% for v in range(1, 11) %}
-                <option value="{{ v }}" {{ 'selected' if score_min is not none and score_min==v }}>{{ v }}+</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">Sort</label>
-            <select name="sort"
-                class="auto-submit border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-400">
-                <option value="start_time" {{ 'selected' if sort=='start_time' }}>Date ↑</option>
-                <option value="-start_time" {{ 'selected' if sort=='-start_time' }}>Date ↓</option>
-                <option value="-score" {{ 'selected' if sort=='-score' }}>Score ↓</option>
-                <option value="score" {{ 'selected' if sort=='score' }}>Score ↑</option>
-                <option value="title" {{ 'selected' if sort=='title' }}>Title A-Z</option>
-                <option value="-title" {{ 'selected' if sort=='-title' }}>Title Z-A</option>
-            </select>
-        </div>
-        {% if q or city or source or tagged or score_min is not none %}
-        <a href="/events" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium py-1.5">✕ Clear filters</a>
-        {% endif %}
+    {# Filter chips row #}
+    <div class="flex flex-wrap gap-2 items-end">
+      {% for name, label, options in [
+        ('city', 'Location', cities),
+        ('source', 'Source', sources),
+        ('tagged', 'Status', ['yes', 'no']),
+        ('score_min', 'Min Score', range(1, 11)),
+        ('sort', 'Sort', [('start_time', 'Date ↑'), ('-start_time', 'Date ↓'), ('-score', 'Score ↓'), ('title', 'Title')])
+      ] %}
+      <div class="flex flex-col">
+        <label class="text-xs text-[var(--color-faint)] font-medium mb-1">{{ label }}</label>
+        <select name="{{ name }}"
+            class="auto-submit border border-[var(--color-edge)] rounded-lg px-3 py-1.5 text-sm bg-[var(--color-surface)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30">
+          {% if name == 'sort' %}
+            {% for val, lbl in options %}
+            <option value="{{ val }}" {{ 'selected' if sort==val }}>{{ lbl }}</option>
+            {% endfor %}
+          {% elif name == 'tagged' %}
+            <option value="">All</option>
+            <option value="yes" {{ 'selected' if tagged=='yes' }}>Tagged</option>
+            <option value="no" {{ 'selected' if tagged=='no' }}>Untagged</option>
+          {% elif name == 'score_min' %}
+            <option value="">Any</option>
+            {% for v in options %}
+            <option value="{{ v }}" {{ 'selected' if score_min is not none and score_min==v }}>{{ v }}+</option>
+            {% endfor %}
+          {% elif name == 'city' %}
+            <option value="">All Cities</option>
+            {% for c in options %}
+            <option value="{{ c }}" {{ 'selected' if city==c }}>{{ c }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="">All Sources</option>
+            {% for s in options %}
+            <option value="{{ s }}" {{ 'selected' if source==s }}>{{ s }}</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+  </form>
+
+  {# ═══ RESULTS ═══ #}
+  <div id="events-results-wrapper" class="relative">
+    {# Skeleton overlay #}
+    <div class="skeleton-overlay">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+        {% for _ in range(8) %}
+        <div class="skeleton skeleton-card"></div>
+        {% endfor %}
+      </div>
     </div>
 
-    {# Hidden page field — reset to 1 on filter change #}
-    <input type="hidden" name="page" value="1" id="page-input" />
-</form>
-
-{# ── Results (swapped by HTMX) ── #}
-<div id="events-results-wrapper" class="relative">
-    {# Skeleton overlay — shown during HTMX requests #}
-    <div class="skeleton-overlay" id="events-skeleton">
-        {% include "partials/_skeleton_table.html" %}
-    </div>
     <div id="events-results">
-        {% include "partials/_events_table.html" %}
+      {% include "partials/_events_table.html" %}
     </div>
+  </div>
 </div>
 
 {% endblock %}

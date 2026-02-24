@@ -1,6 +1,5 @@
-{# Notification preview block #}
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mt-8 shadow-xs">
-    <h3 class="font-semibold text-gray-900 mb-3">📨 Notification Preview</h3>
-    <pre
-        class="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap">{{ message }}</pre>
+{# Notification preview #}
+<div class="bg-[var(--color-surface)] rounded-xl p-5 mt-8 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up">
+    <h3 class="font-semibold text-[var(--color-heading)] mb-3">📨 Notification Preview</h3>
+    <pre class="bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ message }}</pre>
 </div>

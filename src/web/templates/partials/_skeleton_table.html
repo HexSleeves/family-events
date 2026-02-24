@@ -1,38 +1,6 @@
-{# Skeleton loading state for the events table #}
-<div class="p-5">
-  {# Summary line skeleton #}
-  <div class="mb-3">
-    <div class="skeleton skeleton-text w-40"></div>
-  </div>
-
-  {# Table header skeleton #}
-  <div class="flex gap-3 pb-2.5 mb-1 border-b border-gray-200 dark:border-gray-700">
-    <div class="skeleton skeleton-text w-16"></div>
-    <div class="skeleton skeleton-text w-14"></div>
-    <div class="skeleton skeleton-text w-40"></div>
-    <div class="skeleton skeleton-text w-20"></div>
-    <div class="skeleton skeleton-text w-16"></div>
-    <div class="skeleton skeleton-text w-12"></div>
-    <div class="skeleton skeleton-text w-20"></div>
-  </div>
-
-  {# Row skeletons #} {% for i in range(8) %}
-  <div class="flex items-center gap-3 py-3 border-b border-gray-100">
-    <div class="skeleton skeleton-text w-16"></div>
-    <div class="skeleton skeleton-text w-14"></div>
-    <div class="skeleton skeleton-text-lg" style="width: {{ [55, 70, 45, 60, 50, 65, 40, 58][i] }}%"></div>
-    <div class="skeleton skeleton-text w-20"></div>
-    <div class="skeleton skeleton-badge"></div>
-    <div class="skeleton skeleton-badge"></div>
-    <div class="skeleton skeleton-text w-16"></div>
-    <div class="skeleton skeleton-badge" style="width: 42px"></div>
-  </div>
-  {% endfor %} {# Pagination skeleton #}
-  <div class="flex items-center gap-2 mt-4">
-    <div class="skeleton" style="width: 60px; height: 30px; border-radius: 8px"></div>
-    <div class="skeleton" style="width: 32px; height: 30px; border-radius: 8px"></div>
-    <div class="skeleton" style="width: 32px; height: 30px; border-radius: 8px"></div>
-    <div class="skeleton" style="width: 32px; height: 30px; border-radius: 8px"></div>
-    <div class="skeleton" style="width: 60px; height: 30px; border-radius: 8px"></div>
-  </div>
+{# Skeleton loading state for events grid #}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  {% for _ in range(8) %}
+  <div class="skeleton skeleton-card"></div>
+  {% endfor %}
 </div>

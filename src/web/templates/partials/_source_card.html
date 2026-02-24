@@ -1,63 +1,44 @@
-{% set status_badges = {
-"active": {"class": "bg-green-100 text-green-800", "icon": "✅"},
-"stale": {"class": "bg-orange-100 text-orange-800", "icon": "⚠️"},
-"failed": {"class": "bg-red-100 text-red-800", "icon": "❌"},
-"analyzing": {"class": "bg-blue-100 text-blue-800", "icon": "🔄"},
-"pending": {"class": "bg-gray-100 text-gray-700", "icon": "⏳"},
-"disabled": {"class": "bg-gray-100 text-gray-500", "icon": "⏸️"},
+{# Source card for custom sources #}
+{% set status_colors = {
+  'active': ('bg-[var(--color-success-light)]', 'text-[var(--color-success)]'),
+  'analyzing': ('bg-[var(--color-info-light)]', 'text-[var(--color-info)]'),
+  'failed': ('bg-[var(--color-danger-light)]', 'text-[var(--color-danger)]'),
+  'stale': ('bg-[var(--color-warning-light)]', 'text-[var(--color-warning)]'),
+  'disabled': ('bg-[var(--color-surface-tertiary)]', 'text-[var(--color-faint)]'),
+  'pending': ('bg-[var(--color-surface-tertiary)]', 'text-[var(--color-muted)]')
 } %}
-{% set badge = status_badges.get(source.status, status_badges["pending"]) %}
-<div
-    class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs mb-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up">
-    <div class="flex items-start justify-between">
-        <div>
-            <div class="flex items-center gap-2">
-                <a href="/source/{{ source.id }}" class="font-semibold text-gray-900 hover:text-indigo-600">{{
-                    source.name }}</a>
-                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ badge.class }}">{{
-                    badge.icon }} {{ source.status }}</span>
-            </div>
-            <div class="text-gray-400 dark:text-gray-500 text-xs mt-0.5">{{ source.url }}</div>
-            <div class="text-gray-500 dark:text-gray-400 text-xs mt-1">
-                {% if source.recipe_json %}
-                Strategy: {{ "JSON-LD" if '"jsonld"' in source.recipe_json else "CSS selectors" }}
-                {% endif %}
-                {% if source.last_event_count %}
-                · {{ source.last_event_count }} events
-                {% endif %}
-                {% if source.last_scraped_at %}
-                · Last: {{ source.last_scraped_at.strftime("%b %d, %-I:%M%p") }}
-                {% endif %}
-            </div>
-            {% if source.last_error %}
-            <div class="text-red-500 text-xs mt-1">Error: {{ source.last_error[:100] }}</div>
-            {% endif %}
-        </div>
-        <div class="flex gap-1.5">
-            <button hx-post="/api/sources/{{ source.id }}/test" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-                hx-indicator="this"
-                class="px-2.5 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-700 hover:bg-gray-100 cursor-pointer transition">
-                🧪 Test <span class="htmx-indicator"><span class="spinner"
-                        style="border-color:rgba(0,0,0,.2);border-top-color:#333;width:10px;height:10px"></span></span>
-            </button>
-            {% if source.status in ("stale", "failed") %}
-            <button hx-post="/api/sources/{{ source.id }}/analyze" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-                hx-indicator="this"
-                class="px-2.5 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-700 hover:bg-gray-100 cursor-pointer transition">
-                🔄 Re-analyze <span class="htmx-indicator"><span class="spinner"
-                        style="border-color:rgba(0,0,0,.2);border-top-color:#333;width:10px;height:10px"></span></span>
-            </button>
-            {% endif %}
-            <button hx-post="/api/sources/{{ source.id }}/toggle" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-                class="px-2.5 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-700 hover:bg-gray-100 cursor-pointer transition">
-                {{ "⏸️ Disable" if source.enabled else "▶️ Enable" }}
-            </button>
-            <button hx-delete="/api/sources/{{ source.id }}" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-                hx-confirm="Delete this source and all its events?"
-                class="px-2.5 py-1 rounded-lg border border-red-300 text-xs text-red-600 hover:bg-red-50 cursor-pointer transition">
-                🗑️
-            </button>
-        </div>
+{% set bg_cls, text_cls = status_colors.get(source.status, status_colors['pending']) %}
+
+<div class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-card)] transition-all duration-200 animate-fade-in-up">
+  <div class="flex items-start justify-between">
+    <div class="min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        <a href="/source/{{ source.id }}" class="font-semibold text-[var(--color-heading)] hover:text-[var(--color-brand)] transition-colors">{{ source.name }}</a>
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ bg_cls }} {{ text_cls }}">{{ source.status }}</span>
+      </div>
+      <p class="text-xs text-[var(--color-muted)] truncate">{{ source.url }}</p>
+      {% if source.last_event_count %}
+      <p class="text-xs text-[var(--color-faint)] mt-1">{{ source.last_event_count }} events · Last scraped {{ source.last_scraped_at.strftime('%b %d') if source.last_scraped_at else 'never' }}</p>
+      {% endif %}
+      {% if source.last_error %}
+      <p class="text-xs text-[var(--color-danger)] mt-1 truncate">Error: {{ source.last_error[:80] }}</p>
+      {% endif %}
     </div>
-    <div id="test-{{ source.id }}" class="mt-2"></div>
+
+    <div class="flex items-center gap-2 shrink-0">
+      <button hx-post="/api/sources/{{ source.id }}/test" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
+          class="px-3 py-1.5 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+        Test
+      </button>
+      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
+          class="px-3 py-1.5 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+        {{ 'Disable' if source.enabled else 'Enable' }}
+      </button>
+      <button hx-delete="/api/sources/{{ source.id }}" hx-target="#test-{{ source.id }}" hx-confirm="Delete this source?"
+          class="px-3 py-1.5 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+        Delete
+      </button>
+    </div>
+  </div>
+  <div id="test-{{ source.id }}" class="mt-3"></div>
 </div>

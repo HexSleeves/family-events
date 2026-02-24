@@ -1,18 +1,18 @@
-{# HTMX partial: test scrape results #}
-{% if count == 0 %}
-<div class="text-orange-600 text-sm font-semibold">⚠️ No events found. Recipe may need updating.</div>
-{% else %}
-<div class="text-green-600 text-sm font-semibold mb-2">✅ Found {{ count }} events:</div>
-<div class="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
-    {% for event in events[:10] %}
-    <div class="text-xs">
-        <span class="text-gray-400">{{ event.start_time.strftime("%m/%d") }}</span>
-        <span class="font-medium">{{ event.title[:80] }}</span>
-        {% if event.location_name %}<span class="text-gray-400">· {{ event.location_name }}</span>{% endif %}
+{# Test scrape results #}
+<div class="bg-[var(--color-success-light)] rounded-lg p-4 mt-3">
+  <p class="text-sm font-medium text-[var(--color-success)] mb-2">Found {{ count }} events</p>
+  {% if events %}
+  <div class="space-y-1">
+    {% for event in events[:5] %}
+    <div class="text-sm text-[var(--color-body)]">
+      <span class="text-[var(--color-faint)]">{{ event.start_time.strftime('%b %d') if event.start_time else '?' }}</span>
+      · {{ event.title }}
+      {% if event.location_name %}<span class="text-[var(--color-faint)]">· {{ event.location_name }}</span>{% endif %}
     </div>
     {% endfor %}
-    {% if count > 10 %}
-    <div class="text-xs text-gray-400">... and {{ count - 10 }} more</div>
+    {% if count > 5 %}
+    <p class="text-xs text-[var(--color-faint)] mt-1">...and {{ count - 5 }} more</p>
     {% endif %}
+  </div>
+  {% endif %}
 </div>
-{% endif %}

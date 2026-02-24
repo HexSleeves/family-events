@@ -1,33 +1,280 @@
-{% extends "base.html" %} {% block title %}Dashboard{% endblock %} {% block
-content %} {% include "partials/_stats.html" %}
+{% extends "base.html" %}
+{% block title %}Discover{% endblock %}
+{% block content %}
 
-<div class="flex flex-wrap gap-2 mb-6 animate-fade-in-up stagger-4">
-    <button hx-post="/api/scrape" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
-        🔄 Run Scrapers
-        <span class="htmx-indicator"><span class="spinner"></span></span>
-    </button>
-    <button hx-post="/api/tag" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
-        🏷️ Tag Events
-        <span class="htmx-indicator"><span class="spinner"></span></span>
-    </button>
-    <button hx-post="/api/notify" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
-        📬 Send Notification
-        <span class="htmx-indicator"><span class="spinner"></span></span>
-    </button>
-</div>
+{# ═══════════════════════════════════════════════════════════
+   MACRO: Event card for horizontal scroll sections
+   ═══════════════════════════════════════════════════════════ #}
+{% macro event_card(event, size="normal", delay=0) %}
+  {% set score = event.tags.toddler_score if event.tags else none %}
+  {% set score_class = "score-low" if score is not none and score <= 3
+                  else "score-mid" if score is not none and score <= 6
+                  else "score-high" if score is not none and score <= 8
+                  else "score-top" if score is not none
+                  else "score-low" %}
+  {% set score_bg = "score-bg-low" if score is not none and score <= 3
+                else "score-bg-mid" if score is not none and score <= 6
+                else "score-bg-high" if score is not none and score <= 8
+                else "score-bg-top" if score is not none
+                else "score-bg-low" %}
+  {% set card_w = "w-[280px] md:w-[300px]" if size == "featured" else "w-[240px] md:w-[260px]" %}
 
-<h2 class="text-lg font-semibold mb-4 animate-fade-in-up stagger-5">
-    ⭐ Top Toddler-Friendly Events
-</h2>
-{% if top_events %} {% for e in top_events %} {% set event = e %} {% set
-highlight = false %} {% set score_display = e.tags.toddler_score %} {% set link
-= none %} {% set short_date = false %} {% set show_source = true %} {% set
-show_price = false %} {% set card_delay = loop.index0 + 6 %} {% include
-"partials/_event_card.html" %} {% endfor %} {% else %}
-<p class="text-gray-500 text-sm animate-fade-in">
-    No tagged events yet. Run scrapers then tag!
-</p>
-{% endif %} {% endblock %}
+  <a href="/event/{{ event.id }}"
+     class="{{ card_w }} group block rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 animate-fade-in-up{% if delay %} stagger-{{ [delay, 9] | min }}{% endif %}">
+
+    {# ── Image ── #}
+    <div class="relative aspect-[16/10] rounded-t-xl overflow-hidden">
+      {% if event.image_url %}
+        <img src="{{ event.image_url }}" alt="{{ event.title }}"
+             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+             loading="lazy" />
+      {% else %}
+        <div class="img-placeholder w-full h-full text-3xl">
+          {% if event.tags and event.tags.categories %}
+            {% set cat = event.tags.categories[0] | lower if event.tags.categories else '' %}
+            {% if 'art' in cat or 'craft' in cat %}🎨
+            {% elif 'outdoor' in cat or 'adventure' in cat %}🌳
+            {% elif 'nature' in cat or 'animal' in cat or 'wildlife' in cat %}🦋
+            {% elif 'music' in cat %}🎵
+            {% elif 'story' in cat or 'book' in cat %}📚
+            {% else %}🎈
+            {% endif %}
+          {% else %}🎈
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Score badge — top left #}
+      {% if score is not none %}
+        <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold {{ score_bg }} {{ score_class }} backdrop-blur-sm">
+          ⭐ {{ score }}/10
+        </div>
+      {% endif %}
+
+      {# Free badge — top right #}
+      {% if event.is_free %}
+        <div class="absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--color-success-light)] text-[var(--color-success)]">
+          Free
+        </div>
+      {% endif %}
+    </div>
+
+    {# ── Card body ── #}
+    <div class="p-3">
+      <h3 class="text-sm font-semibold text-[var(--color-heading)] line-clamp-2 leading-snug group-hover:text-[var(--color-brand)] transition-colors">
+        {{ event.title }}
+      </h3>
+
+      <p class="mt-1.5 text-xs text-[var(--color-muted)] flex items-center gap-1 truncate">
+        <svg class="w-3.5 h-3.5 shrink-0 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        {{ event.location_name or event.location_city or "TBA" }}
+      </p>
+
+      <p class="mt-1 text-xs text-[var(--color-faint)] flex items-center gap-1">
+        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        {{ event.start_time.strftime('%a %b %d, %I:%M%p') }}
+      </p>
+
+      {# Tags row #}
+      {% if event.tags %}
+        <div class="mt-2 flex flex-wrap gap-1">
+          {% if event.tags.indoor_outdoor %}
+            <span class="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--color-info-light)] text-[var(--color-info)]">{{ event.tags.indoor_outdoor }}</span>
+          {% endif %}
+          {% if event.tags.meltdown_risk %}
+            <span class="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-medium {{ 'bg-[var(--color-success-light)] text-[var(--color-success)]' if event.tags.meltdown_risk == 'low' else 'bg-[var(--color-warning-light)] text-[var(--color-warning)]' }}">{{ event.tags.meltdown_risk }} meltdown</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </a>
+{% endmacro %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   HERO / GREETING
+   ═══════════════════════════════════════════════════════════ #}
+<section class="mb-8 animate-fade-in-up">
+  <h1 class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">
+    Discover family events 🎈
+  </h1>
+  <p class="mt-1 text-[var(--color-muted)] text-sm sm:text-base">
+    Curated toddler-friendly things to do in Lafayette &amp; Baton Rouge
+  </p>
+</section>
+
+
+{# ═══════════════════════════════════════════════════════════
+   TOP PICKS
+   ═══════════════════════════════════════════════════════════ #}
+{% if top_events %}
+<section class="mb-10 animate-fade-in-up stagger-1">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
+      ⭐ Top Picks
+    </h2>
+    <a href="/events?sort=-score" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
+      See all →
+    </a>
+  </div>
+
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    {% for event in top_events %}
+      {{ event_card(event, size="featured", delay=loop.index0 + 2) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   CATEGORY: Arts & Crafts
+   ═══════════════════════════════════════════════════════════ #}
+{% if arts_events %}
+<section class="mb-10 animate-fade-in-up stagger-3">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
+      🎨 Arts &amp; Crafts
+    </h2>
+    <a href="/events?q=arts+crafts" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
+      See all →
+    </a>
+  </div>
+
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    {% for event in arts_events %}
+      {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   CATEGORY: Outdoor Adventures
+   ═══════════════════════════════════════════════════════════ #}
+{% if outdoor_events %}
+<section class="mb-10 animate-fade-in-up stagger-5">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
+      🌳 Outdoor Adventures
+    </h2>
+    <a href="/events?q=outdoor" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
+      See all →
+    </a>
+  </div>
+
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    {% for event in outdoor_events %}
+      {{ event_card(event, size="normal", delay=loop.index0 + 6) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   CATEGORY: Nature & Wildlife
+   ═══════════════════════════════════════════════════════════ #}
+{% if nature_events %}
+<section class="mb-10 animate-fade-in-up stagger-7">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
+      🦋 Nature &amp; Wildlife
+    </h2>
+    <a href="/events?q=nature+wildlife" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
+      See all →
+    </a>
+  </div>
+
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    {% for event in nature_events %}
+      {{ event_card(event, size="normal", delay=loop.index0 + 8) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   EMPTY STATE
+   ═══════════════════════════════════════════════════════════ #}
+{% if not top_events and not arts_events and not outdoor_events and not nature_events %}
+<section class="text-center py-16 animate-fade-in-up stagger-2">
+  <div class="text-5xl mb-4">🎈</div>
+  <h2 class="text-xl font-bold text-[var(--color-heading)] mb-2">No events yet</h2>
+  <p class="text-[var(--color-muted)] text-sm max-w-md mx-auto">
+    Run the scrapers and tagger to start discovering toddler-friendly events in your area.
+  </p>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
+   ADMIN QUICK ACTIONS  (only for logged-in users)
+   ═══════════════════════════════════════════════════════════ #}
+{% if current_user %}
+<section class="mt-4 mb-2 animate-fade-in-up stagger-9">
+  <hr class="border-[var(--color-edge-subtle)] mb-8" />
+
+  <h2 class="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-wider mb-4">Admin</h2>
+
+  {# Stats row #}
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+    <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
+      <div class="text-2xl font-bold text-[var(--color-brand)]">{{ total }}</div>
+      <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">Events</div>
+    </div>
+    <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
+      <div class="text-2xl font-bold text-[var(--color-success)]">{{ tagged }}</div>
+      <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">Tagged</div>
+    </div>
+    <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
+      <div class="text-2xl font-bold text-[var(--color-warning)]">{{ untagged }}</div>
+      <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">Untagged</div>
+    </div>
+    <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
+      <div class="text-2xl font-bold text-[var(--color-info)]">{{ sources }}</div>
+      <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">Sources</div>
+    </div>
+  </div>
+
+  {# Action buttons #}
+  <div class="flex flex-wrap gap-2">
+    <button
+      hx-post="/api/scrape"
+      hx-swap="none"
+      hx-indicator="this"
+      hx-disabled-elt="this"
+      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
+      🔄 Run Scrapers
+      <span class="htmx-indicator"><span class="spinner-brand"></span></span>
+    </button>
+    <button
+      hx-post="/api/tag"
+      hx-swap="none"
+      hx-indicator="this"
+      hx-disabled-elt="this"
+      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
+      🏷️ Tag Events
+      <span class="htmx-indicator"><span class="spinner-brand"></span></span>
+    </button>
+    <button
+      hx-post="/api/notify"
+      hx-swap="none"
+      hx-indicator="this"
+      hx-disabled-elt="this"
+      class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
+      📬 Send Notification
+      <span class="htmx-indicator"><span class="spinner-brand"></span></span>
+    </button>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

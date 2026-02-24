@@ -95,7 +95,12 @@ app.add_middleware(
 async def _ctx(request: Request, **extra: object) -> dict:
     """Build base template context with current user."""
     user = await get_current_user(request, db)
-    return {"request": request, "current_user": user, **extra}
+    return {
+        "request": request,
+        "current_user": user,
+        "active_page": extra.pop("active_page", ""),
+        **extra,
+    }
 
 
 # ----- Auth Pages -----
@@ -106,7 +111,7 @@ async def login_page(request: Request):
     user = await get_current_user(request, db)
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return templates.TemplateResponse("login.html", await _ctx(request))
+    return templates.TemplateResponse("login.html", await _ctx(request, active_page="auth"))
 
 
 @app.post("/login", response_class=HTMLResponse)
@@ -119,7 +124,7 @@ async def login_submit(request: Request):
     if not user or not verify_password(password, user.password_hash):
         return templates.TemplateResponse(
             "login.html",
-            {**await _ctx(request), "error": "Invalid email or password."},
+            {**await _ctx(request, active_page="auth"), "error": "Invalid email or password."},
         )
 
     login_session(request, user)
@@ -131,7 +136,7 @@ async def signup_page(request: Request):
     user = await get_current_user(request, db)
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return templates.TemplateResponse("signup.html", await _ctx(request))
+    return templates.TemplateResponse("signup.html", await _ctx(request, active_page="auth"))
 
 
 @app.post("/signup", response_class=HTMLResponse)
@@ -158,7 +163,7 @@ async def signup_submit(request: Request):
         return templates.TemplateResponse(
             "signup.html",
             {
-                **await _ctx(request),
+                **await _ctx(request, active_page="auth"),
                 "errors": errors,
                 "email": email,
                 "display_name": display_name,
@@ -192,7 +197,7 @@ async def profile_page(request: Request):
     sources = await db.get_user_sources(user.id)
     return templates.TemplateResponse(
         "profile.html",
-        {**await _ctx(request), "sources": sources},
+        {**await _ctx(request, active_page="admin"), "sources": sources},
     )
 
 
@@ -312,15 +317,36 @@ async def dashboard(request: Request):
         [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
     )[:5]
 
+    # Also grab category sections for discover page
+    arts_events = sorted(
+        [e for e in events if e.tags and "arts" in (e.tags.categories or [])],
+        key=lambda e: e.tags.toddler_score,
+        reverse=True,
+    )[:8]
+    outdoor_events = sorted(
+        [e for e in events if e.tags and e.tags.indoor_outdoor in ("outdoor", "both")],
+        key=lambda e: e.tags.toddler_score,
+        reverse=True,
+    )[:8]
+    nature_events = sorted(
+        [e for e in events if e.tags and "nature" in (e.tags.categories or [])],
+        key=lambda e: e.tags.toddler_score,
+        reverse=True,
+    )[:8]
+
     return templates.TemplateResponse(
         "dashboard.html",
         await _ctx(
             request,
+            active_page="discover",
             total=total,
             tagged=tagged,
             untagged=untagged,
             sources=sources,
             top_events=top_events,
+            arts_events=arts_events,
+            outdoor_events=outdoor_events,
+            nature_events=nature_events,
         ),
     )
 
@@ -354,6 +380,7 @@ async def events_page(
 
     ctx = await _ctx(
         request,
+        active_page="events",
         events=events,
         total=total,
         page=page,
@@ -394,7 +421,7 @@ async def event_detail(request: Request, event_id: str):
 
     return templates.TemplateResponse(
         "event_detail.html",
-        await _ctx(request, event=event, raw_data=raw_data),
+        await _ctx(request, active_page="events", event=event, raw_data=raw_data),
     )
 
 
@@ -423,6 +450,7 @@ async def weekend_page(request: Request):
         "weekend.html",
         await _ctx(
             request,
+            active_page="weekend",
             saturday=saturday,
             sunday=sunday,
             weather=weather,
@@ -441,7 +469,7 @@ async def sources_page(request: Request):
     builtin_stats = await db.get_filter_options()
     return templates.TemplateResponse(
         "sources.html",
-        await _ctx(request, sources=sources, builtin_stats=builtin_stats),
+        await _ctx(request, active_page="sources", sources=sources, builtin_stats=builtin_stats),
     )
 
 
@@ -458,7 +486,9 @@ async def source_detail(request: Request, source_id: str):
         recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
     return templates.TemplateResponse(
         "source_detail.html",
-        await _ctx(request, source=source, recipe=recipe, events=events_from_source),
+        await _ctx(
+            request, active_page="sources", source=source, recipe=recipe, events=events_from_source
+        ),
     )
 
 
@@ -494,8 +524,9 @@ async def api_notify(request: Request):
 async def api_attend(event_id: str):
     await db.mark_attended(event_id)
     return HTMLResponse(
-        '<span class="inline-block px-4 py-2 rounded-lg bg-gray-200 text-gray-600 font-semibold text-sm">'
-        "Attended \u2705</span>"
+        '<span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg '
+        'bg-[var(--color-success-light)] text-[var(--color-success)] text-sm font-medium">'
+        "\u2705 Attended</span>"
     )
 
 

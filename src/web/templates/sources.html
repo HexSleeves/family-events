@@ -2,59 +2,65 @@
 {% block title %}Sources{% endblock %}
 {% block content %}
 
-<div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-semibold animate-fade-in-up">📡 Event Sources</h2>
-</div>
+<div class="animate-fade-in">
+  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">📡 Event Sources</h1>
 
-{# Add source form #}
-<form hx-post="/api/sources" hx-swap="none" hx-indicator="#add-spinner"
-    class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-[1fr_12rem_auto] gap-3 items-end animate-fade-in-up stagger-1">
-    <div>
-        <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">URL</label>
+  {# ═══ ADD SOURCE ═══ #}
+  {% if current_user %}
+  <form hx-post="/api/sources" hx-swap="none" hx-indicator="#add-spinner"
+      class="bg-[var(--color-surface)] rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 animate-fade-in-up stagger-1">
+    <h3 class="font-semibold text-[var(--color-heading)] mb-3">Add Custom Source</h3>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex-1">
         <input type="url" name="url" required placeholder="https://example.com/events"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
+            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+      </div>
+      <div class="w-full sm:w-48">
+        <input type="text" name="name" placeholder="Name (optional)"
+            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+      </div>
+      <button type="submit"
+          class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all flex items-center gap-2">
+        Add Source
+        <span id="add-spinner" class="htmx-indicator spinner"></span>
+      </button>
     </div>
-    <div>
-        <label class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">Name (optional)</label>
-        <input type="text" name="name" placeholder="Auto-detected"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-400" />
+  </form>
+  {% endif %}
+
+  {# ═══ BUILT-IN SOURCES ═══ #}
+  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3 animate-fade-in-up stagger-2">Built-in Sources</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+    {% set builtins = [
+      ('BREC Parks', 'brec.org', 'Baton Rouge parks & recreation', '🏞️'),
+      ('Eventbrite', 'eventbrite.com', 'Both cities', '🎫'),
+      ('AllEvents.in', 'allevents.in', 'Both cities', '🌐'),
+      ('Lafayette Venues', 'Various', 'Moncus Park, Acadiana Arts, Science Museum', '🏠'),
+      ('Libraries', 'LibCal', 'Lafayette & BR libraries', '📚')
+    ] %}
+    {% for name, domain, desc, icon in builtins %}
+    <div class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-{{ loop.index + 2 }}">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">{{ icon }}</span>
+        <div>
+          <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ name }}</h3>
+          <p class="text-xs text-[var(--color-muted)]">{{ desc }}</p>
+        </div>
+        <span class="ml-auto px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success-light)] text-[var(--color-success)]">Active</span>
+      </div>
     </div>
-    <button type="submit"
-        class="inline-flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition">
-        + Add Source
-        <span id="add-spinner" class="htmx-indicator"><span class="spinner"></span></span>
-    </button>
-</form>
+    {% endfor %}
+  </div>
 
-{# Custom sources #}
-{% if sources %}
-<h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-    Custom Sources ({{ sources | length }})</h3>
-{% for source in sources %}
-{% include "partials/_source_card.html" %}
-{% endfor %}
-{% else %}
-<div
-    class="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-xs text-center text-gray-400 dark:text-gray-500 mb-6 animate-fade-in-up stagger-2">
-    No custom sources yet. Add a URL above to get started.
-</div>
-{% endif %}
-
-{# Built-in sources (read-only) #}
-<h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 mt-8">
-    Built-in Sources</h3>
-<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-xs space-y-3 text-sm animate-fade-in-up stagger-3">
-    <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">BREC Parks</span> <span
-            class="text-gray-400 break-all">brec.org</span></div>
-    <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">Eventbrite</span> <span
-            class="text-gray-400 break-all">eventbrite.com</span></div>
-    <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">AllEvents</span> <span
-            class="text-gray-400 break-all">allevents.in</span></div>
-    <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">Lafayette Venues</span> <span
-            class="text-gray-400 break-all">moncuspark.org, acadianacenterforthearts.org,
-            lafayettesciencemuseum.org</span></div>
-    <div class="flex items-start gap-2">🔧 <span class="font-medium shrink-0">Libraries</span> <span
-            class="text-gray-400 break-all">lafayettela.libcal.com, ebrpl.libcal.com</span></div>
+  {# ═══ CUSTOM SOURCES ═══ #}
+  {% if sources %}
+  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3">Custom Sources</h2>
+  <div class="space-y-3">
+    {% for source in sources %}
+    {% include "partials/_source_card.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 
 {% endblock %}

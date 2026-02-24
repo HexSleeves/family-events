@@ -2,100 +2,176 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ══════════════════════════════════════════════════════════════
+   DESIGN TOKENS — Eventbrite-inspired family events theme
+   ══════════════════════════════════════════════════════════════ */
+
 @theme {
-  --animate-fade-in: fade-in 0.4s ease-out both;
-  --animate-fade-in-up: fade-in-up 0.45s ease-out both;
+  /* Brand */
+  --color-brand: #F05537;
+  --color-brand-hover: #D94627;
+  --color-brand-light: #FFF1EE;
+  --color-brand-dark: #B33D22;
+  --color-navy: #1E3A5F;
+  --color-navy-light: #2A4A73;
+
+  /* Surfaces — light mode defaults */
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F9FAFB;
+  --color-surface-tertiary: #F3F4F6;
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text */
+  --color-heading: #111827;
+  --color-body: #374151;
+  --color-muted: #6B7280;
+  --color-faint: #9CA3AF;
+
+  /* Borders */
+  --color-edge: #E5E7EB;
+  --color-edge-subtle: #F3F4F6;
+
+  /* Semantic */
+  --color-success: #059669;
+  --color-success-light: #D1FAE5;
+  --color-warning: #D97706;
+  --color-warning-light: #FEF3C7;
+  --color-danger: #DC2626;
+  --color-danger-light: #FEE2E2;
+  --color-info: #2563EB;
+  --color-info-light: #DBEAFE;
+
+  /* Score colors */
+  --color-score-low: #9CA3AF;
+  --color-score-mid: #F59E0B;
+  --color-score-high: #10B981;
+  --color-score-top: #059669;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-card-hover: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 4px 10px -4px rgb(0 0 0 / 0.05);
+  --shadow-float: 0 20px 40px -8px rgb(0 0 0 / 0.12);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.4s ease-out both;
   --animate-slide-down: slide-down 0.25s ease-out both;
-  --animate-scale-in: scale-in 0.35s ease-out both;
+  --animate-scale-in: scale-in 0.3s ease-out both;
   --animate-pop-in: pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 
   @keyframes fade-in {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
   @keyframes fade-in-up {
-    0% {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   @keyframes slide-down {
-    0% {
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   @keyframes scale-in {
-    0% {
-      opacity: 0;
-      transform: scale(0.96);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
   }
   @keyframes pop-in {
-    0% {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
   }
 }
 
-/* ── v3 compatibility base styles ── */
+/* ══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+
+.dark {
+  --color-surface: #0F172A;
+  --color-surface-secondary: #1E293B;
+  --color-surface-tertiary: #334155;
+  --color-surface-elevated: #1E293B;
+  --color-surface-overlay: rgba(0, 0, 0, 0.7);
+
+  --color-heading: #F1F5F9;
+  --color-body: #CBD5E1;
+  --color-muted: #94A3B8;
+  --color-faint: #64748B;
+
+  --color-edge: #334155;
+  --color-edge-subtle: #1E293B;
+
+  --color-brand-light: #3B1A10;
+
+  --color-success-light: #064E3B;
+  --color-warning-light: #78350F;
+  --color-danger-light: #7F1D1D;
+  --color-info-light: #1E3A8A;
+
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+  --shadow-card-hover: 0 10px 25px -5px rgb(0 0 0 / 0.3), 0 4px 10px -4px rgb(0 0 0 / 0.2);
+  --shadow-float: 0 20px 40px -8px rgb(0 0 0 / 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BASE STYLES
+   ══════════════════════════════════════════════════════════════ */
+
 @layer base {
-  /* Default border color (v4 changed to currentColor) */
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--color-edge);
   }
 
-  /* Buttons use cursor:pointer (v4 changed to default) */
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  body {
+    background-color: var(--color-surface-secondary);
+    color: var(--color-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-brand);
+    color: white;
+  }
 }
 
-/* ── Skeleton animation ── */
+/* ══════════════════════════════════════════════════════════════
+   UTILITY COMPONENTS
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Line clamping ── */
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Skeleton / shimmer ── */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #e5e7eb 25%, #d1d5db 37%, #e5e7eb 63%);
+  background: linear-gradient(90deg, var(--color-surface-tertiary) 25%, var(--color-edge) 37%, var(--color-surface-tertiary) 63%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
-  border-radius: 4px;
+  border-radius: 6px;
 }
-.dark .skeleton {
-  background: linear-gradient(90deg, #374151 25%, #4b5563 37%, #374151 63%);
-  background-size: 200% 100%;
-}
-.skeleton-text { height: 0.75rem; border-radius: 4px; }
-.skeleton-text-lg { height: 1rem; border-radius: 4px; }
+.skeleton-text { height: 0.75rem; }
+.skeleton-text-lg { height: 1rem; }
 .skeleton-badge { height: 1.25rem; width: 3.5rem; border-radius: 9999px; }
-.skeleton-score { height: 1.75rem; width: 2.5rem; border-radius: 6px; }
+.skeleton-card {
+  height: 280px;
+  border-radius: 12px;
+}
 
 /* ── Global top progress bar ── */
 @keyframes progress-indeterminate {
@@ -110,7 +186,7 @@
 #global-progress.htmx-request { opacity: 1; }
 #global-progress .bar {
   width: 40%; height: 100%;
-  background: linear-gradient(90deg, transparent, #818cf8, #a78bfa, transparent);
+  background: linear-gradient(90deg, transparent, var(--color-brand), var(--color-brand-hover), transparent);
   animation: progress-indeterminate 1s ease-in-out infinite;
 }
 
@@ -119,16 +195,22 @@
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator { opacity: 1; }
 
-/* ── Spinner for buttons ── */
+/* ── Spinner ── */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 .spinner {
-  display: inline-block; width: 14px; height: 14px;
+  display: inline-block; width: 16px; height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white; border-radius: 50%;
   animation: spin 0.6s linear infinite;
-  vertical-align: middle; margin-left: 4px;
+  vertical-align: middle; margin-left: 6px;
+}
+.spinner-brand {
+  display: inline-block; width: 20px; height: 20px;
+  border: 2px solid var(--color-edge);
+  border-top-color: var(--color-brand); border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
 /* ── Toast notifications ── */
@@ -143,22 +225,22 @@
 .toast-enter { animation: toast-in 0.3s ease-out forwards; }
 .toast-exit { animation: toast-out 0.25s ease-in forwards; }
 
-/* ── Stagger delays (!important overrides animation shorthand) ── */
-.stagger-1 { animation-delay: 60ms !important; }
-.stagger-2 { animation-delay: 120ms !important; }
-.stagger-3 { animation-delay: 180ms !important; }
-.stagger-4 { animation-delay: 240ms !important; }
-.stagger-5 { animation-delay: 300ms !important; }
-.stagger-6 { animation-delay: 360ms !important; }
-.stagger-7 { animation-delay: 420ms !important; }
-.stagger-8 { animation-delay: 480ms !important; }
-.stagger-9 { animation-delay: 540ms !important; }
+/* ── Stagger delays ── */
+.stagger-1 { animation-delay: 50ms !important; }
+.stagger-2 { animation-delay: 100ms !important; }
+.stagger-3 { animation-delay: 150ms !important; }
+.stagger-4 { animation-delay: 200ms !important; }
+.stagger-5 { animation-delay: 250ms !important; }
+.stagger-6 { animation-delay: 300ms !important; }
+.stagger-7 { animation-delay: 350ms !important; }
+.stagger-8 { animation-delay: 400ms !important; }
+.stagger-9 { animation-delay: 450ms !important; }
 
-/* ── HTMX content swap fade ── */
+/* ── HTMX swap transitions ── */
 .htmx-swapping { opacity: 0; transition: opacity 0.15s ease-out; }
 .htmx-settling { opacity: 1; transition: opacity 0.2s ease-in; }
 
-/* ── Respect reduced motion preference ── */
+/* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -167,11 +249,65 @@
   }
 }
 
-/* ── Skeleton overlay for swap targets ── */
+/* ── Skeleton overlay for HTMX targets ── */
 .skeleton-overlay {
   position: absolute; inset: 0; z-index: 10;
-  background: white; border-radius: 12px;
+  background: var(--color-surface-secondary);
+  border-radius: 12px;
   opacity: 0; pointer-events: none; transition: opacity 150ms;
 }
-.dark .skeleton-overlay { background: #1f2937; }
 .htmx-request .skeleton-overlay { opacity: 1; pointer-events: auto; }
+
+/* ── Score badge colors ── */
+.score-low { color: var(--color-score-low); }
+.score-mid { color: var(--color-score-mid); }
+.score-high { color: var(--color-score-high); }
+.score-top { color: var(--color-score-top); }
+.score-bg-low { background-color: var(--color-surface-tertiary); }
+.score-bg-mid { background-color: var(--color-warning-light); }
+.score-bg-high { background-color: var(--color-success-light); }
+.score-bg-top { background-color: var(--color-success-light); }
+
+/* ── Image placeholder ── */
+.img-placeholder {
+  background: linear-gradient(135deg, var(--color-surface-tertiary) 0%, var(--color-edge) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+/* ── Horizontal scroll sections ── */
+.scroll-section {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.5rem;
+}
+.scroll-section::-webkit-scrollbar { display: none; }
+.scroll-section > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* ── Active nav tab indicator ── */
+.nav-tab {
+  position: relative;
+  transition: color 150ms;
+}
+.nav-tab.active {
+  color: var(--color-brand);
+}
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-brand);
+  border-radius: 1px;
+}

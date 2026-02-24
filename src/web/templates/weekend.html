@@ -1,24 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Weekend Plans{% endblock %}
+{% block title %}This Weekend{% endblock %}
 {% block content %}
 
-<h2 class="text-lg font-semibold mb-2 animate-fade-in-up">🎉 Weekend Plan: {{ saturday.strftime("%b %d") }} - {{
-    sunday.strftime("%b %d") }}</h2>
-<p class="text-gray-500 dark:text-gray-400 text-sm mb-6 animate-fade-in-up stagger-1">
-    {{ weather.saturday.icon }} Sat {{ "%.0f" | format(weather.saturday.temp_high_f) }}°F ·
-    {{ weather.sunday.icon }} Sun {{ "%.0f" | format(weather.sunday.temp_high_f) }}°F
-</p>
+<div class="animate-fade-in">
+  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-2">
+    🎉 Weekend Plan: {{ saturday.strftime('%b %d') }} - {{ sunday.strftime('%b %d') }}
+  </h1>
 
-{% if ranked %}
-{% for event, score in ranked[:10] %}
-{% set medals = ["🥇", "🥈", "🥉"] %}
-{% set medal = medals[loop.index0] if loop.index0 < 3 else "#" ~ loop.index %} {% set highlight=loop.index0 < 3 %} {%
-    set link="/event/" ~ event.id %} {% set short_date=true %} {% set show_source=false %} {% set show_price=true %} {%
-    set score_value="%.0f" | format(score) %} {% set score_display=none %} {% set card_delay=loop.index0 + 2 %} {%
-    include "partials/_event_card.html" %} {% endfor %} {% else %} <p class="text-gray-500">No ranked events. Run
-    scrapers and tagger first!</p>
-    {% endif %}
+  {# ═══ WEATHER BANNER ═══ #}
+  <div class="bg-gradient-to-r from-sky-50 to-amber-50 dark:from-sky-950/20 dark:to-amber-950/20 rounded-xl p-4 border border-[var(--color-edge-subtle)] mb-8 animate-fade-in-up stagger-1">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2">
+          <span class="text-3xl">{{ weather.saturday.icon }}</span>
+          <div>
+            <p class="text-sm font-semibold text-[var(--color-heading)]">Saturday</p>
+            <p class="text-xs text-[var(--color-muted)]">{{ weather.saturday.temp_high_f }}°F</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-3xl">{{ weather.sunday.icon }}</span>
+          <div>
+            <p class="text-sm font-semibold text-[var(--color-heading)]">Sunday</p>
+            <p class="text-xs text-[var(--color-muted)]">{{ weather.sunday.temp_high_f }}°F</p>
+          </div>
+        </div>
+      </div>
+      {% if weather.saturday.temp_high_f and weather.saturday.temp_high_f < 85 %}
+      <p class="text-sm text-[var(--color-success)] font-medium">Great outdoor weather! 🌞</p>
+      {% else %}
+      <p class="text-sm text-[var(--color-warning)] font-medium">Consider indoor activities 🏠</p>
+      {% endif %}
+    </div>
+  </div>
 
-    {% include "partials/_notification.html" %}
+  {# ═══ RANKED EVENTS ═══ #}
+  {% if ranked %}
+  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-4 animate-fade-in-up stagger-2">
+    ⭐ Top {{ ranked|length }} Picks for Your Weekend
+  </h2>
 
-    {% endblock %}
+  <div class="space-y-3 mb-8">
+    {% for event, score in ranked[:15] %}
+      {% set medal = '🥇' if loop.index == 1 else '🥈' if loop.index == 2 else '🥉' if loop.index == 3 else '#' ~ loop.index %}
+      {% set card_delay = loop.index %}
+      {% set score_value = '%d' % score %}
+      {% include "partials/_event_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-16 text-center">
+    <div class="w-16 h-16 rounded-full bg-[var(--color-surface-tertiary)] flex items-center justify-center mb-4">
+      <span class="text-3xl">📅</span>
+    </div>
+    <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-2">No weekend events yet</h3>
+    <p class="text-[var(--color-muted)] max-w-sm">Run the scraper to find events for this weekend.</p>
+  </div>
+  {% endif %}
+
+  {# ═══ NOTIFICATION PREVIEW ═══ #}
+  {% if message %}
+  {% include "partials/_notification.html" %}
+  {% endif %}
+</div>
+
+{% endblock %}

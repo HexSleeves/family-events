@@ -1,31 +1,51 @@
-{# AI tags grid for event detail page #}
+{# AI tags grid for event detail #}
 {% if tags %}
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-xs animate-fade-in-up stagger-1">
-    <h3 class="font-semibold text-gray-900 dark:text-white mb-3">🏷️ AI Tags</h3>
-    <div class="grid grid-cols-2 gap-2.5 text-sm">
-        <div><strong>Toddler Score:</strong> <span class="text-xl font-bold text-indigo-500">{{ tags.toddler_score
-                }}/10</span></div>
-        <div><strong>Age Range:</strong> {{ tags.age_min_recommended }}-{{ tags.age_max_recommended }}</div>
-        <div><strong>Indoor/Outdoor:</strong> {{ tags.indoor_outdoor }}</div>
-        <div><strong>Noise Level:</strong> {{ tags.noise_level }}</div>
-        <div><strong>Crowd:</strong> {{ tags.crowd_level }}</div>
-        <div><strong>Energy:</strong> {{ tags.energy_level }}</div>
-        <div><strong>Stroller-Friendly:</strong> {{ "✅" if tags.stroller_friendly else "❌" }}</div>
-        <div><strong>Parking:</strong> {{ "✅" if tags.parking_available else "❌" }}</div>
-        <div><strong>Bathrooms:</strong> {{ "✅" if tags.bathroom_accessible else "❌" }}</div>
-        <div><strong>Food:</strong> {{ "✅" if tags.food_available else "❌" }}</div>
-        <div><strong>Nap-Compatible:</strong> {{ "✅" if tags.nap_compatible else "❌" }}</div>
-        <div><strong>Weather-Dependent:</strong> {{ "✅" if tags.weather_dependent else "❌" }}</div>
-        <div><strong>Good for Rain:</strong> {{ "✅" if tags.good_for_rain else "❌" }}</div>
-        <div><strong>Good for Heat:</strong> {{ "✅" if tags.good_for_heat else "❌" }}</div>
-        <div><strong>Meltdown Risk:</strong>
-            <span
-                class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ 'bg-green-100 text-green-800' if tags.meltdown_risk == 'low' else 'bg-orange-100 text-orange-800' }}">{{
-                tags.meltdown_risk }}</span>
-        </div>
-        <div><strong>Parent Attention:</strong> {{ tags.parent_attention_required }}</div>
-        <div><strong>Categories:</strong> {{ tags.categories | join(", ") }}</div>
-        <div><strong>Confidence:</strong> {{ "%.0f%%" | format(tags.confidence_score * 100) }}</div>
+<div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
+  <h3 class="font-semibold text-[var(--color-heading)] mb-4">🤖 AI Analysis</h3>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+    {% set items = [
+      ('🎯', 'Toddler Score', tags.toddler_score ~ '/10', ''),
+      ('👶', 'Ages', tags.age_min_recommended ~ '-' ~ tags.age_max_recommended, ''),
+      ('🏠', 'Setting', tags.indoor_outdoor, ''),
+      ('🔊', 'Noise', tags.noise_level, ''),
+      ('👥', 'Crowd', tags.crowd_level, ''),
+      ('⚡', 'Energy', tags.energy_level, ''),
+      ('😤', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk == 'medium' else 'high'),
+      ('👁️', 'Attention', tags.parent_attention_required, ''),
+      ('🛍️', 'Stroller', '✅' if tags.stroller_friendly else '❌', ''),
+      ('🅿️', 'Parking', '✅' if tags.parking_available else '❌', ''),
+      ('🚻', 'Bathrooms', '✅' if tags.bathroom_accessible else '❌', ''),
+      ('🌧️', 'Weather Dep.', '✅' if tags.weather_dependent else '❌', ''),
+      ('😴', 'Nap Compatible', '✅' if tags.nap_compatible else '❌', ''),
+      ('🍔', 'Food Available', '✅' if tags.food_available else '❌', '')
+    ] %}
+    {% for icon, label, value, variant in items %}
+    <div class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--color-surface-secondary)]">
+      <span class="text-base">{{ icon }}</span>
+      <div>
+        <p class="text-xs text-[var(--color-faint)]">{{ label }}</p>
+        <p class="text-sm font-medium text-[var(--color-heading)] capitalize
+          {% if variant == 'low' %} text-[var(--color-success)]{% elif variant == 'high' %} text-[var(--color-danger)]{% endif %}
+        ">{{ value }}</p>
+      </div>
     </div>
+    {% endfor %}
+  </div>
+
+  {% if tags.categories %}
+  <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)]">
+    <p class="text-xs text-[var(--color-faint)] mb-2">Categories</p>
+    <div class="flex flex-wrap gap-1.5">
+      {% for cat in tags.categories %}
+      <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-light)] text-[var(--color-info)]">{{ cat }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if tags.confidence_score %}
+  <p class="text-xs text-[var(--color-faint)] mt-3">Confidence: {{ '%.0f' % (tags.confidence_score * 100) }}%</p>
+  {% endif %}
 </div>
 {% endif %}

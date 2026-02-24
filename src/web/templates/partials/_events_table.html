@@ -1,148 +1,112 @@
-{# Events table + pagination — HTMX swappable partial #}
-{% set _hx_common %}
-hx-target="#events-results"
-hx-swap="innerHTML"
-hx-push-url="true"
-hx-indicator="#events-results-wrapper"
-{% endset %}
-{% set _qs %}q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged
-}}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}{% endset %}
+{# Events results: card grid + pagination #}
 
-{# Results summary #}
-<div class="flex items-center justify-between mb-3">
-    <p class="text-sm text-gray-500">
-        Showing {{ ((page - 1) * per_page) + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} events
-    </p>
-</div>
+{# Result count #}
+<p class="text-sm text-[var(--color-muted)] mb-4">
+  Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} events
+</p>
 
-{# ── Desktop table (hidden on mobile) ── #}
-<div class="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-xs overflow-x-auto">
-    <table class="w-full border-collapse">
-        <thead>
-            <tr class="bg-gray-50 dark:bg-gray-700/50">
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Date</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Time</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Event</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    City</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Source</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Score</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                    Categories</th>
-                <th
-                    class="text-left py-2.5 px-2.5 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase border-b border-gray-200 dark:border-gray-700">
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for event in events %}
-            {% include "partials/_event_row.html" %}
-            {% else %}
-            <tr>
-                <td colspan="8" class="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">No events match your
-                    filters.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+{# ═══ CARD GRID ═══ #}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+  {% for event in events %}
+  {% set score = event.tags.toddler_score if event.tags else none %}
+  {% set score_class = "score-low" if score is not none and score <= 3
+                  else "score-mid" if score is not none and score <= 6
+                  else "score-high" if score is not none and score <= 8
+                  else "score-top" if score is not none
+                  else "" %}
+  {% set score_bg = "score-bg-low" if score is not none and score <= 3
+                else "score-bg-mid" if score is not none and score <= 6
+                else "score-bg-high" if score is not none and score <= 8
+                else "score-bg-top" if score is not none
+                else "" %}
 
-{# ── Mobile card layout (hidden on desktop) ── #}
-<div class="md:hidden space-y-3">
-    {% for event in events %}
-    <a href="/event/{{ event.id }}"
-        class="block bg-white dark:bg-gray-800 rounded-xl shadow-xs p-4 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 animate-fade-in-up stagger-{{ [loop.index0, 9] | min }}">
-        <div class="flex items-start justify-between gap-3">
-            <div class="flex-1 min-w-0">
-                <h3 class="font-semibold text-sm text-gray-900 dark:text-white truncate">{{ event.title[:70] }}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    📅 {{ event.start_time.strftime("%m/%d %a · %-I:%M%p") }}
-                    · 📍 {{ event.location_city }}
-                </p>
-            </div>
-            {% if event.tags %}
-            <span
-                class="shrink-0 inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">{{
-                event.tags.toddler_score }}/10</span>
-            {% else %}
-            <span
-                class="shrink-0 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300">untagged</span>
-            {% endif %}
-        </div>
-        <div class="flex flex-wrap gap-1.5 mt-2">
-            {% set source_label = event.source.replace("custom:", "") if event.source.startswith("custom:") else
-            event.source %}
-            <span
-                class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{{
-                source_label[:20] }}</span>
-            {% if event.tags and event.tags.categories %}
-            <span
-                class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">{{
-                event.tags.categories[:2] | join(", ") }}</span>
-            {% endif %}
-        </div>
-    </a>
-    {% else %}
-    <div class="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">No events match your filters.</div>
-    {% endfor %}
-</div>
+  <a href="/event/{{ event.id }}"
+     class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}">
 
-{# Pagination #}
-{% if total_pages > 1 %}
-<nav class="flex items-center justify-between mt-4 gap-2">
-    <div class="flex items-center gap-1 flex-wrap">
-        {# Previous #}
-        {% if page > 1 %}
-        <button hx-get="/events?{{ _qs }}&page={{ page - 1 }}" {{ _hx_common }}
-            class="px-3 py-2 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center">←
-            Prev</button>
-        {% endif %}
+    {# Image #}
+    <div class="relative aspect-[16/10] overflow-hidden">
+      {% if event.image_url %}
+      <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+      {% else %}
+      <div class="img-placeholder w-full h-full text-2xl">
+        {% if event.tags and event.tags.categories %}{{ {'play': '🎪', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
+      </div>
+      {% endif %}
 
-        {# Page numbers — show fewer on mobile #}
-        {% set page_start = [1, page - 1] | max %}
-        {% set page_end = [total_pages, page + 1] | min %}
+      {# Score badge #}
+      {% if score is not none %}
+      <div class="absolute top-2.5 left-2.5">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold bg-white/90 backdrop-blur-sm shadow-xs {{ score_class }}">
+          {% if score >= 9 %}⭐{% endif %}{{ score }}
+        </span>
+      </div>
+      {% endif %}
 
-        {% if page_start > 1 %}
-        <button hx-get="/events?{{ _qs }}&page=1" {{ _hx_common }}
-            class="hidden sm:flex px-3 py-2 md:py-1.5 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 items-center justify-center">1</button>
-        {% if page_start > 2 %}
-        <span class="hidden sm:inline px-1 text-gray-400">…</span>
-        {% endif %}
-        {% endif %}
-
-        {% for p in range(page_start, page_end + 1) %}
-        <button {% if p !=page %}hx-get="/events?{{ _qs }}&page={{ p }}" {{ _hx_common }}{% endif %}
-            class="px-3 py-2 md:py-1.5 rounded-lg text-sm cursor-pointer transition min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center {{ 'bg-indigo-500 text-white font-semibold' if p == page else 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">{{
-            p }}</button>
-        {% endfor %}
-
-        {% if page_end < total_pages %} {% if page_end < total_pages - 1 %} <span
-            class="hidden sm:inline px-1 text-gray-400">…</span>
-            {% endif %}
-            <button hx-get="/events?{{ _qs }}&page={{ total_pages }}" {{ _hx_common }}
-                class="hidden sm:flex px-3 py-2 md:py-1.5 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 items-center justify-center">{{
-                total_pages }}</button>
-            {% endif %}
-
-            {# Next #}
-            {% if page < total_pages %} <button hx-get="/events?{{ _qs }}&page={{ page + 1 }}" {{ _hx_common }}
-                class="px-3 py-2 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center">
-                Next →</button>
-                {% endif %}
+      {# Free badge #}
+      {% if event.is_free %}
+      <span class="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-success)] text-white shadow-xs">Free</span>
+      {% endif %}
     </div>
 
-    <p class="text-xs text-gray-400 shrink-0">{{ page }}/{{ total_pages }}</p>
+    {# Content #}
+    <div class="p-3.5">
+      <div class="flex items-center gap-2 text-xs text-[var(--color-faint)] mb-1.5">
+        <span>{{ event.start_time.strftime('%a %b %d') }}</span>
+        <span>·</span>
+        <span class="capitalize">{{ event.source }}</span>
+      </div>
+      <h3 class="font-semibold text-[var(--color-heading)] text-sm leading-snug line-clamp-2 group-hover:text-[var(--color-brand)] transition-colors mb-1.5">
+        {{ event.title }}
+      </h3>
+      <p class="text-xs text-[var(--color-muted)] truncate">
+        📍 {{ event.location_name or event.location_city }}, {{ event.location_city }}
+      </p>
+      {% if event.tags and event.tags.categories %}
+      <div class="flex flex-wrap gap-1 mt-2">
+        {% for cat in event.tags.categories[:2] %}
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-surface-tertiary)] text-[var(--color-muted)]">{{ cat }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{# ═══ PAGINATION ═══ #}
+{% if total_pages > 1 %}
+<nav class="flex items-center justify-center gap-1 mt-6" aria-label="Pagination">
+  {# Previous #}
+  {% if page > 1 %}
+  <button hx-get="/events?page={{ page - 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+          hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
+          class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+    ←
+  </button>
+  {% endif %}
+
+  {# Page numbers #}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg bg-[var(--color-brand)] text-white text-sm font-semibold">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page - 1 and p <= page + 1) %}
+    <button hx-get="/events?page={{ p }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+            hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
+            class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+      {{ p }}
+    </button>
+    {% elif p == 2 or p == total_pages - 1 %}
+    <span class="text-[var(--color-faint)] px-1">…</span>
+    {% endif %}
+  {% endfor %}
+
+  {# Next #}
+  {% if page < total_pages %}
+  <button hx-get="/events?page={{ page + 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+          hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
+          class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+    →
+  </button>
+  {% endif %}
 </nav>
 {% endif %}
