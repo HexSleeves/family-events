@@ -3,11 +3,11 @@
 {% block content %}
 
 <div class="space-y-6">
-    <h2 class="text-xl font-bold">👤 Profile &mdash; {{ current_user.display_name }}</h2>
-    <p class="text-sm text-gray-500 dark:text-gray-400">{{ current_user.email }} &middot; Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
+    <h2 class="text-xl font-bold animate-fade-in-up">👤 Profile &mdash; {{ current_user.display_name }}</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 animate-fade-in-up stagger-1">{{ current_user.email }} &middot; Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
 
     {# ── Theme ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-2 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🎨 Appearance</h3>
         <form hx-post="/api/profile/theme" hx-swap="none" class="flex flex-wrap items-center gap-4">
             <label class="flex items-center gap-2 cursor-pointer">
@@ -26,14 +26,14 @@
                 <span class="text-sm">💻 System</span>
             </label>
             <button type="submit"
-                class="sm:ml-auto px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                class="sm:ml-auto px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
                 Save
             </button>
         </form>
     </section>
 
     {# ── Location ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-3 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">📍 Location</h3>
         <form hx-post="/api/profile/location" hx-swap="none" class="space-y-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -50,7 +50,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button type="submit"
-                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
                     Save Location
                 </button>
             </div>
@@ -60,7 +60,7 @@
     {# ── Child Preferences ── #}
     {% set p = current_user.interest_profile %}
     {% set c = p.constraints %}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-4 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🧩 Child Preferences</h3>
         <form hx-post="/api/profile/preferences" hx-swap="none" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -104,7 +104,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button type="submit"
-                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
                     Save Preferences
                 </button>
             </div>
@@ -112,7 +112,7 @@
     </section>
 
     {# ── Notification Channels ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-5 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🔔 Notifications</h3>
         <form hx-post="/api/profile/notifications" hx-swap="none" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -144,7 +144,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button type="submit"
-                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold cursor-pointer transition">
+                    class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
                     Save Notifications
                 </button>
             </div>
@@ -152,7 +152,7 @@
     </section>
 
     {# ── Your Sources ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-6 hover:shadow-md transition-shadow duration-200">
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold">📡 Your Sources</h3>
             <a href="/sources" class="text-xs text-indigo-500 hover:text-indigo-600 font-medium">Manage all &rarr;</a>
@@ -161,7 +161,7 @@
         <div class="space-y-2">
             {% for s in sources %}
             <div class="flex items-center gap-3 text-sm">
-                <span class="{% if s.status == 'active' %}text-green-500{% elif s.status == 'failed' %}text-red-500{% else %}text-gray-400{% endif %}">●</span>
+                <span class="{% if s.status == 'active' %}text-green-500{% elif s.status == 'failed' %}text-red-500{% else %}text-gray-400{% endif %}">&#x25cf;</span>
                 <a href="/source/{{ s.id }}" class="font-medium hover:text-indigo-500 transition">{{ s.name }}</a>
                 <span class="text-gray-400 text-xs">{{ s.domain }}</span>
                 <span class="ml-auto text-xs px-2 py-0.5 rounded-full
@@ -178,7 +178,7 @@
     </section>
 
     {# ── Change Password ── #}
-    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+    <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-7 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🔒 Change Password</h3>
         <form hx-post="/api/profile/password" hx-swap="none" class="space-y-3">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -200,7 +200,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <button type="submit"
-                    class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold cursor-pointer transition">
+                    class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
                     Change Password
                 </button>
             </div>

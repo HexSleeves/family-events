@@ -11,6 +11,39 @@
     <script>
       tailwind.config = {
         darkMode: "class",
+        theme: {
+          extend: {
+            animation: {
+              "fade-in": "fade-in 0.4s ease-out both",
+              "fade-in-up": "fade-in-up 0.45s ease-out both",
+              "slide-down": "slide-down 0.25s ease-out both",
+              "scale-in": "scale-in 0.35s ease-out both",
+              "pop-in": "pop-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both",
+            },
+            keyframes: {
+              "fade-in": {
+                "0%": { opacity: "0" },
+                "100%": { opacity: "1" },
+              },
+              "fade-in-up": {
+                "0%": { opacity: "0", transform: "translateY(12px)" },
+                "100%": { opacity: "1", transform: "translateY(0)" },
+              },
+              "slide-down": {
+                "0%": { opacity: "0", transform: "translateY(-8px)" },
+                "100%": { opacity: "1", transform: "translateY(0)" },
+              },
+              "scale-in": {
+                "0%": { opacity: "0", transform: "scale(0.96)" },
+                "100%": { opacity: "1", transform: "scale(1)" },
+              },
+              "pop-in": {
+                "0%": { opacity: "0", transform: "scale(0.9)" },
+                "100%": { opacity: "1", transform: "scale(1)" },
+              },
+            },
+          },
+        },
       };
     </script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -156,6 +189,56 @@
         animation: toast-out 0.25s ease-in forwards;
       }
 
+      /* ── Stagger delays (needs !important to override animation shorthand) ── */
+      .stagger-1 {
+        animation-delay: 60ms !important;
+      }
+      .stagger-2 {
+        animation-delay: 120ms !important;
+      }
+      .stagger-3 {
+        animation-delay: 180ms !important;
+      }
+      .stagger-4 {
+        animation-delay: 240ms !important;
+      }
+      .stagger-5 {
+        animation-delay: 300ms !important;
+      }
+      .stagger-6 {
+        animation-delay: 360ms !important;
+      }
+      .stagger-7 {
+        animation-delay: 420ms !important;
+      }
+      .stagger-8 {
+        animation-delay: 480ms !important;
+      }
+      .stagger-9 {
+        animation-delay: 540ms !important;
+      }
+
+      /* ── HTMX content swap fade ── */
+      .htmx-swapping {
+        opacity: 0;
+        transition: opacity 0.15s ease-out;
+      }
+      .htmx-settling {
+        opacity: 1;
+        transition: opacity 0.2s ease-in;
+      }
+
+      /* ── Respect reduced motion preference ── */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
       /* ── Skeleton overlay for swap targets ── */
       .skeleton-overlay {
         position: absolute;
@@ -180,7 +263,7 @@
       (function() {
           {% if current_user and current_user.theme == 'auto' %}
           if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-              document.documentElement.classList.add('dark');
+              changeTheme('dark');
           }
           {% endif %}
       })();
@@ -197,54 +280,135 @@
       class="bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-700 dark:to-purple-700 text-white py-4 mb-6"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center gap-4">
-        <a href="/" class="text-xl font-bold hover:opacity-90 transition shrink-0"
+        <a
+          href="/"
+          class="text-xl font-bold hover:opacity-90 transition shrink-0"
           >🌟 Family Events</a
         >
         {# Hamburger button — mobile only #}
         <button
           id="menu-toggle"
-          onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+          onclick="
+            document.getElementById('mobile-menu').classList.toggle('hidden')
+          "
           class="ml-auto md:hidden p-2 rounded-md bg-white/15 hover:bg-white/30 transition cursor-pointer"
           aria-label="Toggle menu"
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
         </button>
         {# Desktop nav #}
         <nav class="ml-auto hidden md:flex gap-2 items-center">
-          <a href="/" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🏠 Dashboard</a>
-          <a href="/events" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📅 Events</a>
-          <a href="/weekend" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🎉 Weekend</a>
-          <a href="/sources" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📡 Sources</a>
+          <a
+            href="/"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >🏠 Dashboard</a
+          >
+          <a
+            href="/events"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >📅 Events</a
+          >
+          <a
+            href="/weekend"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >🎉 Weekend</a
+          >
+          <a
+            href="/sources"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >📡 Sources</a
+          >
           {% if current_user %}
           <span class="mx-1 text-white/40">|</span>
-          <a href="/profile" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">👤 {{ current_user.display_name }}</a>
-          <a href="/logout" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">↩ Logout</a>
+          <a
+            href="/profile"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >👤 {{ current_user.display_name }}</a
+          >
+          <a
+            href="/logout"
+            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 hover:-translate-y-0.5 active:scale-95 text-sm transition-all duration-200"
+            >↩ Logout</a
+          >
           {% else %}
           <span class="mx-1 text-white/40">|</span>
-          <a href="/login" class="px-3 py-1.5 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition">Log In</a>
-          <a href="/signup" class="px-3 py-1.5 rounded-md bg-white/30 hover:bg-white/40 text-sm font-medium transition">Sign Up</a>
+          <a
+            href="/login"
+            class="px-3 py-1.5 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition"
+            >Log In</a
+          >
+          <a
+            href="/signup"
+            class="px-3 py-1.5 rounded-md bg-white/30 hover:bg-white/40 text-sm font-medium transition"
+            >Sign Up</a
+          >
           {% endif %}
         </nav>
       </div>
-      {# Mobile menu — hidden by default #}
-      <nav id="mobile-menu" class="hidden md:hidden mt-3 px-4 pb-2 space-y-1">
-        <a href="/" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">🏠 Dashboard</a>
-        <a href="/events" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">📅 Events</a>
-        <a href="/weekend" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">🎉 Weekend</a>
-        <a href="/sources" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">📡 Sources</a>
+      {# Mobile menu — hidden by default, animated on toggle #}
+      <nav
+        id="mobile-menu"
+        class="hidden md:hidden mt-3 px-4 pb-2 space-y-1 animate-slide-down"
+      >
+        <a
+          href="/"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >🏠 Dashboard</a
+        >
+        <a
+          href="/events"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >📅 Events</a
+        >
+        <a
+          href="/weekend"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >🎉 Weekend</a
+        >
+        <a
+          href="/sources"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >📡 Sources</a
+        >
         <div class="border-t border-white/20 my-2"></div>
         {% if current_user %}
-        <a href="/profile" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">👤 {{ current_user.display_name }}</a>
-        <a href="/logout" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">↩ Logout</a>
+        <a
+          href="/profile"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >👤 {{ current_user.display_name }}</a
+        >
+        <a
+          href="/logout"
+          class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition"
+          >↩ Logout</a
+        >
         {% else %}
-        <a href="/login" class="block px-3 py-2 rounded-md bg-white/15 hover:bg-white/25 text-sm font-medium transition">Log In</a>
-        <a href="/signup" class="block px-3 py-2 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition">Sign Up</a>
+        <a
+          href="/login"
+          class="block px-3 py-2 rounded-md bg-white/15 hover:bg-white/25 text-sm font-medium transition"
+          >Log In</a
+        >
+        <a
+          href="/signup"
+          class="block px-3 py-2 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition"
+          >Sign Up</a
+        >
         {% endif %}
       </nav>
     </header>
-    <main class="max-w-4xl mx-auto px-4 pb-12">
+    <main class="max-w-4xl mx-auto px-4 pb-12 animate-fade-in">
       {% block content %}{% endblock %}
     </main>
 
@@ -252,7 +416,7 @@
     <div
       id="toast-container"
       class="fixed flex flex-col gap-2 pointer-events-none left-4 right-4 bottom-4 items-center md:left-auto md:bottom-auto md:top-4 md:right-4 md:items-end"
-      style="z-index:10000;max-width:24rem"
+      style="z-index: 10000; max-width: 24rem"
     ></div>
 
     <script>
@@ -276,7 +440,9 @@
           var container = document.getElementById("toast-container");
           var el = document.createElement("div");
           el.style.cssText =
-            "background:" + (bgColors[variant] || bgColors.success) + ";" +
+            "background:" +
+            (bgColors[variant] || bgColors.success) +
+            ";" +
             "color:#fff;font-size:0.875rem;font-weight:500;" +
             "padding:0.75rem 1rem;border-radius:0.5rem;" +
             "box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);" +
@@ -302,36 +468,57 @@
             clearTimeout(timer);
             node.classList.remove("toast-enter");
             node.classList.add("toast-exit");
-            node.addEventListener("animationend", function () {
-              node.remove();
-            });
+            node.addEventListener(
+              "animationend",
+              function () {
+                node.remove();
+              },
+              { once: true },
+            );
           }
         }
 
-        // Listen for HTMX-triggered toast events (from HX-Trigger header)
-        document.body.addEventListener("showToast", function (e) {
-          var d = e.detail || {};
-          showToast(d.message || "Done", d.variant || "success", d.duration);
-        });
+        function changeTheme(theme) {
+          document.documentElement.classList.remove("dark", "light", "auto");
+          document.documentElement.classList.add(theme);
+        }
 
-        // Parse HX-Trigger header from every HTMX response
-        document.body.addEventListener("htmx:afterRequest", function (e) {
-          var xhr = e.detail.xhr;
-          if (!xhr) return;
-          var trigger = xhr.getResponseHeader("HX-Trigger");
-          if (!trigger) return;
-          try {
-            var parsed = JSON.parse(trigger);
-            if (parsed.showToast) {
-              var d = parsed.showToast;
-              showToast(d.message || "Done", d.variant || "success", d.duration);
+        if (!window._toastListenersAttached) {
+          window._toastListenersAttached = true;
+
+          document.body.addEventListener("showToast", function (e) {
+            var d = e.detail || {};
+            showToast(d.message || "Done", d.variant || "success", d.duration);
+          });
+
+          document.body.addEventListener("changeTheme", function (e) {
+            var d = e.detail || {};
+            changeTheme(d.theme || "auto");
+          });
+
+          document.body.addEventListener("htmx:afterRequest", function (e) {
+            var xhr = e.detail.xhr;
+            if (!xhr) return;
+            var trigger = xhr.getResponseHeader("HX-Trigger");
+            if (!trigger) return;
+            try {
+              var parsed = JSON.parse(trigger);
+              if (parsed.showToast) {
+                var d = parsed.showToast;
+                showToast(
+                  d.message || "Done",
+                  d.variant || "success",
+                  d.duration,
+                );
+              }
+            } catch (err) {
+              /* not JSON, ignore */
             }
-          } catch (err) {
-            /* not JSON, ignore */
-          }
-        });
+          });
+        }
 
         window.showToast = showToast;
+        window.changeTheme = changeTheme;
       })();
     </script>
   </body>

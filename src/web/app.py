@@ -49,6 +49,16 @@ def _toast(
     )
 
 
+def _change_theme(theme: str):
+    """Return an HTMLResponse that triggers a theme change via HX-Trigger."""
+    payload = json.dumps({"changeTheme": {"theme": theme}})
+    return HTMLResponse(
+        content="",
+        status_code=200,
+        headers={"HX-Trigger": payload},
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
@@ -130,7 +140,12 @@ async def signup_submit(request: Request):
     if errors:
         return templates.TemplateResponse(
             "signup.html",
-            {**await _ctx(request), "errors": errors, "email": email, "display_name": display_name},
+            {
+                **await _ctx(request),
+                "errors": errors,
+                "email": email,
+                "display_name": display_name,
+            },
         )
 
     user = User(
@@ -220,7 +235,7 @@ async def api_update_theme(request: Request):
     if theme not in ("light", "dark", "auto"):
         theme = "auto"
     await db.update_user(user.id, theme=theme)
-    return _toast("Theme updated — reload to apply", "info")
+    return _change_theme(theme)
 
 
 @app.post("/api/profile/notifications", response_class=HTMLResponse)

@@ -6,8 +6,8 @@
     <a href="/sources" class="text-sm text-indigo-600 hover:text-indigo-800">← All Sources</a>
 </div>
 
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm">
-    <h2 class="text-xl font-bold text-gray-900">{{ source.name }}</h2>
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up">
+    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ source.name }}</h2>
     <div class="text-gray-500 dark:text-gray-400 dark:text-gray-500 text-sm mt-1">
         <a href="{{ source.url }}" target="_blank" class="text-indigo-600 hover:underline">{{ source.url }}</a>
     </div>
@@ -40,8 +40,8 @@
 </div>
 
 {% if recipe %}
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm">
-    <h3 class="font-semibold text-gray-900 mb-3">📝 Scraping Recipe</h3>
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up stagger-1">
+    <h3 class="font-semibold text-gray-900 dark:text-white mb-3">📝 Scraping Recipe</h3>
     <div class="grid grid-cols-2 gap-2 text-sm mb-3">
         <div><strong>Strategy:</strong> {{ recipe.strategy }}</div>
         <div><strong>Confidence:</strong> {{ "%.0f%%" | format(recipe.confidence * 100) }}</div>
@@ -63,8 +63,8 @@
 {% endif %}
 
 {% if events %}
-<div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
-    <h3 class="font-semibold text-gray-900 mb-3">Recent Events ({{ events | length }})</h3>
+<div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm animate-fade-in-up stagger-2">
+    <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Recent Events ({{ events | length }})</h3>
     <div class="space-y-2">
         {% for event in events %}
         <div class="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">

@@ -4,54 +4,39 @@
 
 {% include "partials/_stats.html" %}
 
-<div class="flex flex-wrap gap-2 mb-6">
-    <button
-        hx-post="/api/scrape"
-        hx-swap="none"
-        hx-indicator="this"
-        hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
-    >
+<div class="flex flex-wrap gap-2 mb-6 animate-fade-in-up stagger-4">
+    <button hx-post="/api/scrape" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
         🔄 Run Scrapers
         <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
-    <button
-        hx-post="/api/tag"
-        hx-swap="none"
-        hx-indicator="this"
-        hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
-    >
+    <button hx-post="/api/tag" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
         🏷️ Tag Events
         <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
-    <button
-        hx-post="/api/notify"
-        hx-swap="none"
-        hx-indicator="this"
-        hx-disabled-elt="this"
-        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
-    >
+    <button hx-post="/api/notify" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md hover:-translate-y-0.5 active:scale-95 text-white font-semibold text-sm cursor-pointer transition-all duration-200 disabled:opacity-60 disabled:cursor-wait">
         📬 Send Notification
         <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
 </div>
 
-
-<h2 class="text-lg font-semibold mb-4">⭐ Top Toddler-Friendly Events</h2>
+<h2 class="text-lg font-semibold mb-4 animate-fade-in-up stagger-5">⭐ Top Toddler-Friendly Events</h2>
 {% if top_events %}
-    {% for e in top_events %}
-        {% set event = e %}
-        {% set highlight = false %}
-        {% set score_display = e.tags.toddler_score %}
-        {% set link = none %}
-        {% set short_date = false %}
-        {% set show_source = true %}
-        {% set show_price = false %}
-        {% include "partials/_event_card.html" %}
-    {% endfor %}
+{% for e in top_events %}
+{% set event = e %}
+{% set highlight = false %}
+{% set score_display = e.tags.toddler_score %}
+{% set link = none %}
+{% set short_date = false %}
+{% set show_source = true %}
+{% set show_price = false %}
+{% set card_delay = loop.index0 + 6 %}
+{% include "partials/_event_card.html" %}
+{% endfor %}
 {% else %}
-    <p class="text-gray-500 text-sm">No tagged events yet. Run scrapers then tag!</p>
+<p class="text-gray-500 text-sm animate-fade-in">No tagged events yet. Run scrapers then tag!</p>
 {% endif %}
 
 {% endblock %}
