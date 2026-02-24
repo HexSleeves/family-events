@@ -45,6 +45,8 @@ graph TB
     WEB -->|read events| DB
 ```
 
+
+
 ## Data Pipeline Flow
 
 The full pipeline runs as: **Scrape → Tag → Rank → Notify**.
@@ -78,6 +80,8 @@ sequenceDiagram
     F->>N: Formatted message
     N->>N: Route to channels<br/>(console, SMS, Telegram, email)
 ```
+
+
 
 ## Scraper Architecture
 
@@ -130,6 +134,8 @@ classDiagram
     BaseScraper <|-- LibraryScraper
 ```
 
+
+
 ## Database Schema
 
 Single table design. Events are uniquely identified by `(source, source_id)`.
@@ -163,6 +169,8 @@ erDiagram
         int attended "0 or 1"
     }
 ```
+
+
 
 ### EventTags JSON Structure
 
@@ -224,15 +232,19 @@ graph LR
     style NV fill:#6b7280,color:#fff
 ```
 
-| Factor | Weight | Source | How It Works |
-|--------|--------|--------|-------------|
-| Toddler Score | ×3.0 | AI tags | LLM rates 0-10 how appropriate for a 3-year-old |
-| Interest Match | ×2.5 | Tags + Profile | Compares event categories against loves/likes/dislikes |
-| Weather Compat | ×2.0 | Tags + Forecast | Rain→indoor bonus, heat→shade bonus, outdoor→clear bonus |
-| City Proximity | ×2.0 | Event location | Lafayette=+10, Baton Rouge=+2, other=-5 |
-| Timing | ×1.5 | Event time | Morning bonus, nap time (1-3pm) penalty, post-bedtime penalty |
-| Logistics | ×1.0 | AI tags | Stroller-friendly, parking, bathrooms, low meltdown risk |
-| Novelty | ×0.5 | Attended flag | Not recently attended gets a bonus |
+
+
+
+| Factor         | Weight | Source          | How It Works                                                  |
+| -------------- | ------ | --------------- | ------------------------------------------------------------- |
+| Toddler Score  | ×3.0   | AI tags         | LLM rates 0-10 how appropriate for a 3-year-old               |
+| Interest Match | ×2.5   | Tags + Profile  | Compares event categories against loves/likes/dislikes        |
+| Weather Compat | ×2.0   | Tags + Forecast | Rain→indoor bonus, heat→shade bonus, outdoor→clear bonus      |
+| City Proximity | ×2.0   | Event location  | Lafayette=+10, Baton Rouge=+2, other=-5                       |
+| Timing         | ×1.5   | Event time      | Morning bonus, nap time (1-3pm) penalty, post-bedtime penalty |
+| Logistics      | ×1.0   | AI tags         | Stroller-friendly, parking, bathrooms, low meltdown risk      |
+| Novelty        | ×0.5   | Attended flag   | Not recently attended gets a bonus                            |
+
 
 ## Notification Flow
 
@@ -251,6 +263,8 @@ graph LR
     style TG fill:#0ea5e9,color:#fff
     style EM fill:#f59e0b,color:#fff
 ```
+
+
 
 The formatter produces a plain-text message like:
 
@@ -313,6 +327,8 @@ graph TD
     style SCHEDULER fill:#f59e0b,color:#fff
 ```
 
+
+
 ## File Structure
 
 ```
@@ -357,3 +373,4 @@ family-events/
     ├── frontend.md             # HTMX + template docs
     └── pipeline.md             # Scraping + tagging pipeline
 ```
+

@@ -101,6 +101,7 @@ return templates.TemplateResponse("events.html", ctx)
 ```
 
 This means the same URL works for both:
+
 - **Full page load** (browser navigation) → full HTML with `<html>`, nav, etc.
 - **HTMX request** (search/filter/pagination) → just the table + pagination fragment
 
