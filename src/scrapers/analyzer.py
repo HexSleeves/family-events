@@ -139,14 +139,17 @@ class PageAnalyzer:
             comment.extract()
         # Remove elements with ad/cookie classes
         for el in soup.find_all(class_=True):
-            class_val = el.get("class") or []
-            classes = (
-                " ".join(str(c) for c in class_val)
-                if isinstance(class_val, list)
-                else str(class_val)
-            )
-            if any(c in classes.lower() for c in _STRIP_CLASSES):
-                el.decompose()
+            try:
+                class_val = el.get("class") or []
+                classes = (
+                    " ".join(str(c) for c in class_val)
+                    if isinstance(class_val, list)
+                    else str(class_val)
+                )
+                if any(c in classes.lower() for c in _STRIP_CLASSES):
+                    el.decompose()
+            except (AttributeError, TypeError):
+                continue
         # Prefer <main> content
         main = soup.find("main")
         root = main if main else soup.body or soup
@@ -172,6 +175,12 @@ class PageAnalyzer:
         raw = json.loads(response.choices[0].message.content or "{}")
         raw["version"] = 1
         raw["analyzed_at"] = datetime.now(tz=UTC).isoformat()
+        # Clean null fields from CSS strategy
+        if raw.get("css") and raw["css"].get("fields"):
+            fields = raw["css"]["fields"]
+            for key in list(fields):
+                if fields[key] is None:
+                    del fields[key]
         return ScrapeRecipe.model_validate(raw)
 
     # -- Validation ---------------------------------------------------------

@@ -25,7 +25,7 @@ class Pagination(BaseModel):
 class CSSFields(BaseModel):
     title: FieldRule
     description: FieldRule | None = None
-    start_time: FieldRule
+    start_time: FieldRule | None = None
     end_time: FieldRule | None = None
     location: FieldRule | None = None
     url: FieldRule | None = None

@@ -128,8 +128,8 @@ class GenericScraper(BaseScraper):
         assert self.recipe.css is not None
         fields = self.recipe.css.fields
         title = self._field(el, fields.title)
-        start_raw = self._field(el, fields.start_time)
-        if not title or not start_raw:
+        start_raw = self._field(el, fields.start_time) if fields.start_time else ""
+        if not title:
             return None
 
         event_url = self._field(el, fields.url)
