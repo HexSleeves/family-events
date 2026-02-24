@@ -9,31 +9,42 @@
         hx-post="/api/scrape"
         hx-target="#action-status"
         hx-swap="innerHTML"
-        class="inline-block px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition"
+        hx-indicator="this"
+        hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
     >
         🔄 Run Scrapers
-        <span class="htmx-indicator">...</span>
+        <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     <button
         hx-post="/api/tag"
         hx-target="#action-status"
         hx-swap="innerHTML"
-        class="inline-block px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition"
+        hx-indicator="this"
+        hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
     >
         🏷️ Tag Events
-        <span class="htmx-indicator">...</span>
+        <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     <button
         hx-post="/api/notify"
         hx-target="#action-status"
         hx-swap="innerHTML"
-        class="inline-block px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition"
+        hx-indicator="this"
+        hx-disabled-elt="this"
+        class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
     >
         📬 Send Notification
-        <span class="htmx-indicator">...</span>
+        <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
 </div>
-<div id="action-status" class="mb-6"></div>
+{# Action result + skeleton loading state #}
+<div id="action-status" class="mb-6 relative">
+    <div id="action-skeleton" class="htmx-indicator">
+        {% include "partials/_skeleton_action.html" %}
+    </div>
+</div>
 
 <h2 class="text-lg font-semibold mb-4">⭐ Top Toddler-Friendly Events</h2>
 {% if top_events %}

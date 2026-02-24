@@ -12,6 +12,7 @@
     hx-swap="innerHTML"
     hx-push-url="true"
     hx-trigger="submit, change from:.auto-submit"
+    hx-indicator="#events-results-wrapper"
     class="bg-white rounded-xl p-4 shadow-sm mb-4 space-y-3"
 >
     {# Search bar #}
@@ -28,6 +29,7 @@
             hx-push-url="true"
             hx-trigger="keyup changed delay:300ms"
             hx-include="#events-form"
+            hx-indicator="#events-results-wrapper"
         />
         <svg class="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -92,8 +94,14 @@
 </form>
 
 {# ── Results (swapped by HTMX) ── #}
-<div id="events-results">
-    {% include "partials/_events_table.html" %}
+<div id="events-results-wrapper" class="relative">
+    {# Skeleton overlay — shown during HTMX requests #}
+    <div class="skeleton-overlay" id="events-skeleton">
+        {% include "partials/_skeleton_table.html" %}
+    </div>
+    <div id="events-results">
+        {% include "partials/_events_table.html" %}
+    </div>
 </div>
 
 {% endblock %}

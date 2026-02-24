@@ -18,9 +18,12 @@
             hx-post="/api/attend/{{ event.id }}"
             hx-target="#attend-btn"
             hx-swap="outerHTML"
-            class="inline-block px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm cursor-pointer transition"
+            hx-indicator="this"
+            hx-disabled-elt="this"
+            class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
         >
             ✅ Mark Attended
+            <span class="htmx-indicator"><span class="spinner"></span></span>
         </button>
     </div>
 </div>

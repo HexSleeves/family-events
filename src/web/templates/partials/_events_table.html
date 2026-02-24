@@ -1,4 +1,11 @@
 {# Events table + pagination — HTMX swappable partial #}
+{% set _hx_common %}
+    hx-target="#events-results"
+    hx-swap="innerHTML"
+    hx-push-url="true"
+    hx-indicator="#events-results-wrapper"
+{% endset %}
+{% set _qs %}q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}{% endset %}
 
 {# Results summary #}
 <div class="flex items-center justify-between mb-3">
@@ -40,11 +47,7 @@
     <div class="flex items-center gap-1">
         {# Previous #}
         {% if page > 1 %}
-        <button
-            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ page - 1 }}"
-            hx-target="#events-results"
-            hx-swap="innerHTML"
-            hx-push-url="true"
+        <button hx-get="/events?{{ _qs }}&page={{ page - 1 }}" {{ _hx_common }}
             class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >← Prev</button>
         {% endif %}
@@ -54,11 +57,7 @@
         {% set page_end = [total_pages, page + 2] | min %}
 
         {% if page_start > 1 %}
-        <button
-            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page=1"
-            hx-target="#events-results"
-            hx-swap="innerHTML"
-            hx-push-url="true"
+        <button hx-get="/events?{{ _qs }}&page=1" {{ _hx_common }}
             class="px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >1</button>
         {% if page_start > 2 %}
@@ -68,12 +67,7 @@
 
         {% for p in range(page_start, page_end + 1) %}
         <button
-            {% if p != page %}
-            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ p }}"
-            hx-target="#events-results"
-            hx-swap="innerHTML"
-            hx-push-url="true"
-            {% endif %}
+            {% if p != page %}hx-get="/events?{{ _qs }}&page={{ p }}" {{ _hx_common }}{% endif %}
             class="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition {{ 'bg-indigo-500 text-white font-semibold' if p == page else 'text-gray-700 hover:bg-gray-100' }}"
         >{{ p }}</button>
         {% endfor %}
@@ -82,22 +76,14 @@
         {% if page_end < total_pages - 1 %}
         <span class="px-1 text-gray-400">…</span>
         {% endif %}
-        <button
-            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ total_pages }}"
-            hx-target="#events-results"
-            hx-swap="innerHTML"
-            hx-push-url="true"
+        <button hx-get="/events?{{ _qs }}&page={{ total_pages }}" {{ _hx_common }}
             class="px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >{{ total_pages }}</button>
         {% endif %}
 
         {# Next #}
         {% if page < total_pages %}
-        <button
-            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ page + 1 }}"
-            hx-target="#events-results"
-            hx-swap="innerHTML"
-            hx-push-url="true"
+        <button hx-get="/events?{{ _qs }}&page={{ page + 1 }}" {{ _hx_common }}
             class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
         >Next →</button>
         {% endif %}
