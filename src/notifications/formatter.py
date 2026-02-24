@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from src.db.models import Event
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.db.models import Event
 
 
 def format_console_message(
@@ -26,8 +29,8 @@ def format_console_message(
         "",
     ]
 
-    for i, (event, score) in enumerate(events_with_scores[:3]):
-        medal = medals[i] if i < 3 else f"#{i+1}"
+    for i, (event, _score) in enumerate(events_with_scores[:3]):
+        medal = medals[i] if i < 3 else f"#{i + 1}"
         tags = event.tags
 
         # Day and time

@@ -22,9 +22,7 @@ class DayForecast:
 class WeatherService:
     """Fetch weekend weather from OpenWeatherMap."""
 
-    async def get_weekend_forecast(
-        self, sat: date, sun: date
-    ) -> dict[str, DayForecast]:
+    async def get_weekend_forecast(self, sat: date, sun: date) -> dict[str, DayForecast]:
         """Returns {"saturday": forecast, "sunday": forecast}."""
         if not settings.weather_api_key:
             return self._default_forecast(sat, sun)

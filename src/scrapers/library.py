@@ -16,6 +16,7 @@ with plain httpx, we'll use the LibCal RSS feed:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import re
 from datetime import datetime
@@ -23,6 +24,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 from src.db.models import Event
+
 from .base import BaseScraper
 
 LIBRARY_SOURCES = [
@@ -91,7 +93,9 @@ class LibraryScraper(BaseScraper):
         description = desc_el.get_text(strip=True) if desc_el else ""
         # Strip HTML from description
         if "<" in description:
-            description = BeautifulSoup(description, "html.parser").get_text(separator=" ", strip=True)
+            description = BeautifulSoup(description, "html.parser").get_text(
+                separator=" ", strip=True
+            )
 
         pub_date = item.find("pubDate")
         start_time = datetime.now()
@@ -101,10 +105,7 @@ class LibraryScraper(BaseScraper):
         # Extract event ID from URL like /event/15766217
         source_id = ""
         m = re.search(r"/event/(\d+)", link)
-        if m:
-            source_id = m.group(1)
-        else:
-            source_id = hashlib.md5(f"{title}{link}".encode()).hexdigest()
+        source_id = m.group(1) if m else hashlib.md5(f"{title}{link}".encode()).hexdigest()
 
         return Event(
             source=self.source_name,
@@ -152,12 +153,16 @@ class LibraryScraper(BaseScraper):
                     continue
 
                 # Link
-                href = title_el.get("href", "") if title_el else ""
+                href = str(title_el.get("href") or "") if title_el else ""
 
                 # Date
                 month = card.select_one(".s-lc-evt-date-m")
                 day = card.select_one(".s-lc-evt-date-d")
-                date_text = f"{month.get_text(strip=True)} {day.get_text(strip=True)}" if month and day else ""
+                date_text = (
+                    f"{month.get_text(strip=True)} {day.get_text(strip=True)}"
+                    if month and day
+                    else ""
+                )
 
                 # Time
                 time_el = card.select_one(".s-lc-eventcard-heading-text")
@@ -176,20 +181,24 @@ class LibraryScraper(BaseScraper):
 
                 # Source ID
                 m = re.search(r"/event/(\d+)", href)
-                source_id = m.group(1) if m else hashlib.md5(f"{title}{date_text}".encode()).hexdigest()
+                source_id = (
+                    m.group(1) if m else hashlib.md5(f"{title}{date_text}".encode()).hexdigest()
+                )
 
-                events.append(Event(
-                    source=self.source_name,
-                    source_url=href or lib["base_url"],
-                    source_id=source_id,
-                    title=title,
-                    description=description[:2000],
-                    location_name=location,
-                    location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
-                    start_time=start_time,
-                    is_free=True,
-                    raw_data={"source_library": lib["name"]},
-                ))
+                events.append(
+                    Event(
+                        source=self.source_name,
+                        source_url=href or lib["base_url"],
+                        source_id=source_id,
+                        title=title,
+                        description=description[:2000],
+                        location_name=location,
+                        location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+                        start_time=start_time,
+                        is_free=True,
+                        raw_data={"source_library": lib["name"]},
+                    )
+                )
             except Exception as exc:
                 self.log(f"Card parse error: {exc}")
 
@@ -200,10 +209,8 @@ class LibraryScraper(BaseScraper):
         year = datetime.now().year
         # Parse month/day
         dt = datetime.now()
-        try:
+        with contextlib.suppress(ValueError):
             dt = datetime.strptime(f"{date_text} {year}", "%b %d %Y")
-        except ValueError:
-            pass
 
         # Parse time from the time_text
         m = re.search(r"(\d{1,2}):(\d{2})(am|pm)", time_text.lower())

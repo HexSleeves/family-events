@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+# ---------------------------------------------------------------------------
+# EventTags - AI-generated metadata about an event
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# EventTags – AI-generated metadata about an event
-# ---------------------------------------------------------------------------
 
 class EventTags(BaseModel):
     age_min_recommended: int = 0
@@ -36,8 +36,9 @@ class EventTags(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Event – a single scraped event
+# Event - a single scraped event
 # ---------------------------------------------------------------------------
+
 
 class Event(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -48,7 +49,7 @@ class Event(BaseModel):
     description: str = ""
     location_name: str = ""
     location_address: str = ""
-    location_city: Literal["Lafayette", "Baton Rouge", "Other"] = "Lafayette"
+    location_city: str = "Lafayette"  # Typically "Lafayette", "Baton Rouge", or "Other"
     latitude: float | None = None
     longitude: float | None = None
     start_time: datetime
@@ -59,24 +60,23 @@ class Event(BaseModel):
     price_min: float | None = None
     price_max: float | None = None
     image_url: str | None = None
-    scraped_at: datetime = Field(default_factory=datetime.utcnow)
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     raw_data: dict[str, Any] = Field(default_factory=dict)
     tags: EventTags | None = None
     attended: bool = False
 
 
 # ---------------------------------------------------------------------------
-# InterestProfile – child preferences & family constraints
+# InterestProfile - child preferences & family constraints
 # ---------------------------------------------------------------------------
+
 
 class Constraints(BaseModel):
     max_drive_time_minutes: int = 45
-    preferred_cities: list[str] = Field(
-        default_factory=lambda: ["Lafayette", "Baton Rouge"]
-    )
+    preferred_cities: list[str] = Field(default_factory=lambda: ["Lafayette", "Baton Rouge"])
     home_city: str = "Lafayette"  # Primary city gets ranking boost
     nap_time: str = "13:00-15:00"  # HH:MM-HH:MM
-    bedtime: str = "19:30"         # HH:MM
+    bedtime: str = "19:30"  # HH:MM
     budget_per_event: float = 30.0
 
     @property
@@ -98,12 +98,15 @@ class Constraints(BaseModel):
 class InterestProfile(BaseModel):
     loves: list[str] = Field(
         default_factory=lambda: [
-            "animals", "playground", "water_play", "music", "trains", "art_messy",
+            "animals",
+            "playground",
+            "water_play",
+            "music",
+            "trains",
+            "art_messy",
         ]
     )
-    likes: list[str] = Field(
-        default_factory=lambda: ["nature_walks", "story_time", "dancing"]
-    )
+    likes: list[str] = Field(default_factory=lambda: ["nature_walks", "story_time", "dancing"])
     dislikes: list[str] = Field(
         default_factory=lambda: ["loud_crowds", "sitting_still_long", "dark_spaces"]
     )

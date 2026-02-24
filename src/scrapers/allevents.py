@@ -9,13 +9,15 @@ AllEvents renders event cards in the HTML with structured data.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 from bs4 import BeautifulSoup
 
 from src.db.models import Event
+
 from .base import BaseScraper
 
 SEARCH_URLS: dict[str, str] = {
@@ -73,9 +75,7 @@ class AllEventsScraper(BaseScraper):
                     items = [data]
                 elif "itemListElement" in data:
                     items = [
-                        el.get("item", el)
-                        for el in data["itemListElement"]
-                        if isinstance(el, dict)
+                        el.get("item", el) for el in data["itemListElement"] if isinstance(el, dict)
                     ]
 
             for item in items:
@@ -118,12 +118,14 @@ class AllEventsScraper(BaseScraper):
         price_str = offers.get("price", "") if isinstance(offers, dict) else ""
         is_free = str(price_str).lower() in ("", "0", "0.00", "free")
         price_val = None
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             price_val = float(price_str)
-        except (ValueError, TypeError):
-            pass
 
-        sid = hashlib.md5(url.encode()).hexdigest() if url else hashlib.md5(f"{title}{start}".encode()).hexdigest()
+        sid = (
+            hashlib.md5(url.encode()).hexdigest()
+            if url
+            else hashlib.md5(f"{title}{start}".encode()).hexdigest()
+        )
 
         return Event(
             source=self.source_name,
@@ -205,7 +207,7 @@ class AllEventsScraper(BaseScraper):
             title=title,
             location_name=loc_text,
             location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
-            start_time=_parse_dt(date_text) if date_text else datetime.utcnow(),
+            start_time=_parse_dt(date_text) if date_text else datetime.now(tz=UTC),
             is_free=is_free,
             image_url=image,
         )
@@ -214,6 +216,7 @@ class AllEventsScraper(BaseScraper):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_dt(raw: str) -> datetime:
     raw = raw.strip()

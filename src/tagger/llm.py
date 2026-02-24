@@ -70,21 +70,29 @@ class EventTagger:
 
         # Category detection
         if any(w in title for w in ["zoo", "animal", "petting", "farm", "wildlife"]):
-            cats.append("animals"); toddler_score += 2
+            cats.append("animals")
+            toddler_score += 2
         if any(w in title for w in ["art", "craft", "paint", "ceramic", "creative"]):
-            cats.append("arts"); toddler_score += 1
+            cats.append("arts")
+            toddler_score += 1
         if any(w in title for w in ["music", "concert", "sing", "band", "jazz"]):
             cats.append("music")
         if any(w in title for w in ["nature", "swamp", "trail", "garden", "hike", "park"]):
             cats.append("nature")
         if any(w in title for w in ["story", "book", "read", "library", "learn"]):
-            cats.append("learning"); toddler_score += 1
-        if any(w in title for w in ["play", "playground", "bounce", "jump", "kid", "toddler", "child", "youth"]):
-            cats.append("play"); toddler_score += 2
+            cats.append("learning")
+            toddler_score += 1
+        if any(
+            w in title
+            for w in ["play", "playground", "bounce", "jump", "kid", "toddler", "child", "youth"]
+        ):
+            cats.append("play")
+            toddler_score += 2
         if any(w in title for w in ["sport", "soccer", "baseball", "basketball", "fit"]):
             cats.append("sports")
         if any(w in title for w in ["splash", "swim", "pool", "water", "aqua"]):
-            cats.append("water"); toddler_score += 2
+            cats.append("water")
+            toddler_score += 2
 
         # Detect indoor/outdoor
         indoor_outdoor = "both"
@@ -94,11 +102,36 @@ class EventTagger:
             indoor_outdoor = "outdoor"
 
         # Family/kid oriented boost
-        if any(w in title for w in ["family", "kid", "toddler", "preschool", "baby", "child", "youth", "beginnings"]):
+        if any(
+            w in title
+            for w in [
+                "family",
+                "kid",
+                "toddler",
+                "preschool",
+                "baby",
+                "child",
+                "youth",
+                "beginnings",
+            ]
+        ):
             toddler_score += 1
 
         # Adult-oriented penalty
-        if any(w in title for w in ["bar", "wine", "beer", "cocktail", "adults only", "senior", "5k", "marathon", "trivia"]):
+        if any(
+            w in title
+            for w in [
+                "bar",
+                "wine",
+                "beer",
+                "cocktail",
+                "adults only",
+                "senior",
+                "5k",
+                "marathon",
+                "trivia",
+            ]
+        ):
             toddler_score = max(1, toddler_score - 4)
 
         # Time-based nap compatibility
@@ -158,12 +191,10 @@ class EventTagger:
             response_format={"type": "json_object"},
         )
 
-        raw = json.loads(response.choices[0].message.content)
+        raw = json.loads(response.choices[0].message.content or "{}")
         return EventTags.model_validate(raw)
 
-    async def tag_events(
-        self, events: list[Event]
-    ) -> list[tuple[Event, EventTags]]:
+    async def tag_events(self, events: list[Event]) -> list[tuple[Event, EventTags]]:
         """Tag multiple events. Returns list of (event, tags) pairs."""
         results: list[tuple[Event, EventTags]] = []
         for event in events:

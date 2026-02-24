@@ -129,6 +129,22 @@ Configured in `src/db/models.py` → `InterestProfile`:
 - **Dislikes:** loud crowds, sitting still, dark spaces
 - **Constraints:** 45 min max drive, nap 1-3pm, bedtime 7:30pm, $30 budget
 
+## Development
+
+```bash
+# Install dev tools
+uv sync --group dev
+
+# Format
+ruff format src/
+
+# Lint
+ruff check src/ --fix
+
+# Type check
+ty check
+```
+
 ## Tech Stack
 
 - **Python 3.12** + **uv** package manager
@@ -138,3 +154,5 @@ Configured in `src/db/models.py` → `InterestProfile`:
 - **OpenAI** API for event tagging (gpt-4o-mini)
 - **APScheduler** for cron jobs
 - **Pydantic v2** for data models
+- **ruff** for formatting + linting
+- **ty** for type checking

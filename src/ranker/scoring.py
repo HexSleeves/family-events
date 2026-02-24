@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from src.db.models import Event, EventTags, InterestProfile
-from src.ranker.weather import DayForecast
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.db.models import Event, EventTags, InterestProfile
+    from src.ranker.weather import DayForecast
 
 
 def score_event(
@@ -106,9 +109,12 @@ def _weather_score(
                 score -= 4.0
 
     # Nice weather bonus for outdoor events
-    if 65 < forecast.temp_high_f < 85 and forecast.precipitation_pct < 30:
-        if tags.indoor_outdoor in ("outdoor", "both"):
-            score += 3.0
+    if (
+        65 < forecast.temp_high_f < 85
+        and forecast.precipitation_pct < 30
+        and tags.indoor_outdoor in ("outdoor", "both")
+    ):
+        score += 3.0
 
     return max(score, 0.0)
 
@@ -165,7 +171,7 @@ def _city_score(event: Event, profile: InterestProfile) -> float:
     if event.location_city == home:
         return 10.0  # Strong boost for home city
     elif event.location_city in profile.constraints.preferred_cities:
-        return 2.0   # Acceptable but not preferred
+        return 2.0  # Acceptable but not preferred
     else:
         return -5.0  # Unknown/far city
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiosqlite
@@ -58,16 +58,12 @@ def _row_to_event(row: aiosqlite.Row) -> Event:
     d["is_free"] = bool(d["is_free"])
     d["attended"] = bool(d["attended"])
     # JSON fields
-    d["raw_data"] = json.loads(d["raw_data"]) if d["raw_data"] else {}
-    d["tags"] = (
-        EventTags.model_validate(json.loads(d["tags"])) if d["tags"] else None
-    )
+    d["raw_data"] = json.loads(str(d["raw_data"])) if d["raw_data"] else {}
+    d["tags"] = EventTags.model_validate(json.loads(str(d["tags"]))) if d["tags"] else None
     # Datetimes stored as ISO strings
-    d["start_time"] = datetime.fromisoformat(d["start_time"])
-    d["end_time"] = (
-        datetime.fromisoformat(d["end_time"]) if d["end_time"] else None
-    )
-    d["scraped_at"] = datetime.fromisoformat(d["scraped_at"])
+    d["start_time"] = datetime.fromisoformat(str(d["start_time"]))
+    d["end_time"] = datetime.fromisoformat(str(d["end_time"])) if d["end_time"] else None
+    d["scraped_at"] = datetime.fromisoformat(str(d["scraped_at"]))
     return Event.model_validate(d)
 
 
@@ -95,9 +91,7 @@ def _event_to_params(event: Event) -> dict[str, Any]:
         "image_url": event.image_url,
         "scraped_at": event.scraped_at.isoformat(),
         "raw_data": json.dumps(event.raw_data),
-        "tags": (
-            json.dumps(event.tags.model_dump()) if event.tags else None
-        ),
+        "tags": (json.dumps(event.tags.model_dump()) if event.tags else None),
         "attended": int(event.attended),
     }
 
@@ -196,9 +190,7 @@ class Database:
     # Queries
     # ------------------------------------------------------------------
 
-    async def get_events_for_weekend(
-        self, sat_date: str, sun_date: str
-    ) -> list[Event]:
+    async def get_events_for_weekend(self, sat_date: str, sun_date: str) -> list[Event]:
         """Return events whose start_time falls on the given Saturday or Sunday.
 
         Dates should be ISO date strings like '2025-07-12'.
@@ -236,8 +228,8 @@ class Database:
 
     async def get_recent_events(self, days: int = 14) -> list[Event]:
         """Return events with start_time within the next `days` days."""
-        now = datetime.utcnow().isoformat()
-        future = (datetime.utcnow() + timedelta(days=days)).isoformat()
+        now = datetime.now(tz=UTC).isoformat()
+        future = (datetime.now(tz=UTC) + timedelta(days=days)).isoformat()
         async with self.db.execute(
             """
             SELECT * FROM events
@@ -261,7 +253,7 @@ class Database:
     # Context manager support
     # ------------------------------------------------------------------
 
-    async def __aenter__(self) -> "Database":
+    async def __aenter__(self) -> Database:
         await self.connect()
         return self
 

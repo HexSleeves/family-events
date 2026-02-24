@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup, Tag
 
 from src.db.models import Event
+
 from .base import BaseScraper
 
 BASE_URL = "https://www.brec.org"
@@ -26,7 +27,7 @@ class BrecScraper(BaseScraper):
 
     async def scrape(self, enrich: bool = False) -> list[Event]:
         """Scrape current month + next month from BREC calendar.
-        
+
         Args:
             enrich: If True, fetch detail pages for descriptions (slower but better for LLM tagging).
         """
@@ -57,8 +58,9 @@ class BrecScraper(BaseScraper):
     async def _enrich_events(self, events: list[Event], max_concurrent: int = 5) -> list[Event]:
         """Fetch detail pages to get full descriptions."""
         import asyncio
+
         sem = asyncio.Semaphore(max_concurrent)
-        
+
         async def enrich_one(event: Event) -> Event:
             if event.description or not event.source_url or event.source_url == CALENDAR_URL:
                 return event
@@ -68,18 +70,22 @@ class BrecScraper(BaseScraper):
                         resp = await client.get(event.source_url)
                         if resp.status_code == 200:
                             soup = BeautifulSoup(resp.text, "html.parser")
-                            desc_el = soup.select_one(".event-description, .event-detail, .description, article p, main p")
+                            desc_el = soup.select_one(
+                                ".event-description, .event-detail, .description, article p, main p"
+                            )
                             if desc_el:
-                                event.description = desc_el.get_text(separator=" ", strip=True)[:2000]
+                                event.description = desc_el.get_text(separator=" ", strip=True)[
+                                    :2000
+                                ]
                 except Exception:
                     pass
             return event
-        
+
         # Only enrich a sample to avoid hammering the server
         to_enrich = [e for e in events if not e.description][:50]
         self.log(f"Enriching {len(to_enrich)} events with descriptions...")
         enriched = await asyncio.gather(*[enrich_one(e) for e in to_enrich])
-        
+
         # Merge back
         enriched_map = {e.source_id: e for e in enriched}
         return [enriched_map.get(e.source_id, e) for e in events]
@@ -103,7 +109,7 @@ class BrecScraper(BaseScraper):
                 continue
 
             # Day headers: <header class="day-header"><h2>Sunday, February 1, 2026</h2></header>
-            if el.name == "header" and "day-header" in el.get("class", []):
+            if el.name == "header" and "day-header" in (el.get("class") or []):
                 h2 = el.select_one("h2")
                 if h2:
                     current_date_str = h2.get_text(strip=True)
@@ -130,7 +136,7 @@ class BrecScraper(BaseScraper):
 
         # Link
         link_el = article.select_one("a[href]")
-        href = link_el["href"] if link_el else ""
+        href = str(link_el["href"]) if link_el else ""
         if href and not href.startswith("http"):
             href = f"{BASE_URL}{href}"
 
@@ -144,9 +150,9 @@ class BrecScraper(BaseScraper):
 
         # Image
         img_el = article.select_one("img")
-        image = None
+        image: str | None = None
         if img_el:
-            image = img_el.get("src", "")
+            image = str(img_el.get("src", ""))
             if image and not image.startswith("http"):
                 image = f"{BASE_URL}{image}"
 

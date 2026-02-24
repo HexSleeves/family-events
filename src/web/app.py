@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
-from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from src.db.database import Database
 from src.db.models import InterestProfile
+from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService
-from src.notifications.formatter import format_console_message
 
 db = Database()
 
@@ -31,6 +28,7 @@ app = FastAPI(title="Family Events", lifespan=lifespan)
 
 
 # ----- HTML Templates (inline for simplicity) -----
+
 
 def _page(title: str, content: str) -> str:
     return f"""<!DOCTYPE html>
@@ -102,9 +100,7 @@ async def dashboard():
 
     # Top events by toddler score
     top_events = sorted(
-        [e for e in events if e.tags],
-        key=lambda e: e.tags.toddler_score,
-        reverse=True
+        [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
     )[:5]
 
     top_html = ""
@@ -116,7 +112,7 @@ async def dashboard():
                 <div class="score">{e.tags.toddler_score}</div>
                 <div>
                     <h3>{e.title}</h3>
-                    <div class="meta">📍 {e.location_city} · 📅 {e.start_time.strftime('%b %d, %I:%M%p')} · {e.source}</div>
+                    <div class="meta">📍 {e.location_city} · 📅 {e.start_time.strftime("%b %d, %I:%M%p")} · {e.source}</div>
                     <div style="margin-top:0.3rem">
                         <span class="badge badge-blue">{e.tags.indoor_outdoor}</span>
                         <span class="badge badge-green">{e.tags.meltdown_risk} meltdown</span>
@@ -155,11 +151,15 @@ async def events_page():
     for e in events:
         ts = e.tags.toddler_score if e.tags else "-"
         cats = ", ".join(e.tags.categories[:3]) if e.tags else ""
-        tag_badge = f'<span class="badge badge-green">{ts}/10</span>' if e.tags else '<span class="badge badge-orange">untagged</span>'
+        tag_badge = (
+            f'<span class="badge badge-green">{ts}/10</span>'
+            if e.tags
+            else '<span class="badge badge-orange">untagged</span>'
+        )
         rows += f"""
         <tr>
-            <td>{e.start_time.strftime('%m/%d %a')}</td>
-            <td>{e.start_time.strftime('%-I:%M%p')}</td>
+            <td>{e.start_time.strftime("%m/%d %a")}</td>
+            <td>{e.start_time.strftime("%-I:%M%p")}</td>
             <td><a href="{e.source_url}" target="_blank">{e.title[:60]}</a></td>
             <td>{e.location_city}</td>
             <td><span class="badge badge-gray">{e.source}</span></td>
@@ -186,12 +186,14 @@ async def events_page():
 @app.get("/event/{event_id}", response_class=HTMLResponse)
 async def event_detail(event_id: str):
     import json
+
     async with db.db.execute("SELECT * FROM events WHERE id = :id", {"id": event_id}) as cursor:
         row = await cursor.fetchone()
     if not row:
         return HTMLResponse(_page("Not Found", "<p>Event not found.</p>"), status_code=404)
 
     from src.db.database import _row_to_event
+
     event = _row_to_event(row)
 
     tags_html = ""
@@ -207,17 +209,17 @@ async def event_detail(event_id: str):
                 <div><strong>Noise Level:</strong> {t.noise_level}</div>
                 <div><strong>Crowd:</strong> {t.crowd_level}</div>
                 <div><strong>Energy:</strong> {t.energy_level}</div>
-                <div><strong>Stroller-Friendly:</strong> {'✅' if t.stroller_friendly else '❌'}</div>
-                <div><strong>Parking:</strong> {'✅' if t.parking_available else '❌'}</div>
-                <div><strong>Bathrooms:</strong> {'✅' if t.bathroom_accessible else '❌'}</div>
-                <div><strong>Food:</strong> {'✅' if t.food_available else '❌'}</div>
-                <div><strong>Nap-Compatible:</strong> {'✅' if t.nap_compatible else '❌'}</div>
-                <div><strong>Weather-Dependent:</strong> {'✅' if t.weather_dependent else '❌'}</div>
-                <div><strong>Good for Rain:</strong> {'✅' if t.good_for_rain else '❌'}</div>
-                <div><strong>Good for Heat:</strong> {'✅' if t.good_for_heat else '❌'}</div>
-                <div><strong>Meltdown Risk:</strong> <span class="badge {'badge-green' if t.meltdown_risk == 'low' else 'badge-orange' if t.meltdown_risk == 'medium' else 'badge-orange'}">{t.meltdown_risk}</span></div>
+                <div><strong>Stroller-Friendly:</strong> {"✅" if t.stroller_friendly else "❌"}</div>
+                <div><strong>Parking:</strong> {"✅" if t.parking_available else "❌"}</div>
+                <div><strong>Bathrooms:</strong> {"✅" if t.bathroom_accessible else "❌"}</div>
+                <div><strong>Food:</strong> {"✅" if t.food_available else "❌"}</div>
+                <div><strong>Nap-Compatible:</strong> {"✅" if t.nap_compatible else "❌"}</div>
+                <div><strong>Weather-Dependent:</strong> {"✅" if t.weather_dependent else "❌"}</div>
+                <div><strong>Good for Rain:</strong> {"✅" if t.good_for_rain else "❌"}</div>
+                <div><strong>Good for Heat:</strong> {"✅" if t.good_for_heat else "❌"}</div>
+                <div><strong>Meltdown Risk:</strong> <span class="badge {"badge-green" if t.meltdown_risk == "low" else "badge-orange"}">{t.meltdown_risk}</span></div>
                 <div><strong>Parent Attention:</strong> {t.parent_attention_required}</div>
-                <div><strong>Categories:</strong> {', '.join(t.categories)}</div>
+                <div><strong>Categories:</strong> {", ".join(t.categories)}</div>
                 <div><strong>Confidence:</strong> {t.confidence_score:.0%}</div>
             </div>
         </div>"""
@@ -227,12 +229,12 @@ async def event_detail(event_id: str):
         <h2>{event.title}</h2>
         <div class="meta" style="margin:0.5rem 0">
             📍 {event.location_name}, {event.location_city} ·
-            📅 {event.start_time.strftime('%A, %B %d at %-I:%M %p')}
-            {f' - {event.end_time.strftime("%-I:%M %p")}' if event.end_time else ''} ·
-            💵 {'Free' if event.is_free else f'${event.price_min or "?"}'} ·
+            📅 {event.start_time.strftime("%A, %B %d at %-I:%M %p")}
+            {f" - {event.end_time.strftime('%-I:%M %p')}" if event.end_time else ""} ·
+            💵 {"Free" if event.is_free else f"${event.price_min or '?'}"} ·
             <span class="badge badge-gray">{event.source}</span>
         </div>
-        <p style="margin-top:0.8rem">{event.description[:1000] if event.description else 'No description available.'}</p>
+        <p style="margin-top:0.8rem">{event.description[:1000] if event.description else "No description available."}</p>
         <div style="margin-top:1rem">
             <a href="{event.source_url}" target="_blank" class="btn btn-primary">View Original</a>
             <button class="btn btn-primary" style="background:#059669" onclick="fetch('/api/attend/{event.id}',{{method:'POST'}}).then(()=>alert('Marked as attended!'))">✅ Mark Attended</button>
@@ -270,17 +272,17 @@ async def weekend_page():
 
     ranked_html = ""
     for i, (event, score) in enumerate(ranked[:10]):
-        medal = ["🥇", "🥈", "🥉"][i] if i < 3 else f"#{i+1}"
+        medal = ["🥇", "🥈", "🥉"][i] if i < 3 else f"#{i + 1}"
         cats = ", ".join(event.tags.categories) if event.tags else ""
         ranked_html += f"""
-        <div class="card" style="{'border-left: 4px solid #6366f1;' if i < 3 else ''}">
+        <div class="card" style="{"border-left: 4px solid #6366f1;" if i < 3 else ""}">
             <div style="display:flex;align-items:center;gap:1rem">
                 <div style="font-size:1.5rem;min-width:2rem">{medal}</div>
                 <div style="flex:1">
                     <h3><a href="/event/{event.id}">{event.title}</a></h3>
                     <div class="meta">
-                        📍 {event.location_city} · 🕐 {event.start_time.strftime('%a %-I:%M%p')} ·
-                        💵 {'Free' if event.is_free else f'${event.price_min or "?"}'}
+                        📍 {event.location_city} · 🕐 {event.start_time.strftime("%a %-I:%M%p")} ·
+                        💵 {"Free" if event.is_free else f"${event.price_min or '?'}"}
                     </div>
                     <div style="margin-top:0.3rem">{cats}</div>
                 </div>
@@ -292,12 +294,12 @@ async def weekend_page():
         </div>"""
 
     content = f"""
-    <h2 style="margin-bottom:0.5rem">🎉 Weekend Plan: {saturday.strftime('%b %d')} - {sunday.strftime('%b %d')}</h2>
+    <h2 style="margin-bottom:0.5rem">🎉 Weekend Plan: {saturday.strftime("%b %d")} - {sunday.strftime("%b %d")}</h2>
     <p class="meta" style="margin-bottom:1rem">
-        {weather['saturday'].icon} Sat {weather['saturday'].temp_high_f:.0f}°F ·
-        {weather['sunday'].icon} Sun {weather['sunday'].temp_high_f:.0f}°F
+        {weather["saturday"].icon} Sat {weather["saturday"].temp_high_f:.0f}°F ·
+        {weather["sunday"].icon} Sun {weather["sunday"].temp_high_f:.0f}°F
     </p>
-    {ranked_html if ranked_html else '<p>No ranked events. Run scrapers and tagger first!</p>'}
+    {ranked_html if ranked_html else "<p>No ranked events. Run scrapers and tagger first!</p>"}
 
     <div class="card" style="margin-top:2rem">
         <h3>📨 Notification Preview</h3>
@@ -308,9 +310,11 @@ async def weekend_page():
 
 # ----- API Endpoints -----
 
+
 @app.post("/api/scrape")
 async def api_scrape():
     from src.scheduler import run_scrape
+
     count = await run_scrape(db)
     return {"count": count}
 
@@ -318,6 +322,7 @@ async def api_scrape():
 @app.post("/api/tag")
 async def api_tag():
     from src.scheduler import run_tag
+
     count = await run_tag(db)
     return {"count": count}
 
@@ -325,6 +330,7 @@ async def api_tag():
 @app.post("/api/notify")
 async def api_notify():
     from src.scheduler import run_notify
+
     message = await run_notify(db)
     return {"message": message}
 
@@ -338,6 +344,15 @@ async def api_attend(event_id: str):
 @app.get("/api/events")
 async def api_events():
     events = await db.get_recent_events(days=30)
-    return [{"id": e.id, "title": e.title, "source": e.source, "city": e.location_city,
-             "start_time": e.start_time.isoformat(), "tagged": e.tags is not None,
-             "toddler_score": e.tags.toddler_score if e.tags else None} for e in events]
+    return [
+        {
+            "id": e.id,
+            "title": e.title,
+            "source": e.source,
+            "city": e.location_city,
+            "start_time": e.start_time.isoformat(),
+            "tagged": e.tags is not None,
+            "toddler_score": e.tags.toddler_score if e.tags else None,
+        }
+        for e in events
+    ]

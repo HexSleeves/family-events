@@ -10,6 +10,7 @@ All three use Modern Events Calendar (MEC) plugin, so parsing logic is shared.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import re
 from datetime import datetime
@@ -17,6 +18,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup, Tag
 
 from src.db.models import Event
+
 from .base import BaseScraper
 
 MEC_SOURCES = [
@@ -85,14 +87,12 @@ class LafayetteScraper(BaseScraper):
         return unique
 
     def _parse_mec_article(self, art: Tag, src: dict) -> Event | None:
-        title_el = art.select_one(
-            ".mec-event-title a, h4 a, h3 a, h2 a"
-        )
+        title_el = art.select_one(".mec-event-title a, h4 a, h3 a, h2 a")
         if not title_el:
             return None
 
         title = title_el.get_text(strip=True)
-        href = title_el.get("href", "")
+        href = str(title_el.get("href") or "")
         if href and not href.startswith("http"):
             href = f"{src['base']}{href}"
 
@@ -116,14 +116,16 @@ class LafayetteScraper(BaseScraper):
             desc = desc_el.get_text(strip=True)[:500]
 
         img_el = art.select_one("img")
-        image = img_el.get("src") if img_el else None
+        image = str(img_el.get("src", "")) if img_el else None
 
         start_time = _parse_mec_dt(date_text, time_text)
 
         m = re.search(r"/events?/([^/?]+)", href)
-        sid = f"{src['sub']}_{m.group(1)}" if m else hashlib.md5(
-            f"{src['sub']}_{title}_{date_text}".encode()
-        ).hexdigest()
+        sid = (
+            f"{src['sub']}_{m.group(1)}"
+            if m
+            else hashlib.md5(f"{src['sub']}_{title}_{date_text}".encode()).hexdigest()
+        )
 
         return Event(
             source=self.source_name,
@@ -135,19 +137,30 @@ class LafayetteScraper(BaseScraper):
             location_city="Lafayette",
             start_time=start_time,
             image_url=image,
-            raw_data={"sub": src["sub"], "venue": src["name"],
-                      "date_raw": date_text, "time_raw": time_text},
+            raw_data={
+                "sub": src["sub"],
+                "venue": src["name"],
+                "date_raw": date_text,
+                "time_raw": time_text,
+            },
         )
 
     def _extract_event_links(self, soup: BeautifulSoup, src: dict) -> list[Event]:
         """Fallback: gather events from <a> links to event detail pages."""
         events: list[Event] = []
         seen: set[str] = set()
-        skip = {"events", "all events", "view all", "private events",
-                "special events", "member events", "show more dates ››"}
+        skip = {
+            "events",
+            "all events",
+            "view all",
+            "private events",
+            "special events",
+            "member events",
+            "show more dates >>",
+        }
 
         for link in soup.select('a[href*="events/"]'):
-            href = link.get("href", "")
+            href = str(link.get("href") or "")
             text = link.get_text(strip=True)
             if not text or len(text) < 3 or text.lower() in skip:
                 continue
@@ -160,24 +173,24 @@ class LafayetteScraper(BaseScraper):
             start_time = datetime.now()
             occ = re.search(r"occurrence=(\d{4}-\d{2}-\d{2})", href)
             if occ:
-                try:
+                with contextlib.suppress(ValueError):
                     start_time = datetime.strptime(occ.group(1), "%Y-%m-%d")
-                except ValueError:
-                    pass
 
             m = re.search(r"/events?/([^/?]+)", href)
             sid = f"{src['sub']}_{m.group(1)}" if m else hashlib.md5(href.encode()).hexdigest()
 
-            events.append(Event(
-                source=self.source_name,
-                source_url=href,
-                source_id=sid,
-                title=text,
-                location_name=src["name"],
-                location_city="Lafayette",
-                start_time=start_time,
-                raw_data={"sub": src["sub"], "venue": src["name"]},
-            ))
+            events.append(
+                Event(
+                    source=self.source_name,
+                    source_url=href,
+                    source_id=sid,
+                    title=text,
+                    location_name=src["name"],
+                    location_city="Lafayette",
+                    start_time=start_time,
+                    raw_data={"sub": src["sub"], "venue": src["name"]},
+                )
+            )
         return events
 
 
@@ -187,8 +200,10 @@ def _apply_time(dt: datetime, time_text: str) -> datetime:
     m = re.search(r"(\d{1,2}):(\d{2})\s*(am|pm)", time_text.lower())
     if m:
         h, mi, ap = int(m.group(1)), int(m.group(2)), m.group(3)
-        if ap == "pm" and h != 12: h += 12
-        if ap == "am" and h == 12: h = 0
+        if ap == "pm" and h != 12:
+            h += 12
+        if ap == "am" and h == 12:
+            h = 0
         return dt.replace(hour=h, minute=mi)
     return dt
 

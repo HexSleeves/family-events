@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import date, datetime, timedelta
 
 from src.db.database import Database
@@ -19,11 +18,11 @@ from src.scrapers.library import LibraryScraper
 from src.tagger.llm import EventTagger
 
 ALL_SCRAPERS = [
-    LafayetteScraper(),   # Lafayette-first: Moncus Park, Acadiana Arts, Science Museum
+    LafayetteScraper(),  # Lafayette-first: Moncus Park, Acadiana Arts, Science Museum
     EventbriteScraper(),  # Both cities
-    AllEventsScraper(),   # Both cities
-    BrecScraper(),        # Baton Rouge
-    LibraryScraper(),     # Both cities (needs Playwright for full results)
+    AllEventsScraper(),  # Both cities
+    BrecScraper(),  # Baton Rouge
+    LibraryScraper(),  # Both cities (needs Playwright for full results)
 ]
 
 
@@ -37,9 +36,9 @@ async def run_scrape(db: Database | None = None) -> int:
     total = 0
     for scraper in ALL_SCRAPERS:
         try:
-            print(f"\n{'='*40}")
+            print(f"\n{'=' * 40}")
             print(f"Scraping: {scraper.source_name}")
-            print(f"{'='*40}")
+            print(f"{'=' * 40}")
             events = await scraper.scrape()
             for event in events:
                 await db.upsert_event(event)
@@ -83,9 +82,7 @@ async def run_tag(db: Database | None = None) -> int:
     return len(tagged)
 
 
-async def run_notify(
-    db: Database | None = None, child_name: str = "Your Little One"
-) -> str:
+async def run_notify(db: Database | None = None, child_name: str = "Your Little One") -> str:
     """Rank weekend events and send notification. Returns the message."""
     own_db = db is None
     if own_db:
@@ -105,8 +102,10 @@ async def run_notify(
     # Get weather
     weather_svc = WeatherService()
     weather = await weather_svc.get_weekend_forecast(saturday, sunday)
-    print(f"Weather: Sat {weather['saturday'].icon} {weather['saturday'].temp_high_f:.0f}°F / "
-          f"Sun {weather['sunday'].icon} {weather['sunday'].temp_high_f:.0f}°F")
+    print(
+        f"Weather: Sat {weather['saturday'].icon} {weather['saturday'].temp_high_f:.0f}°F / "
+        f"Sun {weather['sunday'].icon} {weather['sunday'].temp_high_f:.0f}°F"
+    )
 
     # Get weekend events
     events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())

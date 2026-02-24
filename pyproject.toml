@@ -1,7 +1,7 @@
 [project]
 name = "family-events"
 version = "0.1.0"
-description = "Add your description here"
+description = "Family event discovery system for Lafayette & Baton Rouge, LA"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,9 +12,62 @@ dependencies = [
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "lxml>=6.0.2",
-    "openai>=2.22.0",
+    "openai>=2.23.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
     "python-multipart>=0.0.22",
     "uvicorn>=0.41.0",
 ]
+
+[dependency-groups]
+dev = ["ruff>=0.15", "ty>=0.0.18"]
+
+# --------------------------------------------------------------------------
+# Ruff
+# --------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length    = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "UP007", # use X | Y for unions (we use this already but some old code)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style               = "double"
+indent-style              = "space"
+skip-magic-trailing-comma = false
+line-ending               = "auto"
+
+# --------------------------------------------------------------------------
+# ty
+# --------------------------------------------------------------------------
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.rules]
+# Start lenient, tighten over time
+possibly-unresolved-reference = "warn"
+unresolved-import             = "warn"
+unresolved-attribute          = "ignore" # too noisy with dynamic libs (bs4, aiosqlite)
+invalid-argument-type         = "warn"
+missing-argument              = "warn"
+invalid-return-type           = "warn"

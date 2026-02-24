@@ -11,14 +11,14 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from src.scheduler import run_scrape, run_tag, run_notify
+from src.scheduler import run_notify, run_scrape, run_tag
 
 
 async def daily_scrape_and_tag():
     """Run at 2 AM daily: scrape all sources and tag new events."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"[CRON] Daily scrape started at {datetime.now()}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     try:
         await run_scrape()
         await run_tag()
@@ -28,9 +28,9 @@ async def daily_scrape_and_tag():
 
 async def friday_notification():
     """Run at 8 AM on Fridays: send weekend plans notification."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"[CRON] Friday notification at {datetime.now()}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     try:
         await run_notify()
     except Exception as e:

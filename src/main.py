@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 
 
 def cli() -> None:
@@ -24,18 +23,22 @@ def cli() -> None:
 
     if args.command == "scrape":
         from src.scheduler import run_scrape
+
         asyncio.run(run_scrape())
 
     elif args.command == "tag":
         from src.scheduler import run_tag
+
         asyncio.run(run_tag())
 
     elif args.command == "notify":
         from src.scheduler import run_notify
+
         asyncio.run(run_notify(child_name=args.name))
 
     elif args.command == "pipeline":
         from src.scheduler import run_full_pipeline
+
         asyncio.run(run_full_pipeline(child_name=args.name))
 
     elif args.command == "serve":
@@ -50,6 +53,7 @@ def cli() -> None:
 
 async def _list_events() -> None:
     from src.db.database import Database
+
     async with Database() as db:
         events = await db.get_recent_events(days=30)
     if not events:
@@ -58,13 +62,17 @@ async def _list_events() -> None:
     for e in events:
         tagged = "✅" if e.tags else "⬜"
         score = f"toddler={e.tags.toddler_score}" if e.tags else "untagged"
-        print(f"{tagged} {e.start_time.strftime('%m/%d %a %-I%p')} | {e.title[:50]:50s} | {e.location_city:12s} | {e.source:12s} | {score}")
+        print(
+            f"{tagged} {e.start_time.strftime('%m/%d %a %-I%p')} | {e.title[:50]:50s} | {e.location_city:12s} | {e.source:12s} | {score}"
+        )
     print(f"\nTotal: {len(events)} events")
 
 
 def _serve() -> None:
     import uvicorn
+
     from src.config import settings
+
     uvicorn.run(
         "src.web.app:app",
         host=settings.host,
