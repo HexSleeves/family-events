@@ -66,15 +66,19 @@
 
 ---
 
+### ✅ Mobile Responsive Layout
+
+- Hamburger menu on <md screens with stacked nav links
+- Events table → card layout on mobile with score badge
+- Filter row: 2-column grid on mobile
+- Pagination: 44px min tap targets, fewer page numbers
+- Dashboard buttons, source form, profile grids all stack on mobile
+- Toast container: bottom-center on mobile, top-right on desktop
+- Tested at 375px viewport width
+
+---
+
 ## Up Next
-
-### Mobile Responsive Layout
-
-- Header nav collapses to hamburger menu on small screens
-- Events table becomes card-based layout on mobile
-- Filter row wraps properly on narrow screens
-- Pagination buttons get touch-friendly sizing
-- Test on 375px viewport width
 
 ### Tailwind Production Build
 
