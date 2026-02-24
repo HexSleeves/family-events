@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.db.database import Database
-from src.db.models import Constraints, InterestProfile, Source
+from src.db.models import Constraints, InterestProfile, Source, User
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService
@@ -31,6 +31,22 @@ from src.web.auth import (
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+
+def _toast(
+    message: str,
+    variant: str = "success",
+    *,
+    status_code: int = 200,
+    body: str = "",
+) -> HTMLResponse:
+    """Return an HTMLResponse that triggers a toast notification via HX-Trigger."""
+    payload = json.dumps({"showToast": {"message": message, "variant": variant}})
+    return HTMLResponse(
+        content=body,
+        status_code=status_code,
+        headers={"HX-Trigger": payload},
+    )
 
 
 @asynccontextmanager
@@ -117,8 +133,6 @@ async def signup_submit(request: Request):
             {**await _ctx(request), "errors": errors, "email": email, "display_name": display_name},
         )
 
-    from src.db.models import User
-
     user = User(
         email=email,
         display_name=display_name,
@@ -162,9 +176,7 @@ async def api_update_location(request: Request):
     if not preferred:
         preferred = [home_city]
     await db.update_user(user.id, home_city=home_city, preferred_cities=preferred)
-    return HTMLResponse(
-        '<div class="text-green-600 font-semibold text-sm">✅ Location updated</div>'
-    )
+    return _toast("Location updated")
 
 
 @app.post("/api/profile/preferences", response_class=HTMLResponse)
@@ -195,9 +207,7 @@ async def api_update_preferences(request: Request):
         ),
     )
     await db.update_user(user.id, interest_profile=profile)
-    return HTMLResponse(
-        '<div class="text-green-600 font-semibold text-sm">✅ Preferences updated</div>'
-    )
+    return _toast("Preferences updated")
 
 
 @app.post("/api/profile/theme", response_class=HTMLResponse)
@@ -210,7 +220,7 @@ async def api_update_theme(request: Request):
     if theme not in ("light", "dark", "auto"):
         theme = "auto"
     await db.update_user(user.id, theme=theme)
-    return HTMLResponse('<div class="text-green-600 font-semibold text-sm">✅ Theme updated</div>')
+    return _toast("Theme updated — reload to apply", "info")
 
 
 @app.post("/api/profile/notifications", response_class=HTMLResponse)
@@ -222,10 +232,15 @@ async def api_update_notifications(request: Request):
     channels = form.getlist("channels")
     if not channels:
         channels = ["console"]
-    await db.update_user(user.id, notification_channels=[str(c) for c in channels])
-    return HTMLResponse(
-        '<div class="text-green-600 font-semibold text-sm">✅ Notification settings updated</div>'
+    email_to = str(form.get("email_to", "")).strip()
+    child_name = str(form.get("child_name", "")).strip() or "Your Little One"
+    await db.update_user(
+        user.id,
+        notification_channels=[str(c) for c in channels],
+        email_to=email_to,
+        child_name=child_name,
     )
+    return _toast("Notification settings updated")
 
 
 @app.post("/api/profile/password", response_class=HTMLResponse)
@@ -238,21 +253,13 @@ async def api_update_password(request: Request):
     new_pw = str(form.get("new_password", ""))
     confirm = str(form.get("confirm_password", ""))
     if not verify_password(current, user.password_hash):
-        return HTMLResponse(
-            '<div class="text-red-600 font-semibold text-sm">❌ Current password is incorrect</div>'
-        )
+        return _toast("Current password is incorrect", "error")
     if len(new_pw) < 6:
-        return HTMLResponse(
-            '<div class="text-red-600 font-semibold text-sm">❌ New password must be at least 6 characters</div>'
-        )
+        return _toast("New password must be at least 6 characters", "error")
     if new_pw != confirm:
-        return HTMLResponse(
-            '<div class="text-red-600 font-semibold text-sm">❌ Passwords don\'t match</div>'
-        )
+        return _toast("Passwords don't match", "error")
     await db.update_user(user.id, password_hash=hash_password(new_pw))
-    return HTMLResponse(
-        '<div class="text-green-600 font-semibold text-sm">✅ Password changed</div>'
-    )
+    return _toast("Password changed")
 
 
 # ----- Pages -----
@@ -371,9 +378,11 @@ async def weekend_page(request: Request):
         events = await db.get_recent_events(days=14)
 
     tagged = [e for e in events if e.tags]
-    profile = InterestProfile()
+    user = await get_current_user(request, db)
+    profile = user.interest_profile if user else InterestProfile()
+    child_name = user.child_name if user else "Your Little One"
     ranked = rank_events(tagged, profile, weather)
-    message = format_console_message(ranked, weather)
+    message = format_console_message(ranked, weather, child_name)
 
     return templates.TemplateResponse(
         "weekend.html",
@@ -426,9 +435,7 @@ async def api_scrape():
     from src.scheduler import run_scrape
 
     count = await run_scrape(db)
-    return HTMLResponse(
-        f'<div class="text-green-600 font-semibold">\u2705 Scraped {count} events</div>'
-    )
+    return _toast(f"Scraped {count} events")
 
 
 @app.post("/api/tag", response_class=HTMLResponse)
@@ -436,17 +443,16 @@ async def api_tag():
     from src.scheduler import run_tag
 
     count = await run_tag(db)
-    return HTMLResponse(
-        f'<div class="text-green-600 font-semibold">\u2705 Tagged {count} events</div>'
-    )
+    return _toast(f"Tagged {count} events")
 
 
 @app.post("/api/notify", response_class=HTMLResponse)
-async def api_notify():
+async def api_notify(request: Request):
     from src.scheduler import run_notify
 
-    await run_notify(db)
-    return HTMLResponse('<div class="text-green-600 font-semibold">\u2705 Notification sent!</div>')
+    user = await get_current_user(request, db)
+    await run_notify(db, user=user)
+    return _toast("Notification sent!")
 
 
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
@@ -484,24 +490,16 @@ async def api_add_source(request: Request):
     url = str(form.get("url", "")).strip()
     name = str(form.get("name", "")).strip()
     if not url:
-        return HTMLResponse(
-            '<div class="text-red-600 font-semibold">\u274c Please enter a URL</div>'
-        )
+        return _toast("Please enter a URL", "error")
 
     # Check for built-in domain
     if is_builtin_domain(url):
-        return HTMLResponse(
-            '<div class="text-blue-600 font-semibold">'
-            "\u2705 We already have built-in support for this site!</div>"
-        )
+        return _toast("We already have built-in support for this site!", "info")
 
     # Check for duplicate
     existing = await db.get_source_by_url(url)
     if existing:
-        return HTMLResponse(
-            '<div class="text-orange-600 font-semibold">'
-            "\u26a0\ufe0f This URL has already been added</div>"
-        )
+        return _toast("This URL has already been added", "warning")
 
     # Create source
     domain = extract_domain(url)
@@ -526,17 +524,13 @@ async def api_add_source(request: Request):
             recipe.model_dump_json(),
             status="active" if recipe.confidence >= 0.3 else "failed",
         )
-        return HTMLResponse(
-            f'<div class="text-green-600 font-semibold">'
-            f"\u2705 Source added! Strategy: {recipe.strategy}, "
-            f"confidence: {recipe.confidence:.0%}</div>"
-            f"<script>setTimeout(()=>location.reload(),1000)</script>"
+        return _toast(
+            f"Source added! Strategy: {recipe.strategy}, confidence: {recipe.confidence:.0%}",
+            body="<script>setTimeout(()=>location.reload(),1000)</script>",
         )
     except Exception as e:
         await db.update_source_status(source.id, status="failed", error=str(e))
-        return HTMLResponse(
-            f'<div class="text-red-600 font-semibold">\u274c Analysis failed: {e}</div>'
-        )
+        return _toast(f"Analysis failed: {e}", "error")
 
 
 @app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
@@ -553,16 +547,13 @@ async def api_reanalyze(source_id: str):
             recipe.model_dump_json(),
             status="active" if recipe.confidence >= 0.3 else "failed",
         )
-        return HTMLResponse(
-            f'<div class="text-green-600 font-semibold">'
-            f"\u2705 Re-analyzed! Confidence: {recipe.confidence:.0%}</div>"
-            f"<script>setTimeout(()=>location.reload(),1000)</script>"
+        return _toast(
+            f"Re-analyzed! Confidence: {recipe.confidence:.0%}",
+            body="<script>setTimeout(()=>location.reload(),1000)</script>",
         )
     except Exception as e:
         await db.update_source_status(source_id, status="failed", error=str(e))
-        return HTMLResponse(
-            f'<div class="text-red-600 font-semibold">\u274c Analysis failed: {e}</div>'
-        )
+        return _toast(f"Analysis failed: {e}", "error")
 
 
 @app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
@@ -581,26 +572,23 @@ async def api_test_source(request: Request, source_id: str):
             {"request": request, "events": events, "count": len(events)},
         )
     except Exception as e:
-        return HTMLResponse(
-            f'<div class="text-red-600 font-semibold">\u274c Test failed: {e}</div>'
-        )
+        return _toast(f"Test failed: {e}", "error")
 
 
 @app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)
 async def api_toggle_source(source_id: str):
     enabled = await db.toggle_source(source_id)
     state = "enabled" if enabled else "disabled"
-    icon = "\u2705" if enabled else "\u23f8\ufe0f"
-    return HTMLResponse(
-        f'<div class="text-green-600 font-semibold">{icon} Source {state}</div>'
-        f"<script>setTimeout(()=>location.reload(),500)</script>"
+    return _toast(
+        f"Source {state}",
+        body="<script>setTimeout(()=>location.reload(),500)</script>",
     )
 
 
 @app.delete("/api/sources/{source_id}", response_class=HTMLResponse)
 async def api_delete_source(source_id: str):
     await db.delete_source(source_id)
-    return HTMLResponse(
-        '<div class="text-green-600 font-semibold">\u2705 Source deleted</div>'
-        '<script>setTimeout(()=>location.href="/sources",500)</script>'
+    return _toast(
+        "Source deleted",
+        body='<script>setTimeout(()=>location.href="/sources",500)</script>',
     )

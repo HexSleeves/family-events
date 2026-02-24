@@ -4,13 +4,15 @@ from src.config import settings
 
 
 class EmailNotifier:
-    async def send(self, message: str) -> bool:
-        if not all([settings.resend_api_key, settings.email_to]):
-            print("Email: Missing credentials, skipping")
+    async def send(self, message: str, *, to_email: str = "") -> bool:
+        if not settings.resend_api_key:
+            print("Email: Missing RESEND_API_KEY, skipping")
+            return False
+        if not to_email:
+            print("Email: No recipient email, skipping")
             return False
 
         try:
-            # Convert plain text to simple HTML
             html = message.replace("\n", "<br>")
 
             async with httpx.AsyncClient() as client:
@@ -19,13 +21,13 @@ class EmailNotifier:
                     headers={"Authorization": f"Bearer {settings.resend_api_key}"},
                     json={
                         "from": settings.email_from,
-                        "to": [settings.email_to],
-                        "subject": "🌟 Weekend Plans!",
+                        "to": [to_email],
+                        "subject": "\U0001f31f Weekend Plans!",
                         "html": html,
                     },
                 )
                 resp.raise_for_status()
-                print("Email sent!")
+                print(f"Email sent to {to_email}!")
                 return True
         except Exception as e:
             print(f"Email error: {e}")

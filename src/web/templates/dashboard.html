@@ -7,8 +7,7 @@
 <div class="flex gap-2 mb-6">
     <button
         hx-post="/api/scrape"
-        hx-target="#action-status"
-        hx-swap="innerHTML"
+        hx-swap="none"
         hx-indicator="this"
         hx-disabled-elt="this"
         class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
@@ -18,8 +17,7 @@
     </button>
     <button
         hx-post="/api/tag"
-        hx-target="#action-status"
-        hx-swap="innerHTML"
+        hx-swap="none"
         hx-indicator="this"
         hx-disabled-elt="this"
         class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
@@ -29,8 +27,7 @@
     </button>
     <button
         hx-post="/api/notify"
-        hx-target="#action-status"
-        hx-swap="innerHTML"
+        hx-swap="none"
         hx-indicator="this"
         hx-disabled-elt="this"
         class="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm cursor-pointer transition disabled:opacity-60 disabled:cursor-wait"
@@ -39,12 +36,7 @@
         <span class="htmx-indicator"><span class="spinner"></span></span>
     </button>
 </div>
-{# Action result + skeleton loading state #}
-<div id="action-status" class="mb-6 relative">
-    <div id="action-skeleton" class="htmx-indicator">
-        {% include "partials/_skeleton_action.html" %}
-    </div>
-</div>
+
 
 <h2 class="text-lg font-semibold mb-4">⭐ Top Toddler-Friendly Events</h2>
 {% if top_events %}

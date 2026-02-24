@@ -31,7 +31,7 @@
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold cursor-pointer transition">
             🧪 Test Scrape <span class="htmx-indicator"><span class="spinner"></span></span>
         </button>
-        <button hx-post="/api/sources/{{ source.id }}/analyze" hx-target="#detail-result" hx-swap="innerHTML" hx-indicator="this"
+        <button hx-post="/api/sources/{{ source.id }}/analyze" hx-swap="none" hx-indicator="this"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-semibold text-gray-700 hover:bg-gray-100 cursor-pointer transition">
             🔄 Re-analyze <span class="htmx-indicator"><span class="spinner" style="border-color:rgba(0,0,0,.2);border-top-color:#333"></span></span>
         </button>

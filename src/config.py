@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     # Database
     database_path: str = "family_events.db"
@@ -16,23 +16,20 @@ class Settings(BaseSettings):
     weather_lat: float = 30.2241  # Lafayette, LA
     weather_lon: float = -92.0198
 
-    # Twilio SMS
+    # Twilio SMS (secrets only — recipient is per-user)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
-    twilio_to_number: str = ""
 
-    # Telegram
+    # Telegram (secrets only — chat_id could be per-user later)
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
-    # Email (Resend)
+    # Email / Resend (secret + sender identity)
     resend_api_key: str = ""
-    email_to: str = ""
-    email_from: str = "Family Events <events@example.com>"
+    email_from: str = "Family Events <onboarding@resend.dev>"
 
     # App
-    notification_channels: list[str] = ["console"]  # "console", "sms", "telegram", "email"
     host: str = "0.0.0.0"
     port: int = 8000
 

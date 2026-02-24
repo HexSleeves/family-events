@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS users (
     preferred_cities      TEXT NOT NULL DEFAULT '["Lafayette", "Baton Rouge"]',
     theme                 TEXT NOT NULL DEFAULT 'auto',
     notification_channels TEXT NOT NULL DEFAULT '["console"]',
+    email_to              TEXT NOT NULL DEFAULT '',
+    child_name            TEXT NOT NULL DEFAULT 'Your Little One',
     interest_profile      TEXT NOT NULL DEFAULT '{}',
     created_at            TEXT NOT NULL,
     updated_at            TEXT NOT NULL
@@ -176,9 +178,14 @@ class Database:
         await self._db.execute(_CREATE_EVENTS_TABLE)
         await self._db.execute(_CREATE_SOURCES_TABLE)
         await self._db.execute(_CREATE_USERS_TABLE)
-        # Add user_id column to sources if missing (migration)
-        with contextlib.suppress(Exception):
-            await self._db.execute("ALTER TABLE sources ADD COLUMN user_id TEXT")
+        # Migrations for existing databases
+        for migration in [
+            "ALTER TABLE sources ADD COLUMN user_id TEXT",
+            "ALTER TABLE users ADD COLUMN email_to TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN child_name TEXT NOT NULL DEFAULT 'Your Little One'",
+        ]:
+            with contextlib.suppress(Exception):
+                await self._db.execute(migration)
         for idx_sql in _CREATE_INDEXES:
             await self._db.execute(idx_sql)
         await self._db.commit()
@@ -589,13 +596,13 @@ class Database:
             INSERT INTO users (
                 id, email, display_name, password_hash,
                 home_city, preferred_cities, theme,
-                notification_channels, interest_profile,
-                created_at, updated_at
+                notification_channels, email_to, child_name,
+                interest_profile, created_at, updated_at
             ) VALUES (
                 :id, :email, :display_name, :password_hash,
                 :home_city, :preferred_cities, :theme,
-                :notification_channels, :interest_profile,
-                :created_at, :updated_at
+                :notification_channels, :email_to, :child_name,
+                :interest_profile, :created_at, :updated_at
             )
             """,
             {
@@ -607,6 +614,8 @@ class Database:
                 "preferred_cities": json.dumps(user.preferred_cities),
                 "theme": user.theme,
                 "notification_channels": json.dumps(user.notification_channels),
+                "email_to": user.email_to,
+                "child_name": user.child_name,
                 "interest_profile": json.dumps(user.interest_profile.model_dump()),
                 "created_at": user.created_at.isoformat(),
                 "updated_at": user.updated_at.isoformat(),
@@ -637,6 +646,8 @@ class Database:
             "preferred_cities",
             "theme",
             "notification_channels",
+            "email_to",
+            "child_name",
             "interest_profile",
             "password_hash",
         }
@@ -655,6 +666,12 @@ class Database:
         sql = f"UPDATE users SET {', '.join(sets)} WHERE id = :id"
         await self.db.execute(sql, params)
         await self.db.commit()
+
+    async def get_all_users(self) -> list[User]:
+        """Get all users."""
+        async with self.db.execute("SELECT * FROM users ORDER BY created_at") as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_user(r) for r in rows]
 
     async def get_user_sources(self, user_id: str) -> list[Source]:
         """Get sources belonging to a specific user."""

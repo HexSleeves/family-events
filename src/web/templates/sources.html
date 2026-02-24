@@ -9,8 +9,7 @@
 {# Add source form #}
 <form
     hx-post="/api/sources"
-    hx-target="#add-result"
-    hx-swap="innerHTML"
+    hx-swap="none"
     hx-indicator="#add-spinner"
     class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mb-6 flex gap-3 items-end"
 >
@@ -30,7 +29,6 @@
         <span id="add-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
 </form>
-<div id="add-result" class="mb-4"></div>
 
 {# Custom sources #}
 {% if sources %}

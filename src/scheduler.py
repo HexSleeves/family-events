@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from src.db.database import Database
-from src.db.models import InterestProfile
+from src.db.models import InterestProfile, User
 from src.notifications.dispatcher import NotificationDispatcher
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
@@ -111,12 +111,28 @@ async def run_tag(db: Database | None = None) -> int:
     return len(tagged)
 
 
-async def run_notify(db: Database | None = None, child_name: str = "Your Little One") -> str:
-    """Rank weekend events and send notification. Returns the message."""
+async def run_notify(
+    db: Database | None = None,
+    *,
+    user: User | None = None,
+    child_name: str = "Your Little One",
+) -> str:
+    """Rank weekend events and send notification.
+
+    If a User is provided, uses their profile for ranking and their
+    notification_channels/email_to for dispatch.  Otherwise falls back
+    to defaults (console-only, generic InterestProfile).
+    """
     own_db = db is None
     if own_db:
         db = Database()
         await db.connect()
+
+    # Resolve settings from user profile or defaults
+    profile = user.interest_profile if user else InterestProfile()
+    channels = user.notification_channels if user else ["console"]
+    email_to = user.email_to if user else ""
+    name = user.child_name if user else child_name
 
     # Find next weekend
     today = date.today()
@@ -160,16 +176,15 @@ async def run_notify(db: Database | None = None, child_name: str = "Your Little 
             await db.close()
         return msg
 
-    # Rank
-    profile = InterestProfile()
+    # Rank using user's interest profile
     ranked = rank_events(tagged_events, profile, weather)
 
     # Format message
-    message = format_console_message(ranked, weather, child_name)
+    message = format_console_message(ranked, weather, name)
 
-    # Dispatch
+    # Dispatch to user's chosen channels
     dispatcher = NotificationDispatcher()
-    results = await dispatcher.dispatch(message)
+    results = await dispatcher.dispatch(message, channels=channels, email_to=email_to)
     print(f"Notification results: {results}")
 
     if own_db:
@@ -178,9 +193,9 @@ async def run_notify(db: Database | None = None, child_name: str = "Your Little 
     return message
 
 
-async def run_full_pipeline(child_name: str = "Your Little One") -> str:
+async def run_full_pipeline(*, user: User | None = None) -> str:
     """Run the complete pipeline: scrape → tag → notify."""
     async with Database() as db:
         await run_scrape(db)
         await run_tag(db)
-        return await run_notify(db, child_name)
+        return await run_notify(db, user=user)

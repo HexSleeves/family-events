@@ -60,6 +60,7 @@ def format_console_message(
     total = len(events_with_scores)
     if total > 3:
         lines.append(f"... and {total - 3} more options available!")
+        lines.append("https://noon-disk.exe.xyz/events")
         lines.append("")
 
     lines.append("Have a great weekend! 🎈")

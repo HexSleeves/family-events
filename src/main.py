@@ -34,12 +34,12 @@ def cli() -> None:
     elif args.command == "notify":
         from src.scheduler import run_notify
 
-        asyncio.run(run_notify(child_name=args.name))
+        asyncio.run(run_notify())
 
     elif args.command == "pipeline":
         from src.scheduler import run_full_pipeline
 
-        asyncio.run(run_full_pipeline(child_name=args.name))
+        asyncio.run(run_full_pipeline())
 
     elif args.command == "serve":
         _serve()

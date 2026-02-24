@@ -11,10 +11,11 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from src.db.database import Database
 from src.scheduler import run_notify, run_scrape, run_tag
 
 
-async def daily_scrape_and_tag():
+async def daily_scrape_and_tag() -> None:
     """Run at 2 AM daily: scrape all sources and tag new events."""
     print(f"\n{'=' * 60}")
     print(f"[CRON] Daily scrape started at {datetime.now()}")
@@ -26,18 +27,29 @@ async def daily_scrape_and_tag():
         print(f"[CRON] Scrape/tag error: {e}")
 
 
-async def friday_notification():
-    """Run at 8 AM on Fridays: send weekend plans notification."""
+async def friday_notification() -> None:
+    """Run at 8 AM on Fridays: send weekend plans to each user."""
     print(f"\n{'=' * 60}")
     print(f"[CRON] Friday notification at {datetime.now()}")
     print(f"{'=' * 60}")
     try:
-        await run_notify()
+        async with Database() as db:
+            users = await db.get_all_users()
+            if not users:
+                print("[CRON] No users found, sending default notification")
+                await run_notify(db)
+                return
+            for user in users:
+                print(f"[CRON] Notifying {user.display_name} ({user.email})...")
+                try:
+                    await run_notify(db, user=user)
+                except Exception as e:
+                    print(f"[CRON] Error notifying {user.email}: {e}")
     except Exception as e:
         print(f"[CRON] Notification error: {e}")
 
 
-def main():
+async def main() -> None:
     scheduler = AsyncIOScheduler()
 
     # Daily at 2 AM Central
@@ -61,12 +73,13 @@ def main():
     for job in scheduler.get_jobs():
         print(f"  {job.name}: next run at {job.next_run_time}")
 
-    # Keep running
+    # Keep running until interrupted
     try:
-        asyncio.get_event_loop().run_forever()
+        while True:
+            await asyncio.sleep(3600)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
