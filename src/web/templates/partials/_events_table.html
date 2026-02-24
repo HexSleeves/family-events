@@ -1,0 +1,108 @@
+{# Events table + pagination — HTMX swappable partial #}
+
+{# Results summary #}
+<div class="flex items-center justify-between mb-3">
+    <p class="text-sm text-gray-500">
+        Showing {{ ((page - 1) * per_page) + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} events
+    </p>
+</div>
+
+{# Table #}
+<div class="bg-white rounded-xl shadow-sm overflow-x-auto">
+    <table class="w-full border-collapse">
+        <thead>
+            <tr class="bg-gray-50">
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Date</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Time</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Event</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">City</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Source</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Score</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200">Categories</th>
+                <th class="text-left py-2.5 px-2.5 font-semibold text-gray-500 text-xs uppercase border-b border-gray-200"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+                {% include "partials/_event_row.html" %}
+            {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-8 text-gray-400 text-sm">No events match your filters.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+{% if total_pages > 1 %}
+<nav class="flex items-center justify-between mt-4">
+    <div class="flex items-center gap-1">
+        {# Previous #}
+        {% if page > 1 %}
+        <button
+            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ page - 1 }}"
+            hx-target="#events-results"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+        >← Prev</button>
+        {% endif %}
+
+        {# Page numbers #}
+        {% set page_start = [1, page - 2] | max %}
+        {% set page_end = [total_pages, page + 2] | min %}
+
+        {% if page_start > 1 %}
+        <button
+            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page=1"
+            hx-target="#events-results"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+        >1</button>
+        {% if page_start > 2 %}
+        <span class="px-1 text-gray-400">…</span>
+        {% endif %}
+        {% endif %}
+
+        {% for p in range(page_start, page_end + 1) %}
+        <button
+            {% if p != page %}
+            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ p }}"
+            hx-target="#events-results"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            {% endif %}
+            class="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition {{ 'bg-indigo-500 text-white font-semibold' if p == page else 'text-gray-700 hover:bg-gray-100' }}"
+        >{{ p }}</button>
+        {% endfor %}
+
+        {% if page_end < total_pages %}
+        {% if page_end < total_pages - 1 %}
+        <span class="px-1 text-gray-400">…</span>
+        {% endif %}
+        <button
+            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ total_pages }}"
+            hx-target="#events-results"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+        >{{ total_pages }}</button>
+        {% endif %}
+
+        {# Next #}
+        {% if page < total_pages %}
+        <button
+            hx-get="/events?q={{ q | urlencode }}&city={{ city | urlencode }}&source={{ source | urlencode }}&tagged={{ tagged }}&score_min={{ score_min if score_min is not none else '' }}&sort={{ sort }}&page={{ page + 1 }}"
+            hx-target="#events-results"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+        >Next →</button>
+        {% endif %}
+    </div>
+
+    <p class="text-xs text-gray-400">Page {{ page }} of {{ total_pages }}</p>
+</nav>
+{% endif %}

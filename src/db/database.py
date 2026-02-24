@@ -241,6 +241,117 @@ class Database:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
 
+    async def search_events(
+        self,
+        *,
+        days: int = 30,
+        q: str = "",
+        city: str = "",
+        source: str = "",
+        tagged: str = "",
+        score_min: int | None = None,
+        sort: str = "start_time",
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[Event], int]:
+        """Search events with filters, returning (events, total_count).
+
+        Args:
+            days: Only include events starting within this many days from now.
+            q: Full-text search on title and description.
+            city: Filter by location_city (exact match).
+            source: Filter by source (exact match).
+            tagged: "yes" for tagged only, "no" for untagged only, "" for all.
+            score_min: Minimum toddler_score (requires tagged).
+            sort: Column to sort by. Prefix with "-" for descending.
+            page: 1-based page number.
+            per_page: Results per page.
+
+        Returns:
+            Tuple of (list of events, total matching count).
+        """
+        now = datetime.now(tz=UTC).isoformat()
+        future = (datetime.now(tz=UTC) + timedelta(days=days)).isoformat()
+
+        conditions = ["start_time >= :now", "start_time <= :future"]
+        params: dict[str, Any] = {"now": now, "future": future}
+
+        if q:
+            conditions.append("(title LIKE :q OR description LIKE :q)")
+            params["q"] = f"%{q}%"
+
+        if city:
+            conditions.append("location_city = :city")
+            params["city"] = city
+
+        if source:
+            conditions.append("source = :source")
+            params["source"] = source
+
+        if tagged == "yes":
+            conditions.append("tags IS NOT NULL")
+        elif tagged == "no":
+            conditions.append("tags IS NULL")
+
+        if score_min is not None:
+            conditions.append(
+                "tags IS NOT NULL AND CAST(json_extract(tags, '$.toddler_score') AS INTEGER) >= :score_min"
+            )
+            params["score_min"] = score_min
+
+        where = " AND ".join(conditions)
+
+        # Count total
+        count_sql = f"SELECT COUNT(*) FROM events WHERE {where}"
+        async with self.db.execute(count_sql, params) as cursor:
+            row = await cursor.fetchone()
+            total = row[0] if row else 0
+
+        # Determine sort
+        _valid_sorts = {
+            "start_time": "start_time",
+            "-start_time": "start_time DESC",
+            "title": "title",
+            "-title": "title DESC",
+            "city": "location_city",
+            "-city": "location_city DESC",
+            "source": "source",
+            "-source": "source DESC",
+            "score": "CAST(json_extract(tags, '$.toddler_score') AS INTEGER)",
+            "-score": "CAST(json_extract(tags, '$.toddler_score') AS INTEGER) DESC",
+        }
+        order_clause = _valid_sorts.get(sort, "start_time")
+
+        offset = (page - 1) * per_page
+        params["limit"] = per_page
+        params["offset"] = offset
+
+        query_sql = f"""
+            SELECT * FROM events
+            WHERE {where}
+            ORDER BY {order_clause}
+            LIMIT :limit OFFSET :offset
+        """
+        async with self.db.execute(query_sql, params) as cursor:
+            rows = await cursor.fetchall()
+            events = [_row_to_event(r) for r in rows]
+
+        return events, int(total)
+
+    async def get_filter_options(self) -> dict[str, list[str]]:
+        """Return distinct values for filter dropdowns."""
+        cities: list[str] = []
+        async with self.db.execute(
+            "SELECT DISTINCT location_city FROM events ORDER BY location_city"
+        ) as cursor:
+            cities = [row[0] for row in await cursor.fetchall()]
+
+        sources: list[str] = []
+        async with self.db.execute("SELECT DISTINCT source FROM events ORDER BY source") as cursor:
+            sources = [row[0] for row in await cursor.fetchall()]
+
+        return {"cities": cities, "sources": sources}
+
     async def mark_attended(self, event_id: str) -> None:
         """Mark an event as attended."""
         await self.db.execute(

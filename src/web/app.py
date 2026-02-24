@@ -60,10 +60,54 @@ async def dashboard(request: Request):
 
 
 @app.get("/events", response_class=HTMLResponse)
-async def events_page(request: Request):
-    events = await db.get_recent_events(days=30)
-    events.sort(key=lambda e: e.start_time)
-    return templates.TemplateResponse("events.html", {"request": request, "events": events})
+async def events_page(
+    request: Request,
+    q: str = "",
+    city: str = "",
+    source: str = "",
+    tagged: str = "",
+    score_min: str = "",
+    sort: str = "start_time",
+    page: int = 1,
+):
+    per_page = 25
+    score_min_int = int(score_min) if score_min.isdigit() else None
+    events, total = await db.search_events(
+        days=30,
+        q=q,
+        city=city,
+        source=source,
+        tagged=tagged,
+        score_min=score_min_int,
+        sort=sort,
+        page=page,
+        per_page=per_page,
+    )
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    filters = await db.get_filter_options()
+
+    ctx = {
+        "request": request,
+        "events": events,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "q": q,
+        "city": city,
+        "source": source,
+        "tagged": tagged,
+        "score_min": score_min_int,
+        "sort": sort,
+        "cities": filters["cities"],
+        "sources": filters["sources"],
+    }
+
+    # HTMX partial: only return the table + pagination fragment
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse("partials/_events_table.html", ctx)
+
+    return templates.TemplateResponse("events.html", ctx)
 
 
 @app.get("/event/{event_id}", response_class=HTMLResponse)
