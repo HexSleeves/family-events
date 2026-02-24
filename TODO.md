@@ -31,6 +31,20 @@
 
 ## Up Next
 
+### Generic Scraper with Smart Routing
+**Design doc:** [docs/design-generic-scraper.md](docs/design-generic-scraper.md)
+
+Let users add any event website URL. The system auto-generates a scraping recipe
+via LLM (once), then replays it with BeautifulSoup on every scrape ($0 per run).
+Built-in scrapers handle known domains; unknown domains get the generic path.
+
+**Phases:**
+1. Foundation — Recipe models, Source model, sources table, domain router
+2. Generic Scraper — CSS/JSON-LD replay engine, LLM analyzer + validator
+3. Scheduler — Include user sources in `run_scrape()`, stale detection
+4. Web UI — Sources page (list, add, test, detail, enable/disable, delete)
+5. Polish — Built-in source display, edge cases, confidence display
+
 ### Mobile Responsive Layout
 The current layout works on desktop but needs attention on mobile:
 - Header nav collapses to hamburger menu on small screens
