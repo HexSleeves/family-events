@@ -197,67 +197,62 @@
       class="bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-700 dark:to-purple-700 text-white py-4 mb-6"
     >
       <div class="max-w-4xl mx-auto px-4 flex items-center gap-4">
-        <a href="/" class="text-xl font-bold hover:opacity-90 transition"
+        <a href="/" class="text-xl font-bold hover:opacity-90 transition shrink-0"
           >🌟 Family Events</a
         >
-        <nav class="ml-auto flex gap-2 items-center">
-          <a
-            href="/"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >🏠 Dashboard</a
-          >
-          <a
-            href="/events"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >📅 Events</a
-          >
-          <a
-            href="/weekend"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >🎉 Weekend</a
-          >
-          <a
-            href="/sources"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >📡 Sources</a
-          >
+        {# Hamburger button — mobile only #}
+        <button
+          id="menu-toggle"
+          onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+          class="ml-auto md:hidden p-2 rounded-md bg-white/15 hover:bg-white/30 transition cursor-pointer"
+          aria-label="Toggle menu"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        {# Desktop nav #}
+        <nav class="ml-auto hidden md:flex gap-2 items-center">
+          <a href="/" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🏠 Dashboard</a>
+          <a href="/events" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📅 Events</a>
+          <a href="/weekend" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🎉 Weekend</a>
+          <a href="/sources" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📡 Sources</a>
           {% if current_user %}
           <span class="mx-1 text-white/40">|</span>
-          <a
-            href="/profile"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >👤 {{ current_user.display_name }}</a
-          >
-          <a
-            href="/logout"
-            class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition"
-            >↩ Logout</a
-          >
+          <a href="/profile" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">👤 {{ current_user.display_name }}</a>
+          <a href="/logout" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">↩ Logout</a>
           {% else %}
           <span class="mx-1 text-white/40">|</span>
-          <a
-            href="/login"
-            class="px-3 py-1.5 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition"
-            >Log In</a
-          >
-          <a
-            href="/signup"
-            class="px-3 py-1.5 rounded-md bg-white/30 hover:bg-white/40 text-sm font-medium transition"
-            >Sign Up</a
-          >
+          <a href="/login" class="px-3 py-1.5 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition">Log In</a>
+          <a href="/signup" class="px-3 py-1.5 rounded-md bg-white/30 hover:bg-white/40 text-sm font-medium transition">Sign Up</a>
           {% endif %}
         </nav>
       </div>
+      {# Mobile menu — hidden by default #}
+      <nav id="mobile-menu" class="hidden md:hidden mt-3 px-4 pb-2 space-y-1">
+        <a href="/" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">🏠 Dashboard</a>
+        <a href="/events" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">📅 Events</a>
+        <a href="/weekend" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">🎉 Weekend</a>
+        <a href="/sources" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">📡 Sources</a>
+        <div class="border-t border-white/20 my-2"></div>
+        {% if current_user %}
+        <a href="/profile" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">👤 {{ current_user.display_name }}</a>
+        <a href="/logout" class="block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm transition">↩ Logout</a>
+        {% else %}
+        <a href="/login" class="block px-3 py-2 rounded-md bg-white/15 hover:bg-white/25 text-sm font-medium transition">Log In</a>
+        <a href="/signup" class="block px-3 py-2 rounded-md bg-white/20 hover:bg-white/30 text-sm font-medium transition">Sign Up</a>
+        {% endif %}
+      </nav>
     </header>
     <main class="max-w-4xl mx-auto px-4 pb-12">
       {% block content %}{% endblock %}
     </main>
 
-    {# Toast container #}
+    {# Toast container — bottom-center on mobile, top-right on desktop #}
     <div
       id="toast-container"
-      class="fixed flex flex-col gap-2 pointer-events-none"
-      style="top:1rem;right:1rem;z-index:10000;max-width:24rem"
+      class="fixed flex flex-col gap-2 pointer-events-none left-4 right-4 bottom-4 items-center md:left-auto md:bottom-auto md:top-4 md:right-4 md:items-end"
+      style="z-index:10000;max-width:24rem"
     ></div>
 
     <script>
