@@ -1,0 +1,19 @@
+{# Stats bar partial - can be used for HTMX refresh #}
+<div class="flex gap-4 flex-wrap mb-6">
+    <div class="bg-white rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px]">
+        <div class="text-3xl font-bold text-indigo-500">{{ total }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wide">Events</div>
+    </div>
+    <div class="bg-white rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px]">
+        <div class="text-3xl font-bold text-indigo-500">{{ tagged }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wide">Tagged</div>
+    </div>
+    <div class="bg-white rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px]">
+        <div class="text-3xl font-bold text-indigo-500">{{ untagged }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wide">Untagged</div>
+    </div>
+    <div class="bg-white rounded-xl py-4 px-6 shadow-sm text-center flex-1 min-w-[120px]">
+        <div class="text-3xl font-bold text-indigo-500">{{ sources }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wide">Sources</div>
+    </div>
+</div>

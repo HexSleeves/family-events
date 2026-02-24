@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Weekend Plans{% endblock %}
+{% block content %}
+
+<h2 class="text-lg font-semibold mb-2">🎉 Weekend Plan: {{ saturday.strftime("%b %d") }} - {{ sunday.strftime("%b %d") }}</h2>
+<p class="text-gray-500 text-sm mb-6">
+    {{ weather.saturday.icon }} Sat {{ "%.0f" | format(weather.saturday.temp_high_f) }}°F ·
+    {{ weather.sunday.icon }} Sun {{ "%.0f" | format(weather.sunday.temp_high_f) }}°F
+</p>
+
+{% if ranked %}
+    {% for event, score in ranked[:10] %}
+        {% set medals = ["🥇", "🥈", "🥉"] %}
+        {% set medal = medals[loop.index0] if loop.index0 < 3 else "#" ~ loop.index %}
+        {% set highlight = loop.index0 < 3 %}
+        {% set link = "/event/" ~ event.id %}
+        {% set short_date = true %}
+        {% set show_source = false %}
+        {% set show_price = true %}
+        {% set score_value = "%.0f" | format(score) %}
+        {% set score_display = none %}
+        {% include "partials/_event_card.html" %}
+    {% endfor %}
+{% else %}
+    <p class="text-gray-500">No ranked events. Run scrapers and tagger first!</p>
+{% endif %}
+
+{% include "partials/_notification.html" %}
+
+{% endblock %}

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Family Events{% endblock %} - Family Events</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline; }
+        .htmx-request.htmx-indicator { display: inline; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 leading-relaxed">
+    <header class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-4 mb-6">
+        <div class="max-w-4xl mx-auto px-4 flex items-center gap-4">
+            <h1 class="text-xl font-bold">🌟 Family Events</h1>
+            <nav class="ml-auto flex gap-2">
+                <a href="/" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🏠 Dashboard</a>
+                <a href="/events" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">📅 Events</a>
+                <a href="/weekend" class="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/30 text-sm transition">🎉 Weekend</a>
+            </nav>
+        </div>
+    </header>
+    <main class="max-w-4xl mx-auto px-4 pb-12">
+        {% block content %}{% endblock %}
+    </main>
+    <div id="toast" class="fixed bottom-4 right-4 z-50 transition-all duration-300"></div>
+</body>
+</html>
