@@ -9,11 +9,11 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 ## Tech Stack
 
 - **Python 3.12** with **uv** package manager
-- **FastAPI** (web server + API)
+- **FastAPI** (web server + API) with static file serving
 - **SQLite** (WAL mode, via aiosqlite)
 - **Jinja2** templates with `{% extends %}` / `{% include %}` inheritance
 - **HTMX 2.0.4** for all interactive updates (no custom JS framework)
-- **Tailwind CSS** via CDN play script (no build step)
+- **Tailwind CSS 3.4** production build via CLI (`npm run css:build`), ~26KB minified output
 - **httpx** + **BeautifulSoup** (scraping)
 - **OpenAI API** (gpt-4o-mini for tagging, with heuristic fallback)
 - **Pydantic v2** (all data models)
@@ -25,7 +25,9 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 
 ```bash
 family-events/
-├── pyproject.toml              # deps, ruff config, ty config
+├── pyproject.toml              # Python deps, ruff config, ty config
+├── package.json                # Tailwind CSS devDependency + build scripts
+├── tailwind.config.js          # Content paths, darkMode, custom animations
 ├── .env / .env.example         # API keys only (secrets + infra)
 ├── family_events.db            # SQLite database (auto-created)
 ├── family-events.service       # systemd: web server on port 8000
@@ -43,31 +45,34 @@ family-events/
 │   ├── scrapers/
 │   │   ├── base.py             # BaseScraper ABC with _client() helper
 │   │   ├── lafayette.py        # Moncus Park, Acadiana Arts, Science Museum (MEC plugin)
-│   │   ├── brec.py             # BREC - Baton Rouge parks (HTML parsing)
+│   │   ├── brec.py             # BREC – Baton Rouge parks (HTML parsing)
 │   │   ├── eventbrite.py       # Eventbrite (JSON-LD + HTML fallback, both cities)
 │   │   ├── allevents.py        # AllEvents.in (both cities)
-│   │   ├── library.py          # Lafayette/BR libraries (LibCal - needs Playwright)
+│   │   ├── library.py          # Lafayette/BR libraries (LibCal – needs Playwright)
 │   │   ├── generic.py          # Generic CSS/JSON-LD replay scraper for user sources
-│   │   ├── analyzer.py         # LLM page analyzer - generates ScrapeRecipe from URL
+│   │   ├── analyzer.py         # LLM page analyzer – generates ScrapeRecipe from URL
 │   │   ├── recipe.py           # ScrapeRecipe, CssSelectors models
 │   │   └── router.py           # Domain router: built-in vs generic scraper dispatch
 │   ├── tagger/
 │   │   └── llm.py              # EventTagger: OpenAI with heuristic fallback
 │   ├── ranker/
-│   │   ├── scoring.py          # score_event(), rank_events() - weighted multi-factor
+│   │   ├── scoring.py          # score_event(), rank_events() – weighted multi-factor
 │   │   └── weather.py          # WeatherService (OpenWeatherMap, with defaults)
 │   ├── notifications/
-│   │   ├── formatter.py        # format_console_message() - text notification
+│   │   ├── formatter.py        # format_console_message() – text notification
 │   │   ├── dispatcher.py       # Routes to configured channels (per-user)
 │   │   ├── console.py          # Print to stdout
 │   │   ├── sms.py              # Twilio
 │   │   ├── telegram.py         # Telegram Bot API
 │   │   └── email.py            # Resend (accepts per-user to_email)
 │   └── web/
-│       ├── app.py              # FastAPI routes + _toast() + _ctx() helpers (594 lines)
+│       ├── app.py              # FastAPI routes + static mount + helpers (629 lines)
 │       ├── auth.py             # hash_password, verify_password, session helpers
+│       ├── static/
+│       │   ├── input.css         # Tailwind directives + custom CSS (skeletons, progress, toasts, etc.)
+│       │   └── styles.css        # Built output (~26KB minified)
 │       └── templates/          # 20 Jinja2 templates
-│           ├── base.html            # Layout, nav (auth-aware), dark mode, toast system
+│           ├── base.html            # Layout, nav, dark mode, toast JS, HTMX
 │           ├── dashboard.html       # Stats cards, action buttons, top events
 │           ├── events.html          # Search, filters, paginated table
 │           ├── event_detail.html    # Event info, AI tags grid, raw data
@@ -78,9 +83,9 @@ family-events/
 │           ├── signup.html          # Signup form
 │           ├── profile.html         # Profile sections (theme, location, prefs, etc.)
 │           └── partials/
-│               ├── _event_card.html       # Reusable event card
+│               ├── _event_card.html       # Reusable event card (stagger animations)
 │               ├── _event_row.html        # Table row (events page)
-│               ├── _events_table.html     # Table + pagination (HTMX swap target)
+│               ├── _events_table.html     # Desktop table + mobile cards + pagination
 │               ├── _tags_grid.html        # AI tags 2-column grid
 │               ├── _stats.html            # Stats bar (dashboard)
 │               ├── _notification.html     # Notification preview
@@ -142,9 +147,9 @@ constraints: home_city, nap_time, bedtime, budget_per_event, max_drive_time_minu
 
 ## Database Tables
 
-- **events** — `UNIQUE(source, source_id)` for dedup
-- **sources** — user-added scraping sources with recipes
-- **users** — accounts with preferences, theme, notification settings
+- **events** — `UNIQUE(source, source_id)` for dedup, 1,496 rows
+- **sources** — user-added scraping sources with recipes, 0 rows
+- **users** — accounts with preferences, theme, notification settings, 2 rows
 
 ## Authentication
 
@@ -159,18 +164,48 @@ constraints: home_city, nap_time, bedtime, budget_per_event, max_drive_time_minu
 All API success/error messages use toast notifications instead of inline HTML:
 
 - **Server:** `_toast(message, variant)` returns empty `HTMLResponse` with `HX-Trigger` header
-- **Client:** JS in `base.html` listens for `htmx:afterRequest`, parses `HX-Trigger` header, creates styled toast element
+- **Client:** JS in `base.html` listens for `htmx:afterRequest`, parses `HX-Trigger` header
+- Single handler — no dedicated event listeners (prevents double-fire with HTMX auto-dispatch)
 - **4 variants:** success (green), error (red), warning (amber), info (blue)
-- Toasts slide in from top-right, auto-dismiss after 3.5s, clickable to dismiss early
-- Uses inline styles (not Tailwind classes) for dynamic elements since Tailwind CDN can't JIT-compile dynamically created classes
-- Forms that only need toast feedback use `hx-swap="none"`
+- Toasts: top-right desktop, bottom-center mobile; auto-dismiss 3.5s; click to dismiss
+- Uses inline styles for dynamic toast elements (compiled CSS can't know runtime classes)
 
-## Dark Mode
+## Theme System
 
 - Tailwind `darkMode: 'class'` — toggled by `class="dark"` on `<html>`
 - User preference stored in `users.theme` (light/dark/auto)
-- Auto mode respects `prefers-color-scheme` media query
-- All templates use `dark:` variant classes for backgrounds, text, borders
+- **Server-rendered:** `<html class="dark">` when theme is `dark`
+- **Auto theme:** inline `<script>` in `<head>` checks `prefers-color-scheme` and adds/removes `dark` class before paint (no FOUC)
+- **Client-side toggle:** `changeTheme()` in body JS, called via `HX-Trigger` `changeTheme` event from theme save endpoint
+- **OS listener:** `matchMedia('prefers-color-scheme: dark').addEventListener('change', ...)` re-evaluates when user chose "auto"
+- `data-theme` attribute on `<html>` tracks the user's choice (light/dark/auto) so the OS listener knows whether to act
+- Theme Save button disabled when selection matches current saved theme
+
+## Animations
+
+Custom Tailwind animations defined in `tailwind.config.js`:
+
+- `animate-fade-in` (0.4s) — page content wrapper
+- `animate-fade-in-up` (0.45s, 12px) — cards, sections, headings
+- `animate-slide-down` (0.25s) — mobile menu toggle
+- `animate-scale-in` (0.35s) — login/signup cards
+- `animate-pop-in` (0.3s, spring) — available for badges
+
+Staggered entrances via `.stagger-1` through `.stagger-9` (60ms increments, `!important` to override animation shorthand).
+
+Hover micro-interactions: card lift (`-translate-y-0.5` + `shadow-md`), button press (`active:scale-95`), badge pop (`hover:scale-105`), table row color transition.
+
+`@media (prefers-reduced-motion: reduce)` disables all animations globally.
+
+## CSS Build
+
+- **Source:** `src/web/static/input.css` (Tailwind directives + custom CSS for skeletons, progress bar, spinners, toasts, stagger delays, HTMX transitions, reduced-motion)
+- **Output:** `src/web/static/styles.css` (~26KB minified)
+- **Build:** `npm run css:build` (runs `tailwindcss -i ... -o ... --minify`)
+- **Watch:** `npm run css:watch` (dev mode, rebuilds on template changes)
+- **Config:** `tailwind.config.js` scans `src/web/templates/**/*.html`
+- **Served:** FastAPI `StaticFiles` mount at `/static`
+- No Tailwind CDN — no console warnings in production
 
 ## Scoring Algorithm (src/ranker/scoring.py)
 
@@ -220,9 +255,11 @@ score = toddler_score * 3.0
 - **2 users** in DB (test accounts)
 - **0 custom sources** (generic scraper infrastructure ready)
 - All events tagged via heuristics (no OpenAI key configured)
-- Web UI: full dark mode, toast notifications, user accounts, profile page
+- Web UI fully responsive (mobile + desktop), dark mode, animations, toast notifications
+- Tailwind CSS production build (no CDN)
 - `ruff check` and `ruff format` pass clean
 - Server runs on port 8000 via systemd
+- Latest commit: Tailwind production build migration
 
 ## Environment
 
@@ -231,3 +268,4 @@ score = toddler_score * 3.0
 - systemd services: `family-events` (web) and `family-events-cron` (scheduler)
 - `.env` has secrets only (API keys, sender identities, host/port)
 - User-facing settings (notification channels, interests, location) stored per-user in DB
+- Node.js 20 available for Tailwind CLI builds

@@ -5,8 +5,8 @@
 ### ✅ Refactor Frontend to Jinja2 + HTMX + Tailwind CSS
 
 - 20 Jinja2 templates (10 pages + 10 partials)
-- `base.html` shared layout with nav, Tailwind CDN, HTMX CDN
-- `app.py` is pure route handlers (594 lines)
+- `base.html` shared layout with nav, HTMX CDN
+- `app.py` is pure route handlers (629 lines)
 - All API endpoints return toast or HTML snippets for HTMX
 
 ### ✅ Events Page: Pagination, Search, Filtering
@@ -34,7 +34,7 @@
 
 - Signup, login, logout with bcrypt + signed session cookies
 - Profile page with HTMX-powered sections:
-  - Appearance (light/dark/system theme)
+  - Appearance (light/dark/system theme) with disabled-when-unchanged Save button
   - Location (home city, preferred cities)
   - Child preferences (loves, likes, dislikes, constraints)
   - Notification channel selection
@@ -45,17 +45,18 @@
 ### ✅ Dark Mode
 
 - Tailwind `darkMode: 'class'` with per-user theme preference
-- Auto mode respects `prefers-color-scheme`
+- Auto mode respects `prefers-color-scheme` with live OS change listener
+- Inline `<head>` script prevents FOUC for auto theme
 - All 20 templates have `dark:` variant classes
 
 ### ✅ Toast Notifications
 
 - Replaced all inline success/error HTML with toast system
 - `_toast()` server helper returns `HX-Trigger` header
-- Client JS parses header via `htmx:afterRequest` event
+- Single `htmx:afterRequest` handler (no duplicate event listeners)
 - 4 variants: success (green), error (red), warning (amber), info (blue)
 - Slide-in animation, 3.5s auto-dismiss, click to dismiss
-- Inline styles for dynamic elements (Tailwind CDN can't JIT them)
+- Theme changes trigger both toast + theme swap in one HX-Trigger payload
 
 ### ✅ Per-User Settings
 
@@ -63,8 +64,6 @@
 - Interest profile (loves/likes/dislikes/constraints) per-user
 - Weekend ranking + notifications use logged-in user's profile
 - .env retains only secrets and infrastructure config
-
----
 
 ### ✅ Mobile Responsive Layout
 
@@ -76,16 +75,27 @@
 - Toast container: bottom-center on mobile, top-right on desktop
 - Tested at 375px viewport width
 
+### ✅ Animations & Micro-interactions
+
+- 5 custom Tailwind animations (fade-in, fade-in-up, slide-down, scale-in, pop-in)
+- Staggered card/section entrances (stagger-1–9, 60ms increments)
+- Hover lift on cards/sections, active:scale-95 press on buttons
+- Badge hover:scale-105 pop, table row transition-colors
+- HTMX swap fade transitions (.htmx-swapping/.htmx-settling)
+- `prefers-reduced-motion` disables all animations
+
+### ✅ Tailwind Production Build
+
+- Tailwind CSS 3.4 via npm, CLI build with `npm run css:build`
+- `src/web/static/input.css` → `src/web/static/styles.css` (~26KB minified)
+- `tailwind.config.js` with content paths + custom animation keyframes
+- FastAPI `StaticFiles` mount at `/static`
+- No CDN script tag — no console warnings
+- `npm run css:watch` for development
+
 ---
 
 ## Up Next
-
-### Tailwind Production Build
-
-- Install Tailwind CLI standalone binary
-- Extract to `static/styles.css` via `tailwindcss -o static/styles.css --minify`
-- Replace CDN `<script>` with `<link>` to static CSS
-- Expected ~10-15KB compiled CSS vs ~115KB CDN runtime
 
 ### Event Detail Improvements
 
@@ -123,6 +133,15 @@
 - Email digest with HTML formatting (Resend)
 - "Snooze" or "Not interested" on individual events
 - Notification history page
+
+### Auth & Access Control
+
+- Require login for source management
+- "My Sources" filtered view on profile
+- Public vs private events
+- Admin role
+- Email verification
+- Forgot password flow
 
 ### Infrastructure
 

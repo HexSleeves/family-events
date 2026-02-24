@@ -1,8 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-{% block content %}
-
-{% include "partials/_stats.html" %}
+{% extends "base.html" %} {% block title %}Dashboard{% endblock %} {% block
+content %} {% include "partials/_stats.html" %}
 
 <div class="flex flex-wrap gap-2 mb-6 animate-fade-in-up stagger-4">
     <button hx-post="/api/scrape" hx-swap="none" hx-indicator="this" hx-disabled-elt="this"
@@ -22,21 +19,15 @@
     </button>
 </div>
 
-<h2 class="text-lg font-semibold mb-4 animate-fade-in-up stagger-5">⭐ Top Toddler-Friendly Events</h2>
-{% if top_events %}
-{% for e in top_events %}
-{% set event = e %}
-{% set highlight = false %}
-{% set score_display = e.tags.toddler_score %}
-{% set link = none %}
-{% set short_date = false %}
-{% set show_source = true %}
-{% set show_price = false %}
-{% set card_delay = loop.index0 + 6 %}
-{% include "partials/_event_card.html" %}
-{% endfor %}
-{% else %}
-<p class="text-gray-500 text-sm animate-fade-in">No tagged events yet. Run scrapers then tag!</p>
-{% endif %}
-
-{% endblock %}
+<h2 class="text-lg font-semibold mb-4 animate-fade-in-up stagger-5">
+    ⭐ Top Toddler-Friendly Events
+</h2>
+{% if top_events %} {% for e in top_events %} {% set event = e %} {% set
+highlight = false %} {% set score_display = e.tags.toddler_score %} {% set link
+= none %} {% set short_date = false %} {% set show_source = true %} {% set
+show_price = false %} {% set card_delay = loop.index0 + 6 %} {% include
+"partials/_event_card.html" %} {% endfor %} {% else %}
+<p class="text-gray-500 text-sm animate-fade-in">
+    No tagged events yet. Run scrapers then tag!
+</p>
+{% endif %} {% endblock %}

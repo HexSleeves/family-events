@@ -1,7 +1,6 @@
 {# Event card used in dashboard top events and weekend ranked list #}
 <div
-  class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up{% if card_delay is defined %} stagger-{{ [card_delay, 9] | min }}{% endif %} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200{% if highlight %} border-l-4 border-indigo-500{% endif %}"
->
+  class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up{% if card_delay is defined %} stagger-{{ [card_delay, 9] | min }}{% endif %} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200{% if highlight %} border-l-4 border-indigo-500{% endif %}">
   <div class="flex items-center gap-4">
     {% if medal is defined %}
     <div class="text-2xl min-w-[2rem] text-center">{{ medal }}</div>
@@ -10,13 +9,10 @@
     {% endif %}
     <div class="flex-1 min-w-0">
       <h3 class="font-semibold dark:text-white text-gray-900">
-        {% if link %}<a href="{{ link }}" class="hover:text-indigo-600 transition-colors"
-          >{{ event.title }}</a
-        >{% else %}{{ event.title }}{% endif %}
+        {% if link %}<a href="{{ link }}" class="hover:text-indigo-600 transition-colors">{{ event.title }}</a>{% else
+        %}{{ event.title }}{% endif %}
       </h3>
-      <div
-        class="text-gray-500 dark:text-gray-400 text-sm mt-0.5"
-      >
+      <div class="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
         📍 {{ event.location_city }} · 📅 {{ event.start_time.strftime("%b %d,
         %I:%M%p") if not short_date else event.start_time.strftime("%a
         %-I:%M%p") }} {% if show_source %}· {{ event.source }}{% endif %} {% if
@@ -26,18 +22,15 @@
       {% if event.tags %}
       <div class="mt-1.5 flex flex-wrap gap-1">
         <span
-          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 hover:scale-105 transition-transform duration-150"
-          >{{ event.tags.indoor_outdoor }}</span
-        >
+          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 hover:scale-105 transition-transform duration-150">{{
+          event.tags.indoor_outdoor }}</span>
         <span
-          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold hover:scale-105 transition-transform duration-150 {{ 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' if event.tags.meltdown_risk == 'low' else 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300' }}"
-          >{{ event.tags.meltdown_risk }} meltdown</span
-        >
+          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold hover:scale-105 transition-transform duration-150 {{ 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' if event.tags.meltdown_risk == 'low' else 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300' }}">{{
+          event.tags.meltdown_risk }} meltdown</span>
         {% if event.tags.categories %}
         <span
-          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:scale-105 transition-transform duration-150"
-          >{{ event.tags.categories | join(", ") }}</span
-        >
+          class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:scale-105 transition-transform duration-150">{{
+          event.tags.categories | join(", ") }}</span>
         {% endif %}
       </div>
       {% endif %}

@@ -9,27 +9,43 @@
     {# ── Theme ── #}
     <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 animate-fade-in-up stagger-2 hover:shadow-md transition-shadow duration-200">
         <h3 class="font-semibold mb-3">🎨 Appearance</h3>
-        <form hx-post="/api/profile/theme" hx-swap="none" class="flex flex-wrap items-center gap-4">
+        <form id="theme-form" hx-post="/api/profile/theme" hx-swap="none" class="flex flex-wrap items-center gap-4"
+              data-saved="{{ current_user.theme }}">
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="theme" value="light" {% if current_user.theme == 'light' %}checked{% endif %}
-                    class="accent-indigo-500" />
+                    class="accent-indigo-500" onchange="updateThemeBtn()" />
                 <span class="text-sm">☀️ Light</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="theme" value="dark" {% if current_user.theme == 'dark' %}checked{% endif %}
-                    class="accent-indigo-500" />
+                    class="accent-indigo-500" onchange="updateThemeBtn()" />
                 <span class="text-sm">🌙 Dark</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="theme" value="auto" {% if current_user.theme == 'auto' %}checked{% endif %}
-                    class="accent-indigo-500" />
+                    class="accent-indigo-500" onchange="updateThemeBtn()" />
                 <span class="text-sm">💻 System</span>
             </label>
-            <button type="submit"
-                class="sm:ml-auto px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200">
+            <button id="theme-btn" type="submit" disabled
+                class="sm:ml-auto px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 hover:shadow-md active:scale-95 text-white text-xs font-semibold cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:bg-indigo-500 disabled:active:scale-100">
                 Save
             </button>
         </form>
+        <script>
+            function updateThemeBtn() {
+                var form = document.getElementById('theme-form');
+                var btn = document.getElementById('theme-btn');
+                var selected = form.querySelector('input[name="theme"]:checked').value;
+                btn.disabled = (selected === form.dataset.saved);
+            }
+            // Update saved value after successful submit
+            document.getElementById('theme-form').addEventListener('htmx:afterRequest', function(e) {
+                if (e.detail.successful) {
+                    this.dataset.saved = this.querySelector('input[name="theme"]:checked').value;
+                    updateThemeBtn();
+                }
+            });
+        </script>
     </section>
 
     {# ── Location ── #}

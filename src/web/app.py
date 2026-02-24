@@ -10,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -64,6 +65,7 @@ def _change_theme(theme: str) -> HTMLResponse:
         headers={"HX-Trigger": payload},
     )
 
+
 def _null_response() -> HTMLResponse:
     """Return an HTMLResponse that does nothing."""
     return HTMLResponse(
@@ -81,6 +83,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Family Events", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me-in-prod"),

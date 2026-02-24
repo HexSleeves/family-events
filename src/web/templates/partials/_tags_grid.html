@@ -3,7 +3,8 @@
 <div class="bg-white dark:bg-gray-800 rounded-xl p-5 mb-4 shadow-sm animate-fade-in-up stagger-1">
     <h3 class="font-semibold text-gray-900 dark:text-white mb-3">🏷️ AI Tags</h3>
     <div class="grid grid-cols-2 gap-2.5 text-sm">
-        <div><strong>Toddler Score:</strong> <span class="text-xl font-bold text-indigo-500">{{ tags.toddler_score }}/10</span></div>
+        <div><strong>Toddler Score:</strong> <span class="text-xl font-bold text-indigo-500">{{ tags.toddler_score
+                }}/10</span></div>
         <div><strong>Age Range:</strong> {{ tags.age_min_recommended }}-{{ tags.age_max_recommended }}</div>
         <div><strong>Indoor/Outdoor:</strong> {{ tags.indoor_outdoor }}</div>
         <div><strong>Noise Level:</strong> {{ tags.noise_level }}</div>
@@ -18,7 +19,9 @@
         <div><strong>Good for Rain:</strong> {{ "✅" if tags.good_for_rain else "❌" }}</div>
         <div><strong>Good for Heat:</strong> {{ "✅" if tags.good_for_heat else "❌" }}</div>
         <div><strong>Meltdown Risk:</strong>
-            <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ 'bg-green-100 text-green-800' if tags.meltdown_risk == 'low' else 'bg-orange-100 text-orange-800' }}">{{ tags.meltdown_risk }}</span>
+            <span
+                class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ 'bg-green-100 text-green-800' if tags.meltdown_risk == 'low' else 'bg-orange-100 text-orange-800' }}">{{
+                tags.meltdown_risk }}</span>
         </div>
         <div><strong>Parent Attention:</strong> {{ tags.parent_attention_required }}</div>
         <div><strong>Categories:</strong> {{ tags.categories | join(", ") }}</div>
