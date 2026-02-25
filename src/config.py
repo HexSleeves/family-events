@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # App
     host: str = "0.0.0.0"
     port: int = 8000
+    session_secret: str = ""
+
+    # Basic API rate limiting (per-IP, per-route)
+    rate_limit_window_seconds: int = 60
+    rate_limit_max_requests: int = 20
 
 
 settings = Settings()

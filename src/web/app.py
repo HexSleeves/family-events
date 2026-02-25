@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
+from src.config import settings
 from src.db.database import Database
 from src.db.models import Constraints, InterestProfile, Source, User
 from src.notifications.formatter import format_console_message
@@ -32,6 +35,8 @@ from src.web.auth import (
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+
+_rate_limit_store: dict[str, deque[float]] = {}
 
 
 def _toast(
@@ -75,6 +80,39 @@ def _null_response() -> HTMLResponse:
     )
 
 
+def _require_login(user: User | None) -> HTMLResponse | None:
+    """Require an authenticated user for API routes."""
+    if user:
+        return None
+    return _toast("Please log in first", "error", status_code=401)
+
+
+def _rate_limit_key(request: Request, route: str) -> str:
+    """Build per-IP, per-route rate limit key."""
+    ip = request.client.host if request.client else "unknown"
+    return f"{ip}:{route}"
+
+
+def _check_rate_limit(request: Request, route: str) -> HTMLResponse | None:
+    """Simple sliding-window in-memory rate limiter."""
+    limit = max(1, settings.rate_limit_max_requests)
+    window = max(1, settings.rate_limit_window_seconds)
+
+    now = time.monotonic()
+    key = _rate_limit_key(request, route)
+    hits = _rate_limit_store.setdefault(key, deque())
+
+    cutoff = now - window
+    while hits and hits[0] < cutoff:
+        hits.popleft()
+
+    if len(hits) >= limit:
+        return _toast("Too many requests. Try again in a moment.", "warning", status_code=429)
+
+    hits.append(now)
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
@@ -84,9 +122,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Family Events", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+if not settings.session_secret:
+    raise RuntimeError("SESSION_SECRET must be set (in .env) before starting the web app")
+
 app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me-in-prod"),
+    cast(Any, SessionMiddleware),
+    secret_key=settings.session_secret,
     session_cookie="session",
     max_age=60 * 60 * 24 * 30,  # 30 days
 )
@@ -227,8 +268,8 @@ async def api_update_preferences(request: Request):
     dislikes = [x.strip() for x in str(form.get("dislikes", "")).split(",") if x.strip()]
     nap_time = str(form.get("nap_time", "13:00-15:00")).strip()
     bedtime = str(form.get("bedtime", "19:30")).strip()
-    budget = float(form.get("budget", 30.0))
-    max_drive = int(form.get("max_drive", 45))
+    budget = float(str(form.get("budget", "30.0")))
+    max_drive = int(str(form.get("max_drive", "45")))
 
     profile = InterestProfile(
         loves=loves or user.interest_profile.loves,
@@ -465,7 +506,10 @@ async def weekend_page(request: Request):
 
 @app.get("/sources", response_class=HTMLResponse)
 async def sources_page(request: Request):
-    sources = await db.get_all_sources()
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    sources = await db.get_user_sources(user.id)
     builtin_stats = await db.get_filter_options()
     return templates.TemplateResponse(
         "sources.html",
@@ -475,9 +519,16 @@ async def sources_page(request: Request):
 
 @app.get("/source/{source_id}", response_class=HTMLResponse)
 async def source_detail(request: Request, source_id: str):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
     source = await db.get_source(source_id)
     if not source:
         return HTMLResponse("Source not found", status_code=404)
+    if source.user_id and source.user_id != user.id:
+        return HTMLResponse("Forbidden", status_code=403)
+
     events_from_source, _ = await db.search_events(
         days=90, source=f"custom:{source_id}", per_page=10
     )
@@ -496,7 +547,13 @@ async def source_detail(request: Request, source_id: str):
 
 
 @app.post("/api/scrape", response_class=HTMLResponse)
-async def api_scrape():
+async def api_scrape(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_scrape"):
+        return throttled
+
     from src.scheduler import run_scrape
 
     count = await run_scrape(db)
@@ -504,7 +561,13 @@ async def api_scrape():
 
 
 @app.post("/api/tag", response_class=HTMLResponse)
-async def api_tag():
+async def api_tag(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_tag"):
+        return throttled
+
     from src.scheduler import run_tag
 
     count = await run_tag(db)
@@ -513,15 +576,26 @@ async def api_tag():
 
 @app.post("/api/notify", response_class=HTMLResponse)
 async def api_notify(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_notify"):
+        return throttled
+
     from src.scheduler import run_notify
 
-    user = await get_current_user(request, db)
     await run_notify(db, user=user)
     return _toast("Notification sent!")
 
 
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
-async def api_attend(event_id: str):
+async def api_attend(request: Request, event_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_attend"):
+        return throttled
+
     await db.mark_attended(event_id)
     return HTMLResponse(
         '<span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg '
@@ -552,6 +626,12 @@ async def api_events():
 
 @app.post("/api/sources", response_class=HTMLResponse)
 async def api_add_source(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_add_source"):
+        return throttled
+
     form = await request.form()
     url = str(form.get("url", "")).strip()
     name = str(form.get("name", "")).strip()
@@ -571,13 +651,12 @@ async def api_add_source(request: Request):
     domain = extract_domain(url)
     if not name:
         name = domain.replace(".", " ").title()
-    user = await get_current_user(request, db)
     source = Source(
         name=name,
         url=url,
         domain=domain,
         status="analyzing",
-        user_id=user.id if user else None,
+        user_id=user.id,
     )
     await db.create_source(source)
 
@@ -600,10 +679,18 @@ async def api_add_source(request: Request):
 
 
 @app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
-async def api_reanalyze(source_id: str):
+async def api_reanalyze(request: Request, source_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_reanalyze_source"):
+        return throttled
+
     source = await db.get_source(source_id)
     if not source:
         return HTMLResponse("Not found", status_code=404)
+    if source.user_id and source.user_id != user.id:
+        return HTMLResponse("Forbidden", status_code=403)
     await db.update_source_status(source_id, status="analyzing")
     try:
         analyzer = PageAnalyzer()
@@ -624,9 +711,17 @@ async def api_reanalyze(source_id: str):
 
 @app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
 async def api_test_source(request: Request, source_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_test_source"):
+        return throttled
+
     source = await db.get_source(source_id)
     if not source or not source.recipe_json:
         return HTMLResponse("No recipe to test", status_code=400)
+    if source.user_id and source.user_id != user.id:
+        return HTMLResponse("Forbidden", status_code=403)
     try:
         from src.scrapers.generic import GenericScraper
 
@@ -642,7 +737,19 @@ async def api_test_source(request: Request, source_id: str):
 
 
 @app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)
-async def api_toggle_source(source_id: str):
+async def api_toggle_source(request: Request, source_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_toggle_source"):
+        return throttled
+
+    source = await db.get_source(source_id)
+    if not source:
+        return HTMLResponse("Not found", status_code=404)
+    if source.user_id and source.user_id != user.id:
+        return HTMLResponse("Forbidden", status_code=403)
+
     enabled = await db.toggle_source(source_id)
     state = "enabled" if enabled else "disabled"
     return _toast(
@@ -652,7 +759,19 @@ async def api_toggle_source(source_id: str):
 
 
 @app.delete("/api/sources/{source_id}", response_class=HTMLResponse)
-async def api_delete_source(source_id: str):
+async def api_delete_source(request: Request, source_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_delete_source"):
+        return throttled
+
+    source = await db.get_source(source_id)
+    if not source:
+        return HTMLResponse("Not found", status_code=404)
+    if source.user_id and source.user_id != user.id:
+        return HTMLResponse("Forbidden", status_code=403)
+
     await db.delete_source(source_id)
     return _toast(
         "Source deleted",
