@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Server Error{% endblock %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto mt-10">
+  <div
+    class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] p-8 text-center animate-scale-in">
+    <div class="text-5xl mb-4">⚠️</div>
+    <h1 class="text-2xl font-bold text-[var(--color-heading)]">Something went wrong</h1>
+    <p class="text-[var(--color-muted)] mt-2">We're having trouble loading this page right now. Please try again.</p>
+
+    <div class="mt-6 flex flex-wrap justify-center gap-3">
+      <a href="javascript:location.reload()"
+        class="px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors">Try
+        Again</a>
+      <a href="/"
+        class="px-4 py-2.5 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] font-medium text-sm hover:bg-[var(--color-surface-secondary)] transition-colors">Go
+        Home</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
