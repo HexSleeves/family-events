@@ -1,24 +1,26 @@
 {# AI tags grid for event detail #}
 {% if tags %}
-<div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
+<div
+  class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
   <h3 class="font-semibold text-[var(--color-heading)] mb-4">🤖 AI Analysis</h3>
 
   <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
     {% set items = [
-      ('🎯', 'Toddler Score', tags.toddler_score ~ '/10', ''),
-      ('👶', 'Ages', tags.age_min_recommended ~ '-' ~ tags.age_max_recommended, ''),
-      ('🏠', 'Setting', tags.indoor_outdoor, ''),
-      ('🔊', 'Noise', tags.noise_level, ''),
-      ('👥', 'Crowd', tags.crowd_level, ''),
-      ('⚡', 'Energy', tags.energy_level, ''),
-      ('😤', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk == 'medium' else 'high'),
-      ('👁️', 'Attention', tags.parent_attention_required, ''),
-      ('🛍️', 'Stroller', '✅' if tags.stroller_friendly else '❌', ''),
-      ('🅿️', 'Parking', '✅' if tags.parking_available else '❌', ''),
-      ('🚻', 'Bathrooms', '✅' if tags.bathroom_accessible else '❌', ''),
-      ('🌧️', 'Weather Dep.', '✅' if tags.weather_dependent else '❌', ''),
-      ('😴', 'Nap Compatible', '✅' if tags.nap_compatible else '❌', ''),
-      ('🍔', 'Food Available', '✅' if tags.food_available else '❌', '')
+    ('🎯', 'Toddler Score', tags.toddler_score ~ '/10', ''),
+    ('👶', 'Ages', tags.age_min_recommended ~ '-' ~ tags.age_max_recommended, ''),
+    ('🏠', 'Setting', tags.indoor_outdoor, ''),
+    ('🔊', 'Noise', tags.noise_level, ''),
+    ('👥', 'Crowd', tags.crowd_level, ''),
+    ('⚡', 'Energy', tags.energy_level, ''),
+    ('😤', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk
+    == 'medium' else 'high'),
+    ('👀', 'Attention', tags.parent_attention_required, ''),
+    ('🛍️', 'Stroller', '✅' if tags.stroller_friendly else '❌', ''),
+    ('🅿️', 'Parking', '✅' if tags.parking_available else '❌', ''),
+    ('🚻', 'Bathrooms', '✅' if tags.bathroom_accessible else '❌', ''),
+    ('🌧️', 'Weather Dep.', '✅' if tags.weather_dependent else '❌', ''),
+    ('😴', 'Nap Compatible', '✅' if tags.nap_compatible else '❌', ''),
+    ('🍔', 'Food Available', '✅' if tags.food_available else '❌', '')
     ] %}
     {% for icon, label, value, variant in items %}
     <div class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--color-surface-secondary)]">
@@ -38,7 +40,9 @@
     <p class="text-xs text-[var(--color-faint)] mb-2">Categories</p>
     <div class="flex flex-wrap gap-1.5">
       {% for cat in tags.categories %}
-      <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-light)] text-[var(--color-info)]">{{ cat }}</span>
+      <span
+        class="px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-light)] text-[var(--color-info)]">{{
+        cat }}</span>
       {% endfor %}
     </div>
   </div>

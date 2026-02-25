@@ -1,308 +1,332 @@
 <!doctype html>
-<html
-  lang="en"
-  class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}"
->
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Family Events{% endblock %} — Family Events</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<html lang="en" class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}">
 
-    <script>
-      // Apply theme immediately to prevent FOUC
-      (function() {
-          var theme = '{{ current_user.theme if current_user else "auto" }}';
-          if (theme === 'auto') {
-              if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                  document.documentElement.classList.add('dark');
-              } else {
-                  document.documentElement.classList.remove('dark');
-              }
-          } else if (theme === 'dark') {
-              document.documentElement.classList.add('dark');
-          } else {
-              document.documentElement.classList.remove('dark');
-          }
-          document.documentElement.setAttribute('data-theme', theme);
-      })();
-    </script>
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Family Events{% endblock %} — Family Events</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 
-  <body hx-indicator="#global-progress" class="min-h-screen">
-    {# ── Progress bar ── #}
-    <div id="global-progress"><div class="bar"></div></div>
+  <script>
+    // Apply theme immediately to prevent FOUC
+    (function () {
+      var theme = '{{ current_user.theme if current_user else "auto" }}';
+      if (theme === 'auto') {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
 
-    {# ═══ HEADER ═══ #}
-    <header class="sticky top-0 z-50 bg-[var(--color-surface)]/95 backdrop-blur-md border-b border-[var(--color-edge)]">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          {# Logo #}
-          <a href="/" class="flex items-center gap-2 shrink-0">
-            <span class="text-2xl">🎈</span>
-            <span class="font-bold text-xl text-[var(--color-heading)]">Family Events</span>
-          </a>
+<body hx-indicator="#global-progress" class="min-h-screen">
+  {# ── Progress bar ── #}
+  <div id="global-progress">
+    <div class="bar"></div>
+  </div>
 
-          {# Desktop Search #}
-          <div class="hidden md:flex flex-1 max-w-md mx-8">
-            <div class="relative w-full">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
-              <input
-                type="search"
-                name="q"
-                placeholder="Search events..."
-                class="w-full pl-10 pr-4 py-2 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-                hx-get="/events"
-                hx-trigger="keyup changed delay:300ms"
-                hx-target="body"
-                hx-push-url="true"
-                hx-select="#main-content"
-                hx-swap="innerHTML"
-              />
-            </div>
-          </div>
+  {# ═══ HEADER ═══ #}
+  <header class="sticky top-0 z-50 bg-[var(--color-surface)]/95 backdrop-blur-md border-b border-[var(--color-edge)]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        {# Logo #}
+        <a href="/" class="flex items-center gap-2 shrink-0">
+          <span class="text-2xl">🎈</span>
+          <span class="font-bold text-xl text-[var(--color-heading)]">Family Events</span>
+        </a>
 
-          {# Right side #}
-          <div class="flex items-center gap-2">
-            {# Weekend CTA — desktop #}
-            <a href="/weekend"
-               class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors">
-              🗓️ This Weekend
-            </a>
-
-            {# Theme toggle #}
-            {% if current_user %}
-            <button
-              id="theme-toggle"
-              class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors"
-              aria-label="Toggle theme"
-              onclick="quickToggleTheme()"
-            >
-              <svg class="w-5 h-5 text-[var(--color-muted)] dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-              </svg>
-              <svg class="w-5 h-5 text-[var(--color-muted)] hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-              </svg>
-            </button>
-            {% endif %}
-
-            {# User menu #}
-            {% if current_user %}
-            <div class="relative" id="user-menu">
-              <button onclick="document.getElementById('user-dropdown').classList.toggle('hidden')" class="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <div class="w-8 h-8 rounded-full bg-[var(--color-brand)] flex items-center justify-center">
-                  <span class="text-sm font-medium text-white">{{ current_user.display_name[:2]|upper }}</span>
-                </div>
-                <span class="hidden sm:block text-sm font-medium text-[var(--color-heading)]">{{ current_user.display_name }}</span>
-                <svg class="hidden sm:block w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-              </button>
-              <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50 animate-scale-in">
-                <a href="/profile" class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">⚙️ Settings</a>
-                <a href="/sources" class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">📡 Sources</a>
-                <hr class="my-1 border-[var(--color-edge-subtle)]">
-                <a href="/logout" class="block px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">↩ Log Out</a>
-              </div>
-            </div>
-            {% else %}
-            <a href="/login" class="text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Log In</a>
-            <a href="/signup" class="px-4 py-2 rounded-lg bg-[var(--color-heading)] text-[var(--color-surface)] font-medium text-sm hover:opacity-90 transition-opacity">Sign Up</a>
-            {% endif %}
-
-            {# Mobile hamburger #}
-            <button id="menu-toggle" class="md:hidden p-2 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors" aria-label="Menu">
-              <svg class="w-5 h-5 text-[var(--color-heading)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {# Navigation tabs #}
-      <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
-        <div class="flex gap-1 -mb-px">
-          {% set nav_items = [
-            ('/', 'Discover', 'discover'),
-            ('/events', 'Browse', 'events'),
-            ('/weekend', 'This Weekend', 'weekend'),
-            ('/sources', 'Sources', 'sources')
-          ] %}
-          {% for url, label, key in nav_items %}
-          <a href="{{ url }}"
-             class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == key %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-            {{ label }}
-          </a>
-          {% endfor %}
-          {% if current_user %}
-          <a href="/profile"
-             class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == 'admin' %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-            Admin
-          </a>
-          {% endif %}
-        </div>
-      </nav>
-
-      {# Mobile nav menu #}
-      <div id="mobile-menu" class="hidden md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)] animate-slide-down">
-        <div class="px-4 py-3 space-y-1">
-          {# Mobile search #}
-          <div class="relative mb-3">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        {# Desktop Search #}
+        <div class="hidden md:flex flex-1 max-w-md mx-8">
+          <div class="relative w-full">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
+              stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input
-              type="search"
-              placeholder="Search events..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30"
-              hx-get="/events"
-              hx-trigger="keyup changed delay:300ms"
-              hx-target="body"
-              hx-push-url="true"
-            />
+            <input type="search" name="q" placeholder="Search events..."
+              class="w-full pl-10 pr-4 py-2 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+              hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
+              hx-select="#main-content" hx-swap="innerHTML" />
           </div>
-          <a href="/" class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'discover' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🏠 Discover</a>
-          <a href="/events" class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'events' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📋 Browse All</a>
-          <a href="/weekend" class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'weekend' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🗓️ This Weekend</a>
-          <a href="/sources" class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'sources' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📡 Sources</a>
+        </div>
+
+        {# Right side #}
+        <div class="flex items-center gap-2">
+          {# Weekend CTA — desktop #}
+          <a href="/weekend"
+            class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors">
+            🗓️ This Weekend
+          </a>
+
+          {# Theme toggle #}
           {% if current_user %}
-          <hr class="my-2 border-[var(--color-edge-subtle)]">
-          <a href="/profile" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">⚙️ Settings</a>
-          <a href="/logout" class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">↩ Log Out</a>
+          <button id="theme-toggle" class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors"
+            aria-label="Toggle theme" onclick="quickToggleTheme()">
+            <svg class="w-5 h-5 text-[var(--color-muted)] dark:hidden" fill="none" stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            <svg class="w-5 h-5 text-[var(--color-muted)] hidden dark:block" fill="none" stroke="currentColor"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </button>
           {% endif %}
+
+          {# User menu #}
+          {% if current_user %}
+          <div class="relative" id="user-menu">
+            <button onclick="document.getElementById('user-dropdown').classList.toggle('hidden')"
+              class="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors">
+              <div class="w-8 h-8 rounded-full bg-[var(--color-brand)] flex items-center justify-center">
+                <span class="text-sm font-medium text-white">{{ current_user.display_name[:2]|upper }}</span>
+              </div>
+              <span class="hidden sm:block text-sm font-medium text-[var(--color-heading)]">{{ current_user.display_name
+                }}</span>
+              <svg class="hidden sm:block w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div id="user-dropdown"
+              class="hidden absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50 animate-scale-in">
+              <a href="/profile"
+                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">⚙️
+                Settings</a>
+              <a href="/sources"
+                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">📡
+                Sources</a>
+              <hr class="my-1 border-[var(--color-edge-subtle)]">
+              <a href="/logout"
+                class="block px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">↩
+                Log Out</a>
+            </div>
+          </div>
+          {% else %}
+          <a href="/login"
+            class="text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Log
+            In</a>
+          <a href="/signup"
+            class="px-4 py-2 rounded-lg bg-[var(--color-heading)] text-[var(--color-surface)] font-medium text-sm hover:opacity-90 transition-opacity">Sign
+            Up</a>
+          {% endif %}
+
+          {# Mobile hamburger #}
+          <button id="menu-toggle"
+            class="md:hidden p-2 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors"
+            aria-label="Menu">
+            <svg class="w-5 h-5 text-[var(--color-heading)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
       </div>
-    </header>
+    </div>
 
-    {# ═══ MAIN CONTENT ═══ #}
-    <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {% block content %}{% endblock %}
-    </main>
-
-    {# ═══ FOOTER ═══ #}
-    <footer class="border-t border-[var(--color-edge-subtle)] mt-12">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[var(--color-faint)]">
-          <p>🎈 Family Events — Curated for your little one</p>
-          <p>Lafayette & Baton Rouge, Louisiana</p>
-        </div>
+    {# Navigation tabs #}
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
+      <div class="flex gap-1 -mb-px">
+        {% set nav_items = [
+        ('/', 'Discover', 'discover'),
+        ('/events', 'Browse', 'events'),
+        ('/weekend', 'This Weekend', 'weekend'),
+        ('/sources', 'Sources', 'sources')
+        ] %}
+        {% for url, label, key in nav_items %}
+        <a href="{{ url }}"
+          class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == key %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+        {% if current_user %}
+        <a href="/profile"
+          class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == 'admin' %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+          Admin
+        </a>
+        {% endif %}
       </div>
-    </footer>
+    </nav>
 
-    {# ═══ TOAST CONTAINER ═══ #}
-    <div id="toast-container" class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 md:top-20 md:right-6 max-sm:top-auto max-sm:bottom-4 max-sm:right-4 max-sm:left-4"></div>
+    {# Mobile nav menu #}
+    <div id="mobile-menu"
+      class="hidden md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)] animate-slide-down">
+      <div class="px-4 py-3 space-y-1">
+        {# Mobile search #}
+        <div class="relative mb-3">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
+            stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input type="search" placeholder="Search events..."
+            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30"
+            hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true" />
+        </div>
+        <a href="/"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'discover' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🏠
+          Discover</a>
+        <a href="/events"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'events' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📋
+          Browse All</a>
+        <a href="/weekend"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'weekend' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🗓️
+          This Weekend</a>
+        <a href="/sources"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'sources' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📡
+          Sources</a>
+        {% if current_user %}
+        <hr class="my-2 border-[var(--color-edge-subtle)]">
+        <a href="/profile"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">⚙️
+          Settings</a>
+        <a href="/logout"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">↩
+          Log Out</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
 
-    {# ═══ SCRIPTS ═══ #}
-    <script>
-      // Mobile menu toggle
-      document.getElementById('menu-toggle')?.addEventListener('click', function() {
-        var menu = document.getElementById('mobile-menu');
-        menu.classList.toggle('hidden');
-      });
+  {# ═══ MAIN CONTENT ═══ #}
+  <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    {% block content %}{% endblock %}
+  </main>
 
-      // Close dropdown on outside click
-      document.addEventListener('click', function(e) {
-        var dd = document.getElementById('user-dropdown');
-        var menu = document.getElementById('user-menu');
-        if (dd && menu && !menu.contains(e.target)) {
-          dd.classList.add('hidden');
-        }
-      });
+  {# ═══ FOOTER ═══ #}
+  <footer class="border-t border-[var(--color-edge-subtle)] mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[var(--color-faint)]">
+        <p>🎈 Family Events — Curated for your little one</p>
+        <p>Lafayette & Baton Rouge, Louisiana</p>
+      </div>
+    </div>
+  </footer>
 
-      // Theme quick-toggle (cycles: current -> opposite)
-      function quickToggleTheme() {
-        var html = document.documentElement;
-        var isDark = html.classList.contains('dark');
-        if (isDark) {
-          html.classList.remove('dark');
-          html.setAttribute('data-theme', 'light');
-        } else {
-          html.classList.add('dark');
-          html.setAttribute('data-theme', 'dark');
-        }
-        // Persist via API if logged in
-        fetch('/api/profile/theme', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: 'theme=' + (isDark ? 'light' : 'dark')
-        });
+  {# ═══ TOAST CONTAINER ═══ #}
+  <div id="toast-container"
+    class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 md:top-20 md:right-6 max-sm:top-auto max-sm:bottom-4 max-sm:right-4 max-sm:left-4">
+  </div>
+
+  {# ═══ SCRIPTS ═══ #}
+  <script>
+    // Mobile menu toggle
+    document.getElementById('menu-toggle')?.addEventListener('click', function () {
+      var menu = document.getElementById('mobile-menu');
+      menu.classList.toggle('hidden');
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', function (e) {
+      var dd = document.getElementById('user-dropdown');
+      var menu = document.getElementById('user-menu');
+      if (dd && menu && !menu.contains(e.target)) {
+        dd.classList.add('hidden');
       }
+    });
 
-      // Theme change from HTMX trigger
-      function changeTheme(theme) {
-        var html = document.documentElement;
-        html.setAttribute('data-theme', theme);
-        if (theme === 'dark') {
+    // Theme quick-toggle (cycles: current -> opposite)
+    function quickToggleTheme() {
+      var html = document.documentElement;
+      var isDark = html.classList.contains('dark');
+      if (isDark) {
+        html.classList.remove('dark');
+        html.setAttribute('data-theme', 'light');
+      } else {
+        html.classList.add('dark');
+        html.setAttribute('data-theme', 'dark');
+      }
+      // Persist via API if logged in
+      fetch('/api/profile/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'theme=' + (isDark ? 'light' : 'dark')
+      });
+    }
+
+    // Theme change from HTMX trigger
+    function changeTheme(theme) {
+      var html = document.documentElement;
+      html.setAttribute('data-theme', theme);
+      if (theme === 'dark') {
+        html.classList.add('dark');
+      } else if (theme === 'light') {
+        html.classList.remove('dark');
+      } else {
+        // auto
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           html.classList.add('dark');
-        } else if (theme === 'light') {
-          html.classList.remove('dark');
         } else {
-          // auto
-          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            html.classList.add('dark');
-          } else {
-            html.classList.remove('dark');
-          }
+          html.classList.remove('dark');
         }
       }
+    }
 
-      // OS theme listener for auto mode
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-        if (document.documentElement.getAttribute('data-theme') === 'auto') {
-          if (e.matches) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
+    // OS theme listener for auto mode
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+      if (document.documentElement.getAttribute('data-theme') === 'auto') {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
         }
-      });
+      }
+    });
 
-      // Toast notifications + theme changes via HX-Trigger
-      document.body.addEventListener('htmx:afterRequest', function(evt) {
-        var trigger = evt.detail.xhr?.getResponseHeader('HX-Trigger');
-        if (!trigger) return;
-        try {
-          var data = JSON.parse(trigger);
-          if (data.changeTheme) changeTheme(data.changeTheme.theme);
-          if (data.showToast) showToast(data.showToast.message, data.showToast.variant);
-        } catch(e) {}
-      });
+    // Toast notifications + theme changes via HX-Trigger
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
+      var trigger = evt.detail.xhr?.getResponseHeader('HX-Trigger');
+      if (!trigger) return;
+      try {
+        var data = JSON.parse(trigger);
+        if (data.changeTheme) changeTheme(data.changeTheme.theme);
+        if (data.showToast) showToast(data.showToast.message, data.showToast.variant);
+      } catch (e) { }
+    });
 
-      function showToast(message, variant) {
-        var container = document.getElementById('toast-container');
-        var colors = {
-          success: 'bg-[#059669] text-white',
-          error:   'bg-[#DC2626] text-white',
-          warning: 'bg-[#D97706] text-white',
-          info:    'bg-[#2563EB] text-white'
-        };
-        var icons = {
-          success: '✓',
-          error:   '✗',
-          warning: '⚠',
-          info:    'i'
-        };
-        var el = document.createElement('div');
-        el.className = 'toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + (colors[variant] || colors.info);
-        el.style.minWidth = '250px';
-        el.innerHTML = '<span class="text-base">' + (icons[variant] || icons.info) + '</span><span>' + message + '</span>';
-        el.onclick = function() {
+    function showToast(message, variant) {
+      var container = document.getElementById('toast-container');
+      var colors = {
+        success: 'bg-[#059669] text-white',
+        error: 'bg-[#DC2626] text-white',
+        warning: 'bg-[#D97706] text-white',
+        info: 'bg-[#2563EB] text-white'
+      };
+      var icons = {
+        success: '✓',
+        error: '✗',
+        warning: '⚠',
+        info: 'i'
+      };
+      var el = document.createElement('div');
+      el.className = 'toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + (colors[variant] || colors.info);
+      el.style.minWidth = '250px';
+      el.innerHTML = '<span class="text-base">' + (icons[variant] || icons.info) + '</span><span>' + message + '</span>';
+      el.onclick = function () {
+        el.classList.remove('toast-enter');
+        el.classList.add('toast-exit');
+        setTimeout(function () { el.remove(); }, 250);
+      };
+      container.appendChild(el);
+      setTimeout(function () {
+        if (el.parentNode) {
           el.classList.remove('toast-enter');
           el.classList.add('toast-exit');
-          setTimeout(function(){ el.remove(); }, 250);
-        };
-        container.appendChild(el);
-        setTimeout(function(){
-          if (el.parentNode) {
-            el.classList.remove('toast-enter');
-            el.classList.add('toast-exit');
-            setTimeout(function(){ el.remove(); }, 250);
-          }
-        }, 3500);
-      }
-    </script>
-  </body>
+          setTimeout(function () { el.remove(); }, 250);
+        }
+      }, 3500);
+    }
+  </script>
+</body>
+
 </html>
