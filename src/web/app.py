@@ -38,7 +38,7 @@ from src.web.auth import (
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-logger = logging.getLogger("family_events.web")
+logger = logging.getLogger("uvicorn.error")
 
 _rate_limit_store: dict[str, deque[float]] = {}
 
