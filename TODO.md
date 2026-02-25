@@ -5,8 +5,8 @@
 ### ✅ Refactor Frontend to Jinja2 + HTMX + Tailwind CSS
 
 - 20 Jinja2 templates (10 pages + 10 partials)
-- `base.html` shared layout with nav, HTMX CDN
-- `app.py` is pure route handlers (629 lines)
+- `base.html` shared layout with sticky header, tab nav, toast JS
+- `app.py` is pure route handlers (~650 lines)
 - All API endpoints return toast or HTML snippets for HTMX
 
 ### ✅ Events Page: Pagination, Search, Filtering
@@ -14,13 +14,14 @@
 - SQL-level LIKE search, filter by city/source/tagged/score, sort
 - 300ms debounced search via HTMX `keyup changed delay:300ms`
 - Server-side pagination (25/page) with `hx-push-url` for bookmarkable URLs
-- HTMX partial rendering: `HX-Request` header → returns only table+pagination
+- HTMX partial rendering: `HX-Request` header → returns only card grid + pagination
+- 4-column responsive card grid with images, score badges, category tags
 
 ### ✅ Loading Skeleton Animations
 
-- Global 3px indeterminate progress bar
-- Events table: full skeleton overlay with 8 shimmer rows
-- Action buttons: CSS spinner + disabled state during requests
+- Global 3px indeterminate progress bar (brand color)
+- Events: skeleton card grid overlay during loads
+- Action buttons: CSS spinner (`spinner` / `spinner-brand`) + disabled state
 
 ### ✅ Generic Scraper with Smart Routing
 
@@ -67,31 +68,48 @@
 
 ### ✅ Mobile Responsive Layout
 
-- Hamburger menu on <md screens with stacked nav links
-- Events table → card layout on mobile with score badge
-- Filter row: 2-column grid on mobile
-- Pagination: 44px min tap targets, fewer page numbers
-- Dashboard buttons, source form, profile grids all stack on mobile
-- Toast container: bottom-center on mobile, top-right on desktop
-- Tested at 375px viewport width
+- Hamburger menu on <md screens with search + stacked nav links
+- Events: single-column card grid on mobile, 2-col sm, 3-col lg, 4-col xl
+- Discover: horizontal scroll cards adapt width for mobile
+- Filter dropdowns wrap responsively
+- Pagination: 40px min tap targets, ellipsis for distant pages
+- Toast container: bottom on mobile, top-right desktop
+- Tested at 390px viewport width
 
 ### ✅ Animations & Micro-interactions
 
 - 5 custom Tailwind animations (fade-in, fade-in-up, slide-down, scale-in, pop-in)
-- Staggered card/section entrances (stagger-1–9, 60ms increments)
-- Hover lift on cards/sections, active:scale-95 press on buttons
-- Badge hover:scale-105 pop, table row transition-colors
+- Staggered card/section entrances (stagger-1–9, 50ms increments)
+- Hover: card lift + shadow-card-hover, image zoom (scale-105), title color → brand
+- Button press: active:scale-[0.98]
 - HTMX swap fade transitions (.htmx-swapping/.htmx-settling)
 - `prefers-reduced-motion` disables all animations
 
-### ✅ Tailwind Production Build (v4)
+### ✅ Tailwind CSS v4 Build
 
 - Tailwind CSS 4.2 via `@tailwindcss/cli`, build with `npm run css:build`
-- `src/web/static/input.css` → `src/web/static/styles.css` (~26KB minified)
-- CSS-based config in `input.css` via `@theme` (animations) + `@custom-variant` (dark mode)
-- FastAPI `StaticFiles` mount at `/static`
-- No CDN script tag — no console warnings
-- `npm run css:watch` for development
+- CSS-based config in `input.css` via `@theme` (design tokens) + `@custom-variant` (dark mode)
+- No JS config file — v4 auto-detects template content
+- ~46KB minified output
+
+### ✅ Complete UI Redesign — Eventbrite-inspired
+
+- **Design system:** Custom CSS variables for brand coral (#F05537), surfaces, text, borders, shadows
+- **Dark mode:** CSS variable overrides on `.dark` class (slate palette), quick-toggle in header
+- **Score visualization:** 4-tier color system (gray/amber/emerald/green) for toddler scores 0-10
+- **Layout:** Sticky header with search, tab nav (Discover/Browse/This Weekend/Sources/Admin), user dropdown, footer
+- **Discover page (/):** Horizontal scroll card sections by category (Top Picks, Arts, Outdoor, Nature), admin quick actions
+- **Browse (/events):** 4-column responsive card grid with images, score badges, free badges, category tags
+- **Weekend (/weekend):** Weather banner (gradient), ranked compact cards with thumbnails + medals + points
+- **Event Detail (/event/{id}):** Hero image, info card with large score badge, AI tags 3-column grid with icons
+- **Sources (/sources):** Built-in source cards with icons, add custom source form, status badges
+- **Settings (/profile):** Organized sections (appearance, location, child prefs, notifications, password)
+- **Auth (/login, /signup):** Centered card layout with balloon branding
+- **Mobile:** Hamburger menu with search, single-column card layouts, touch-friendly pagination
+- `active_page` context variable for nav tab highlighting
+- Category event lists (arts, outdoor, nature) computed server-side for discover page
+- Max-width 7xl container (was 4xl)
+- Image placeholders with category emojis for events without images
 
 ---
 
@@ -105,19 +123,21 @@
 - Related/similar events at bottom
 - Scoring breakdown (why this score?)
 
-### Dashboard Improvements
+### Dashboard / Discover Improvements
 
 - Auto-refresh stats after action buttons complete
 - "Last scraped" and "last tagged" timestamps
 - Events-by-day chart or mini calendar
-- Quick filter shortcuts ("Lafayette only", "This weekend", "Free events")
+- More category sections (Music, Sports, Free Events)
+- "Near you" section based on user's home city
 
 ### Weekend Page Improvements
 
 - Map view of weekend events (Leaflet.js)
 - Export to calendar (.ics download)
-- Weather-based recommendations
+- Weather-based recommendations (rain → indoor, heat → water/shade)
 - Time-slot planner (morning vs afternoon, avoiding nap time)
+- Saturday / Sunday column split view
 
 ### Data & Scraping
 
@@ -125,7 +145,7 @@
 - Playwright-based scrapers for library sites (LibCal needs JS)
 - Facebook Groups scraper (Playwright + auth)
 - De-duplicate events across sources (same event on Eventbrite + AllEvents)
-- Scrape event images for card thumbnails
+- Improve image coverage (384 of 767 events missing images)
 
 ### Notifications
 

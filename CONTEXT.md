@@ -13,7 +13,7 @@ ranks by interests/weather/timing, and sends curated weekend notifications.
 - **SQLite** (WAL mode, via aiosqlite)
 - **Jinja2** templates with `{% extends %}` / `{% include %}` inheritance
 - **HTMX 2.0.4** for all interactive updates (no custom JS framework)
-- **Tailwind CSS 4.2** production build via `@tailwindcss/cli` (`npm run css:build`), ~36KB minified output
+- **Tailwind CSS 4.2** production build via `@tailwindcss/cli` (`npm run css:build`), ~46KB minified output
 - **httpx** + **BeautifulSoup** (scraping)
 - **OpenAI API** (gpt-4o-mini for tagging, with heuristic fallback)
 - **Pydantic v2** (all data models)
@@ -65,33 +65,33 @@ family-events/
 │   │   ├── telegram.py         # Telegram Bot API
 │   │   └── email.py            # Resend (accepts per-user to_email)
 │   └── web/
-│       ├── app.py              # FastAPI routes + static mount + helpers (629 lines)
+│       ├── app.py              # FastAPI routes + static mount + helpers (~650 lines)
 │       ├── auth.py             # hash_password, verify_password, session helpers
 │       ├── static/
-│       │   ├── input.css         # Tailwind v4 CSS config (@theme, @custom-variant) + custom CSS
-│       │   └── styles.css        # Built output (~36KB minified)
+│       │   ├── input.css         # Tailwind v4 design tokens, dark mode overrides, component CSS
+│       │   └── styles.css        # Built output (~46KB minified)
 │       └── templates/          # 20 Jinja2 templates
-│           ├── base.html            # Layout, nav, dark mode, toast JS, HTMX
-│           ├── dashboard.html       # Stats cards, action buttons, top events
-│           ├── events.html          # Search, filters, paginated table
-│           ├── event_detail.html    # Event info, AI tags grid, raw data
-│           ├── weekend.html         # Ranked picks, weather, notification preview
-│           ├── sources.html         # Source list, add-source form
+│           ├── base.html            # Sticky header, tab nav, search, user dropdown, theme, toast JS
+│           ├── dashboard.html       # Discover page: horizontal scroll cards by category
+│           ├── events.html          # Browse: search, filters, card grid
+│           ├── event_detail.html    # Hero image, info card, AI tags, raw data
+│           ├── weekend.html         # Weather banner, ranked compact cards
+│           ├── sources.html         # Built-in + custom source management
 │           ├── source_detail.html   # Source info, recipe, test scrape
-│           ├── login.html           # Login form
-│           ├── signup.html          # Signup form
-│           ├── profile.html         # Profile sections (theme, location, prefs, etc.)
+│           ├── login.html           # Centered card login form
+│           ├── signup.html          # Centered card signup form
+│           ├── profile.html         # Settings sections (appearance, location, prefs, etc.)
 │           └── partials/
-│               ├── _event_card.html       # Reusable event card (stagger animations)
-│               ├── _event_row.html        # Table row (events page)
-│               ├── _events_table.html     # Desktop table + mobile cards + pagination
-│               ├── _tags_grid.html        # AI tags 2-column grid
-│               ├── _stats.html            # Stats bar (dashboard)
-│               ├── _notification.html     # Notification preview
-│               ├── _source_card.html      # Source card for sources page
+│               ├── _event_card.html       # Compact card with thumbnail (weekend, dashboard)
+│               ├── _event_row.html        # Legacy table row (unused)
+│               ├── _events_table.html     # Card grid + pagination (browse page)
+│               ├── _tags_grid.html        # AI tags 3-column grid with icons
+│               ├── _stats.html            # Stats cards (admin section)
+│               ├── _notification.html     # Notification preview block
+│               ├── _source_card.html      # Source card with actions
 │               ├── _source_test_results.html  # Test scrape results
-│               ├── _skeleton_table.html   # 8-row shimmer table skeleton
-│               └── _skeleton_action.html  # Spinner + bar for action status
+│               ├── _skeleton_table.html   # Skeleton card grid
+│               └── _skeleton_action.html  # Spinner for action buttons
 ```
 
 ## Key Data Models (src/db/models.py)
@@ -150,13 +150,21 @@ constraints: home_city, nap_time, bedtime, budget_per_event, max_drive_time_minu
 - **sources** — user-added scraping sources with recipes, 0 rows
 - **users** — accounts with preferences, theme, notification settings, 2 rows
 
+## Navigation
+
+- **Sticky header** with logo, search bar (desktop), "This Weekend" CTA, theme toggle, user dropdown
+- **Tab navigation** below header: Discover, Browse, This Weekend, Sources, Admin (logged-in only)
+- `active_page` context variable highlights current tab (set per route)
+- **Mobile:** hamburger menu with search bar, stacked nav links
+- **User dropdown:** Settings, Sources, Log Out (click-outside-to-close)
+- **Logged out:** shows "Log In" / "Sign Up" links instead of avatar
+
 ## Authentication
 
 - **Session-based** via Starlette `SessionMiddleware` (signed cookies, 30-day expiry)
 - **bcrypt** password hashing
 - `get_current_user()` resolves session → User on every request
-- `_ctx()` helper injects `current_user` into all template contexts
-- Nav bar shows login/signup or user name/logout based on auth state
+- `_ctx()` helper injects `current_user` and `active_page` into all template contexts
 
 ## Toast Notification System
 
@@ -165,46 +173,60 @@ All API success/error messages use toast notifications instead of inline HTML:
 - **Server:** `_toast(message, variant)` returns empty `HTMLResponse` with `HX-Trigger` header
 - **Client:** JS in `base.html` listens for `htmx:afterRequest`, parses `HX-Trigger` header
 - Single handler — no dedicated event listeners (prevents double-fire with HTMX auto-dispatch)
-- **4 variants:** success (green), error (red), warning (amber), info (blue)
-- Toasts: top-right desktop, bottom-center mobile; auto-dismiss 3.5s; click to dismiss
-- Uses inline styles for dynamic toast elements (compiled CSS can't know runtime classes)
+- **4 variants:** success (✓ green), error (✗ red), warning (⚠ amber), info (i blue)
+- Toasts: top-right desktop (below sticky header), bottom mobile; auto-dismiss 3.5s; click to dismiss
+- Built with inline styles (runtime-generated elements can't use compiled class names)
 
 ## Theme System
 
 - Tailwind v4 `@custom-variant dark` — toggled by `class="dark"` on `<html>`
+- Dark mode implemented via CSS variable overrides on `.dark` class in `input.css`
 - User preference stored in `users.theme` (light/dark/auto)
 - **Server-rendered:** `<html class="dark">` when theme is `dark`
-- **Auto theme:** inline `<script>` in `<head>` checks `prefers-color-scheme` and adds/removes `dark` class before paint (no FOUC)
-- **Client-side toggle:** `changeTheme()` in body JS, called via `HX-Trigger` `changeTheme` event from theme save endpoint
-- **OS listener:** `matchMedia('prefers-color-scheme: dark').addEventListener('change', ...)` re-evaluates when user chose "auto"
-- `data-theme` attribute on `<html>` tracks the user's choice (light/dark/auto) so the OS listener knows whether to act
-- Theme Save button disabled when selection matches current saved theme
+- **Auto theme:** inline `<script>` in `<head>` checks `prefers-color-scheme` before paint (no FOUC)
+- **Quick toggle:** Moon/sun button in header calls `quickToggleTheme()` → persists via `POST /api/profile/theme`
+- **Profile page:** Radio buttons (Light/Dark/System) with disabled-when-unchanged Save button
+- **OS listener:** re-evaluates when user chose "auto"
+- `data-theme` attribute on `<html>` tracks the user's choice
 
 ## Animations
 
 Custom Tailwind animations defined in `src/web/static/input.css` via `@theme`:
 
-- `animate-fade-in` (0.4s) — page content wrapper
-- `animate-fade-in-up` (0.45s, 12px) — cards, sections, headings
+- `animate-fade-in` (0.35s) — page content wrapper
+- `animate-fade-in-up` (0.4s, 12px) — cards, sections, headings
 - `animate-slide-down` (0.25s) — mobile menu toggle
-- `animate-scale-in` (0.35s) — login/signup cards
+- `animate-scale-in` (0.3s) — login/signup cards, dropdowns
 - `animate-pop-in` (0.3s, spring) — available for badges
 
-Staggered entrances via `.stagger-1` through `.stagger-9` (60ms increments, `!important` to override animation shorthand).
+Staggered entrances via `.stagger-1` through `.stagger-9` (50ms increments).
 
-Hover micro-interactions: card lift (`-translate-y-0.5` + `shadow-md`), button press (`active:scale-95`), badge pop (`hover:scale-105`), table row color transition.
+Hover micro-interactions: card lift (`-translate-y-1` + `shadow-card-hover`), image zoom (`group-hover:scale-105`), button press (`active:scale-[0.98]`), title color change to brand.
 
 `@media (prefers-reduced-motion: reduce)` disables all animations globally.
 
+## Design System
+
+Eventbrite-inspired clean interface using CSS custom properties:
+
+- **Brand color:** Warm coral `#F05537` with hover/light/dark variants
+- **Surfaces:** `--color-surface` (white/slate), `--color-surface-secondary`, `--color-surface-tertiary`
+- **Text:** `--color-heading`, `--color-body`, `--color-muted`, `--color-faint`
+- **Borders:** `--color-edge`, `--color-edge-subtle`
+- **Semantic:** success/warning/danger/info with light background variants
+- **Score colors:** 4-tier system — `score-low` (gray 0-3), `score-mid` (amber 4-6), `score-high` (emerald 7-8), `score-top` (green 9-10)
+- **Shadows:** `--shadow-xs`, `--shadow-card`, `--shadow-card-hover`, `--shadow-float`
+- **Dark mode:** CSS variable overrides on `.dark` class (slate palette)
+- All colors referenced as `var(--color-*)` via Tailwind arbitrary values: `bg-[var(--color-surface)]`
+
 ## CSS Build
 
-- **Source:** `src/web/static/input.css` (Tailwind v4 config via `@theme`/`@custom-variant` + custom CSS for skeletons, progress bar, spinners, toasts, stagger delays, HTMX transitions, reduced-motion)
-- **Output:** `src/web/static/styles.css` (~36KB minified)
+- **Source:** `src/web/static/input.css` (design tokens, dark mode, component CSS)
+- **Output:** `src/web/static/styles.css` (~46KB minified)
 - **Build:** `npm run css:build` (runs `@tailwindcss/cli -i ... -o ... --minify`)
 - **Watch:** `npm run css:watch` (dev mode, rebuilds on template changes)
-- **Detection:** Tailwind v4 auto-detects content from `src/web/templates/**/*.html` (no config file needed)
+- **Detection:** Tailwind v4 auto-detects content (no config file needed)
 - **Served:** FastAPI `StaticFiles` mount at `/static`
-- No Tailwind CDN — no console warnings in production
 
 ## Scoring Algorithm (src/ranker/scoring.py)
 
@@ -224,15 +246,15 @@ score = toddler_score * 3.0
 
 | Route | Auth | Description |
 |-------|------|-------------|
-| `GET /` | No | Dashboard — stats, action buttons, top 5 events |
-| `GET /events` | No | Paginated events table with search/filters (25/page) |
-| `GET /event/{id}` | No | Event detail with AI tags, raw data, attend button |
-| `GET /weekend` | No | Ranked weekend picks with weather |
+| `GET /` | No | Discover — horizontal scroll cards by category, admin actions |
+| `GET /events` | No | Browse — card grid with search/filters (25/page) |
+| `GET /event/{id}` | No | Event detail — hero image, AI tags grid, raw data |
+| `GET /weekend` | No | Weekend planner — weather banner, ranked compact cards |
 | `GET /sources` | No | Source list + add-source form |
 | `GET /source/{id}` | No | Source detail with recipe + test scrape |
 | `GET /login` | No | Login form |
 | `GET /signup` | No | Signup form |
-| `GET /profile` | Yes | Profile page (theme, location, prefs, sources, password) |
+| `GET /profile` | Yes | Settings — appearance, location, prefs, notifications, password |
 | `GET /logout` | Yes | Clear session, redirect to `/` |
 
 ### API Endpoints (return toast or HTML snippets for HTMX)
@@ -250,15 +272,16 @@ score = toddler_score * 3.0
 
 ## Current State
 
-- **1,496 events** in DB (~1,361 BREC, 55 Lafayette, 48 Eventbrite, 31 AllEvents)
+- **767 events** in DB (recent 30 days: ~584 BREC w/ images, 55 Lafayette, 49 Eventbrite, 31 AllEvents)
+- **700 events** have `image_url` populated
 - **2 users** in DB (test accounts)
 - **0 custom sources** (generic scraper infrastructure ready)
 - All events tagged via heuristics (no OpenAI key configured)
-- Web UI fully responsive (mobile + desktop), dark mode, animations, toast notifications
-- Tailwind CSS production build (no CDN)
+- Eventbrite-inspired UI with image-forward card grid, horizontal scroll sections, sticky header
+- Dark mode with CSS variable overrides, theme quick-toggle in header
 - `ruff check` and `ruff format` pass clean
 - Server runs on port 8000 via systemd
-- Latest commit: Tailwind CSS v4 upgrade
+- Latest commit: complete UI redesign
 
 ## Environment
 
