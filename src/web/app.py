@@ -623,22 +623,7 @@ async def weekend_page(request: Request):
     ranked = rank_events(tagged, profile, weather)
     message = format_console_message(ranked, weather, child_name)
 
-    weather_tips: list[str] = []
-    sat = weather["saturday"]
-    sun = weather["sunday"]
-    if sat.precipitation_pct > 50 or sun.precipitation_pct > 50:
-        weather_tips.append("Rain expected: prioritize indoor picks and bring spare clothes.")
-    if sat.temp_high_f >= 95 or sun.temp_high_f >= 95:
-        weather_tips.append("High heat: aim for morning outings, shade, and water-play options.")
-    if (
-        sat.precipitation_pct < 30
-        and sun.precipitation_pct < 30
-        and sat.temp_high_f < 90
-        and sun.temp_high_f < 90
-    ):
-        weather_tips.append("Great weather: outdoor parks and nature events should be excellent.")
-
-    weather_summary, weather_tone = summarize_weekend_recommendation(weather)
+    weather_summary, weather_tone, weather_tips = summarize_weekend_recommendation(weather)
 
     return templates.TemplateResponse(
         "weekend.html",

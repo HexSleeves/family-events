@@ -131,15 +131,21 @@ class WeatherService:
         }
 
 
-def summarize_weekend_recommendation(weather: dict[str, DayForecast]) -> tuple[str, str]:
-    """Return (message, tone) for weekend weather guidance.
+def summarize_weekend_recommendation(
+    weather: dict[str, DayForecast],
+) -> tuple[str, str, list[str]]:
+    """Return (message, tone, tips) for weekend weather guidance.
 
     tone: success | warning | info
     """
     sat = weather.get("saturday")
     sun = weather.get("sunday")
     if not sat or not sun:
-        return ("Weather data unavailable. Plan flexible indoor/outdoor options.", "info")
+        return (
+            "Weather data unavailable. Plan flexible indoor/outdoor options.",
+            "info",
+            ["Check day-of forecast before leaving."],
+        )
 
     days = [sat, sun]
     max_heat = max(d.temp_high_f for d in days)
@@ -147,37 +153,54 @@ def summarize_weekend_recommendation(weather: dict[str, DayForecast]) -> tuple[s
     max_rain = max(d.precipitation_pct for d in days)
     avg_rain = sum(d.precipitation_pct for d in days) / len(days)
 
+    tips: list[str] = []
+    if max_rain > 50:
+        tips.append("Rain expected: prioritize indoor picks and bring spare clothes.")
+    if max_heat >= 95:
+        tips.append("High heat: aim for morning outings, shade, and water-play options.")
+    if max_rain < 30 and max_heat < 90:
+        tips.append("Great weather: outdoor parks and nature events should be excellent.")
+
     if max_rain >= 70:
         return (
             "High rain risk this weekend — prioritize indoor plans with easy parking.",
             "warning",
+            tips,
         )
 
     if max_heat >= 98:
         return (
             "Very hot weekend — prioritize early-morning outings or indoor plans.",
             "warning",
+            tips,
         )
 
     if max_heat >= 92 and avg_rain >= 45:
         return (
             "Hot and unsettled weather — mix indoor picks with short outdoor windows.",
             "info",
+            tips,
         )
 
     if max_heat <= 86 and max_rain <= 35:
-        return ("Great weather for outdoor activities this weekend. 🌤️", "success")
+        return ("Great weather for outdoor activities this weekend. 🌤️", "success", tips)
 
     if min_heat >= 88 and max_rain <= 30:
         return (
             "Warm but mostly dry — outdoor plans are good, especially before noon.",
             "info",
+            tips,
         )
 
     if avg_rain >= 40:
         return (
             "Some rain possible — keep a couple indoor backup options ready.",
             "info",
+            tips,
         )
 
-    return ("Mixed but manageable weather — choose flexible plans and check hourly forecasts.", "info")
+    return (
+        "Mixed but manageable weather — choose flexible plans and check hourly forecasts.",
+        "info",
+        tips,
+    )
