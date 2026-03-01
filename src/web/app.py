@@ -31,7 +31,7 @@ from src.ranker.scoring import (
     _weather_score,
     rank_events,
 )
-from src.ranker.weather import WeatherService
+from src.ranker.weather import WeatherService, summarize_weekend_recommendation
 from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import extract_domain, is_builtin_domain
@@ -638,6 +638,8 @@ async def weekend_page(request: Request):
     ):
         weather_tips.append("Great weather: outdoor parks and nature events should be excellent.")
 
+    weather_summary, weather_tone = summarize_weekend_recommendation(weather)
+
     return templates.TemplateResponse(
         "weekend.html",
         await _ctx(
@@ -648,6 +650,8 @@ async def weekend_page(request: Request):
             weather=weather,
             ranked=ranked,
             message=message,
+            weather_summary=weather_summary,
+            weather_tone=weather_tone,
             weather_tips=weather_tips,
         ),
     )

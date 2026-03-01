@@ -26,11 +26,8 @@
           </div>
         </div>
       </div>
-      {% if weather.saturday.temp_high_f and weather.saturday.temp_high_f < 85 %}
-      <p class="text-sm text-[var(--color-success)] font-medium">Great outdoor weather! 🌞</p>
-      {% else %}
-      <p class="text-sm text-[var(--color-warning)] font-medium">Consider indoor activities 🏠</p>
-      {% endif %}
+      {% set tone_class = 'text-[var(--color-success)]' if weather_tone == 'success' else 'text-[var(--color-warning)]' if weather_tone == 'warning' else 'text-[var(--color-muted)]' %}
+      <p class="text-sm font-medium {{ tone_class }}">{{ weather_summary }}</p>
     </div>
   </div>
 

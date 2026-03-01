@@ -129,3 +129,55 @@ class WeatherService:
                 uv_index=7,
             ),
         }
+
+
+def summarize_weekend_recommendation(weather: dict[str, DayForecast]) -> tuple[str, str]:
+    """Return (message, tone) for weekend weather guidance.
+
+    tone: success | warning | info
+    """
+    sat = weather.get("saturday")
+    sun = weather.get("sunday")
+    if not sat or not sun:
+        return ("Weather data unavailable. Plan flexible indoor/outdoor options.", "info")
+
+    days = [sat, sun]
+    max_heat = max(d.temp_high_f for d in days)
+    min_heat = min(d.temp_high_f for d in days)
+    max_rain = max(d.precipitation_pct for d in days)
+    avg_rain = sum(d.precipitation_pct for d in days) / len(days)
+
+    if max_rain >= 70:
+        return (
+            "High rain risk this weekend — prioritize indoor plans with easy parking.",
+            "warning",
+        )
+
+    if max_heat >= 98:
+        return (
+            "Very hot weekend — prioritize early-morning outings or indoor plans.",
+            "warning",
+        )
+
+    if max_heat >= 92 and avg_rain >= 45:
+        return (
+            "Hot and unsettled weather — mix indoor picks with short outdoor windows.",
+            "info",
+        )
+
+    if max_heat <= 86 and max_rain <= 35:
+        return ("Great weather for outdoor activities this weekend. 🌤️", "success")
+
+    if min_heat >= 88 and max_rain <= 30:
+        return (
+            "Warm but mostly dry — outdoor plans are good, especially before noon.",
+            "info",
+        )
+
+    if avg_rain >= 40:
+        return (
+            "Some rain possible — keep a couple indoor backup options ready.",
+            "info",
+        )
+
+    return ("Mixed but manageable weather — choose flexible plans and check hourly forecasts.", "info")
