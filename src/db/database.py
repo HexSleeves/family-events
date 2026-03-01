@@ -344,6 +344,7 @@ class Database:
         city: str = "",
         source: str = "",
         tagged: str = "",
+        attended: str = "",
         score_min: int | None = None,
         sort: str = "start_time",
         page: int = 1,
@@ -357,6 +358,7 @@ class Database:
             city: Filter by location_city (exact match).
             source: Filter by source (exact match).
             tagged: "yes" for tagged only, "no" for untagged only, "" for all.
+            attended: "yes" for attended only, "no" for unattended only, "" for all.
             score_min: Minimum toddler_score (requires tagged).
             sort: Column to sort by. Prefix with "-" for descending.
             page: 1-based page number.
@@ -387,6 +389,11 @@ class Database:
             conditions.append("tags IS NOT NULL")
         elif tagged == "no":
             conditions.append("tags IS NULL")
+
+        if attended == "yes":
+            conditions.append("attended = 1")
+        elif attended == "no":
+            conditions.append("attended = 0")
 
         if score_min is not None:
             conditions.append(

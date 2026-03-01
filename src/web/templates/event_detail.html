@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ event.title }}{% endblock %}
 {% block content %}
+<script>
+  document.body.addEventListener('htmx:afterRequest', function (evt) {
+    var path = evt.detail.requestConfig?.path || '';
+    if (path.indexOf('/api/attend/') === 0 || path.indexOf('/api/unattend/') === 0) {
+      window.location.reload();
+    }
+  });
+</script>
 
 <div class="max-w-4xl mx-auto animate-fade-in">
   {# Back link #}
@@ -72,11 +80,15 @@
         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors">
         🔗 Share
       </button>
-      <span id="attend-btn">
+      <span id="attend-btn" class="inline-flex items-center gap-2">
         {% if event.attended %}
         <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-success-light)] text-[var(--color-success)] text-sm font-medium">✅ Attended</span>
+        <button hx-post="/api/unattend/{{ event.id }}" hx-swap="none"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+          Undo
+        </button>
         {% else %}
-        <button hx-post="/api/attend/{{ event.id }}" hx-target="#attend-btn" hx-swap="innerHTML"
+        <button hx-post="/api/attend/{{ event.id }}" hx-swap="none"
                 class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
           Mark Attended
         </button>

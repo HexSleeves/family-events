@@ -78,7 +78,7 @@
 <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Pagination">
   {# Previous #}
   {% if page > 1 %}
-  <button hx-get="/events?page={{ page - 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+  <button hx-get="/events?page={{ page - 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
           class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
     ←
@@ -90,7 +90,7 @@
     {% if p == page %}
     <span class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg bg-[var(--color-brand)] text-white text-sm font-semibold">{{ p }}</span>
     {% elif p == 1 or p == total_pages or (p >= page - 1 and p <= page + 1) %}
-    <button hx-get="/events?page={{ p }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+    <button hx-get="/events?page={{ p }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
             hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
             class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
       {{ p }}
@@ -102,7 +102,7 @@
 
   {# Next #}
   {% if page < total_pages %}
-  <button hx-get="/events?page={{ page + 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&score_min={{ score_min or '' }}&sort={{ sort }}"
+  <button hx-get="/events?page={{ page + 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
           class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
     →

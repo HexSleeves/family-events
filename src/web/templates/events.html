@@ -27,6 +27,7 @@
         ('city', 'Location', cities),
         ('source', 'Source', sources),
         ('tagged', 'Status', ['yes', 'no']),
+        ('attended', 'Attended', ['yes', 'no']),
         ('score_min', 'Min Score', range(1, 11)),
         ('sort', 'Sort', [('start_time', 'Date ↑'), ('-start_time', 'Date ↓'), ('-score', 'Score ↓'), ('title', 'Title')])
       ] %}
@@ -42,6 +43,10 @@
             <option value="">All</option>
             <option value="yes" {{ 'selected' if tagged=='yes' }}>Tagged</option>
             <option value="no" {{ 'selected' if tagged=='no' }}>Untagged</option>
+          {% elif name == 'attended' %}
+            <option value="">All</option>
+            <option value="yes" {{ 'selected' if attended=='yes' }}>Attended</option>
+            <option value="no" {{ 'selected' if attended=='no' }}>Not Attended</option>
           {% elif name == 'score_min' %}
             <option value="">Any</option>
             {% for v in options %}

@@ -487,6 +487,7 @@ async def events_page(
     city: str = "",
     source: str = "",
     tagged: str = "",
+    attended: str = "",
     score_min: str = "",
     sort: str = "start_time",
     page: int = 1,
@@ -499,6 +500,7 @@ async def events_page(
         city=city,
         source=source,
         tagged=tagged,
+        attended=attended,
         score_min=score_min_int,
         sort=sort,
         page=page,
@@ -507,9 +509,11 @@ async def events_page(
     total_pages = max(1, (total + per_page - 1) // per_page)
     filters = await db.get_filter_options()
 
+    active_page = "attended" if attended == "yes" else "events"
+
     ctx = await _ctx(
         request,
-        active_page="events",
+        active_page=active_page,
         events=events,
         total=total,
         page=page,
@@ -519,6 +523,7 @@ async def events_page(
         city=city,
         source=source,
         tagged=tagged,
+        attended=attended,
         score_min=score_min_int,
         sort=sort,
         cities=filters["cities"],
@@ -738,11 +743,20 @@ async def api_attend(request: Request, event_id: str):
         return throttled
 
     await db.mark_attended(event_id)
-    return HTMLResponse(
-        '<span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg '
-        'bg-[var(--color-success-light)] text-[var(--color-success)] text-sm font-medium">'
-        "\u2705 Attended</span>"
-    )
+    return _toast("Marked attended")
+
+
+@app.post("/api/unattend/{event_id}", response_class=HTMLResponse)
+async def api_unattend(request: Request, event_id: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_unattend"):
+        return throttled
+
+    await db.db.execute("UPDATE events SET attended = 0 WHERE id = :id", {"id": event_id})
+    await db.db.commit()
+    return _toast("Marked as not attended")
 
 
 @app.get("/api/events")
