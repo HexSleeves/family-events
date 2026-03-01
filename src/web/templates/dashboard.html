@@ -133,10 +133,33 @@
 
 
 {# ═══════════════════════════════════════════════════════════
+   CATEGORY: Near You
+   ═══════════════════════════════════════════════════════════ #}
+{% if near_you_events %}
+<section class="mb-10 animate-fade-in-up stagger-3">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
+      📍 Near You ({{ near_city }})
+    </h2>
+    <a href="/events?city={{ near_city }}&sort=-score" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
+      See all →
+    </a>
+  </div>
+
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    {% for event in near_you_events %}
+      {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════
    CATEGORY: Arts & Crafts
    ═══════════════════════════════════════════════════════════ #}
 {% if arts_events %}
-<section class="mb-10 animate-fade-in-up stagger-3">
+<section class="mb-10 animate-fade-in-up stagger-4">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2">
       🎨 Arts &amp; Crafts
@@ -204,7 +227,7 @@
 {# ═══════════════════════════════════════════════════════════
    EMPTY STATE
    ═══════════════════════════════════════════════════════════ #}
-{% if not top_events and not arts_events and not outdoor_events and not nature_events %}
+{% if not top_events and not near_you_events and not arts_events and not outdoor_events and not nature_events %}
 <section class="text-center py-16 animate-fade-in-up stagger-2">
   <div class="text-5xl mb-4">🎈</div>
   <h2 class="text-xl font-bold text-[var(--color-heading)] mb-2">No events yet</h2>

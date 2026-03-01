@@ -451,6 +451,14 @@ async def dashboard(request: Request):
         reverse=True,
     )[:8]
 
+    user = await get_current_user(request, db)
+    near_city = user.home_city if user else "Lafayette"
+    near_you_events = sorted(
+        [e for e in events if e.tags and e.location_city == near_city],
+        key=lambda e: e.tags.toddler_score,
+        reverse=True,
+    )[:8]
+
     return templates.TemplateResponse(
         "dashboard.html",
         await _ctx(
@@ -463,6 +471,8 @@ async def dashboard(request: Request):
             last_scraped_at=timestamps["last_scraped_at"],
             last_tagged_at=timestamps["last_tagged_at"],
             top_events=top_events,
+            near_city=near_city,
+            near_you_events=near_you_events,
             arts_events=arts_events,
             outdoor_events=outdoor_events,
             nature_events=nature_events,
