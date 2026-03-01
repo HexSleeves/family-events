@@ -54,13 +54,24 @@
     </div>
     {% endif %}
 
-    <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)] flex items-center gap-3">
+    <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)] flex flex-wrap items-center gap-3">
       {% if event.source_url %}
       <a href="{{ event.source_url }}" target="_blank" rel="noopener"
          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors">
         View Original →
       </a>
       {% endif %}
+      {% if maps_url %}
+      <a href="{{ maps_url }}" target="_blank" rel="noopener"
+         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors">
+        🗺️ Open in Maps
+      </a>
+      {% endif %}
+      <button
+        onclick="navigator.clipboard.writeText(window.location.href); showToast('Link copied', 'success')"
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors">
+        🔗 Share
+      </button>
       <span id="attend-btn">
         {% if event.attended %}
         <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-success-light)] text-[var(--color-success)] text-sm font-medium">✅ Attended</span>
@@ -74,17 +85,48 @@
     </div>
   </div>
 
+  {% if score_breakdown %}
+  <div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
+    <h3 class="font-semibold text-[var(--color-heading)] mb-3">Why this score?</h3>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Toddler fit</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.toddler) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Interests</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.interest) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Weather</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.weather) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">City</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.city) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Timing</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.timing) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Logistics</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.logistics) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Novelty</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.novelty) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-brand-light)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Total</p><p class="font-bold text-[var(--color-brand)]">{{ '%.1f'|format(score_breakdown.toddler + score_breakdown.interest + score_breakdown.weather + score_breakdown.city + score_breakdown.timing + score_breakdown.logistics + score_breakdown.novelty) }}</p></div>
+    </div>
+  </div>
+  {% endif %}
+
   {# AI Tags #}
   {% if event.tags %}
   {% set tags = event.tags %}
   {% include "partials/_tags_grid.html" %}
   {% endif %}
 
-  {# Raw data #}
+  {% if related_events %}
   <div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-2">
-    <h3 class="font-semibold text-[var(--color-heading)] mb-3">Raw Data</h3>
-    <pre class="bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ raw_data }}</pre>
+    <h3 class="font-semibold text-[var(--color-heading)] mb-3">Related events</h3>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {% for rel_event, rel_score in related_events %}
+      <a href="/event/{{ rel_event.id }}" class="rounded-lg border border-[var(--color-edge-subtle)] p-3 hover:bg-[var(--color-surface-secondary)] transition-colors">
+        <p class="font-medium text-[var(--color-heading)] line-clamp-1">{{ rel_event.title }}</p>
+        <p class="text-xs text-[var(--color-muted)] mt-1">{{ rel_event.start_time.strftime('%a, %b %d · %I:%M%p') }} · {{ rel_event.location_city }}</p>
+        <p class="text-xs text-[var(--color-brand)] mt-1">Toddler score {{ '%.0f'|format(rel_score) }}/10</p>
+      </a>
+      {% endfor %}
+    </div>
   </div>
+  {% endif %}
+
+  {# Raw data #}
+  <details class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-3">
+    <summary class="font-semibold text-[var(--color-heading)] cursor-pointer">Raw Data</summary>
+    <pre class="mt-3 bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ raw_data }}</pre>
+  </details>
 </div>
 
 {% endblock %}

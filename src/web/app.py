@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import quote_plus
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -22,7 +23,14 @@ from src.config import settings
 from src.db.database import Database
 from src.db.models import Constraints, InterestProfile, Source, User
 from src.notifications.formatter import format_console_message
-from src.ranker.scoring import rank_events
+from src.ranker.scoring import (
+    _city_score,
+    _interest_score,
+    _logistics_score,
+    _timing_score,
+    _weather_score,
+    rank_events,
+)
 from src.ranker.weather import WeatherService
 from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
@@ -420,6 +428,7 @@ async def dashboard(request: Request):
     tagged = sum(1 for e in events if e.tags)
     untagged = total - tagged
     sources = len(set(e.source for e in events))
+    timestamps = await db.get_pipeline_timestamps()
 
     top_events = sorted(
         [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
@@ -451,6 +460,8 @@ async def dashboard(request: Request):
             tagged=tagged,
             untagged=untagged,
             sources=sources,
+            last_scraped_at=timestamps["last_scraped_at"],
+            last_tagged_at=timestamps["last_tagged_at"],
             top_events=top_events,
             arts_events=arts_events,
             outdoor_events=outdoor_events,
@@ -527,9 +538,57 @@ async def event_detail(request: Request, event_id: str):
     event = _row_to_event(row)
     raw_data = json.dumps(event.raw_data, indent=2, default=str)[:3000]
 
+    map_query = ", ".join(
+        [v for v in [event.location_name, event.location_address, event.location_city] if v]
+    )
+    maps_url = (
+        f"https://www.google.com/maps/search/?api=1&query={quote_plus(map_query)}"
+        if map_query
+        else None
+    )
+
+    related_events: list[tuple[object, float]] = []
+    score_breakdown: dict[str, float] | None = None
+    if event.tags:
+        user = await get_current_user(request, db)
+        profile = user.interest_profile if user else InterestProfile()
+
+        start = event.start_time.date()
+        weather = await WeatherService().get_weekend_forecast(start, start)
+        tags = event.tags
+        score_breakdown = {
+            "toddler": tags.toddler_score * 3.0,
+            "interest": _interest_score(tags.categories, profile) * 2.5,
+            "weather": _weather_score(event, tags, weather) * 2.0,
+            "city": _city_score(event, profile) * 2.0,
+            "timing": _timing_score(event, profile) * 1.5,
+            "logistics": _logistics_score(tags) * 1.0,
+            "novelty": (5.0 if not event.attended else 0.0) * 0.5,
+        }
+
+        candidates = await db.get_recent_events(days=30)
+        related = [
+            e
+            for e in candidates
+            if e.id != event.id
+            and e.tags
+            and e.location_city == event.location_city
+            and abs((e.start_time - event.start_time).days) <= 14
+        ]
+        related.sort(key=lambda e: e.tags.toddler_score if e.tags else 0, reverse=True)
+        related_events = [(e, float(e.tags.toddler_score if e.tags else 0)) for e in related[:4]]
+
     return templates.TemplateResponse(
         "event_detail.html",
-        await _ctx(request, active_page="events", event=event, raw_data=raw_data),
+        await _ctx(
+            request,
+            active_page="events",
+            event=event,
+            raw_data=raw_data,
+            maps_url=maps_url,
+            related_events=related_events,
+            score_breakdown=score_breakdown,
+        ),
     )
 
 
@@ -554,6 +613,21 @@ async def weekend_page(request: Request):
     ranked = rank_events(tagged, profile, weather)
     message = format_console_message(ranked, weather, child_name)
 
+    weather_tips: list[str] = []
+    sat = weather["saturday"]
+    sun = weather["sunday"]
+    if sat.precipitation_pct > 50 or sun.precipitation_pct > 50:
+        weather_tips.append("Rain expected: prioritize indoor picks and bring spare clothes.")
+    if sat.temp_high_f >= 95 or sun.temp_high_f >= 95:
+        weather_tips.append("High heat: aim for morning outings, shade, and water-play options.")
+    if (
+        sat.precipitation_pct < 30
+        and sun.precipitation_pct < 30
+        and sat.temp_high_f < 90
+        and sun.temp_high_f < 90
+    ):
+        weather_tips.append("Great weather: outdoor parks and nature events should be excellent.")
+
     return templates.TemplateResponse(
         "weekend.html",
         await _ctx(
@@ -564,6 +638,7 @@ async def weekend_page(request: Request):
             weather=weather,
             ranked=ranked,
             message=message,
+            weather_tips=weather_tips,
         ),
     )
 

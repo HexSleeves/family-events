@@ -244,11 +244,17 @@
     </div>
   </div>
 
+  <div class="mb-4 text-xs text-[var(--color-faint)] space-y-1">
+    <p>Last scraped: <span class="text-[var(--color-body)] font-medium">{{ last_scraped_at.strftime('%b %d, %I:%M %p') if last_scraped_at else 'Never' }}</span></p>
+    <p>Last tagged: <span class="text-[var(--color-body)] font-medium">{{ last_tagged_at.strftime('%b %d, %I:%M %p') if last_tagged_at else 'Never' }}</span></p>
+  </div>
+
   {# Action buttons #}
   <div class="flex flex-wrap gap-2">
     <button
       hx-post="/api/scrape"
       hx-swap="none"
+      hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
       hx-disabled-elt="this"
       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
@@ -258,6 +264,7 @@
     <button
       hx-post="/api/tag"
       hx-swap="none"
+      hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
       hx-disabled-elt="this"
       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
@@ -267,6 +274,7 @@
     <button
       hx-post="/api/notify"
       hx-swap="none"
+      hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
       hx-disabled-elt="this"
       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">

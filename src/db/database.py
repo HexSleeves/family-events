@@ -183,6 +183,7 @@ class Database:
             "ALTER TABLE sources ADD COLUMN user_id TEXT",
             "ALTER TABLE users ADD COLUMN email_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN child_name TEXT NOT NULL DEFAULT 'Your Little One'",
+            "ALTER TABLE events ADD COLUMN tagged_at TEXT",
         ]:
             with contextlib.suppress(Exception):
                 await self._db.execute(migration)
@@ -296,11 +297,29 @@ class Database:
 
     async def update_event_tags(self, event_id: str, tags: EventTags) -> None:
         """Set the tags JSON for a specific event."""
+        now = datetime.now(tz=UTC).isoformat()
         await self.db.execute(
-            "UPDATE events SET tags = :tags WHERE id = :id",
-            {"tags": json.dumps(tags.model_dump()), "id": event_id},
+            "UPDATE events SET tags = :tags, tagged_at = :tagged_at WHERE id = :id",
+            {"tags": json.dumps(tags.model_dump()), "tagged_at": now, "id": event_id},
         )
         await self.db.commit()
+
+    async def get_pipeline_timestamps(self) -> dict[str, datetime | None]:
+        """Return last scrape and tag timestamps from events table."""
+        async with self.db.execute(
+            "SELECT MAX(scraped_at) AS last_scraped_at, MAX(tagged_at) AS last_tagged_at FROM events"
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return {"last_scraped_at": None, "last_tagged_at": None}
+            last_scraped = row["last_scraped_at"]
+            last_tagged = row["last_tagged_at"]
+            return {
+                "last_scraped_at": datetime.fromisoformat(str(last_scraped))
+                if last_scraped
+                else None,
+                "last_tagged_at": datetime.fromisoformat(str(last_tagged)) if last_tagged else None,
+            }
 
     async def get_recent_events(self, days: int = 14) -> list[Event]:
         """Return events with start_time within the next `days` days."""

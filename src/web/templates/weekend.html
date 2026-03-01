@@ -34,6 +34,17 @@
     </div>
   </div>
 
+  {% if weather_tips %}
+  <div class="mb-6 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-4 animate-fade-in-up stagger-2">
+    <h3 class="font-semibold text-[var(--color-heading)] mb-2">Weather-aware tips</h3>
+    <ul class="space-y-1 text-sm text-[var(--color-muted)]">
+      {% for tip in weather_tips %}
+      <li>• {{ tip }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {# ═══ RANKED EVENTS ═══ #}
   {% if ranked %}
   <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-4 animate-fade-in-up stagger-2">
