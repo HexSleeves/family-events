@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -133,6 +135,34 @@ def _row_to_source(row: aiosqlite.Row) -> Source:
     return Source.model_validate(d)
 
 
+def _canonicalize_title(title: str) -> str:
+    """Normalize title for fuzzy dedupe grouping."""
+    text = title.lower().strip()
+    text = re.sub(r"[^a-z0-9\s]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _event_fingerprint(event: Event) -> str:
+    """Build a stable cross-source fingerprint for likely duplicate events."""
+    date_part = event.start_time.date().isoformat()
+    city = (event.location_city or "").lower().strip()
+    title = _canonicalize_title(event.title)
+    key = f"{title}|{date_part}|{city}"
+    return hashlib.sha1(key.encode()).hexdigest()
+
+
+def _title_similarity(a: str, b: str) -> float:
+    """Token overlap similarity for fuzzy title matching."""
+    a_tokens = set(_canonicalize_title(a).split())
+    b_tokens = set(_canonicalize_title(b).split())
+    if not a_tokens or not b_tokens:
+        return 0.0
+    overlap = len(a_tokens & b_tokens)
+    union = len(a_tokens | b_tokens)
+    return overlap / union if union else 0.0
+
+
 def _event_to_params(event: Event) -> dict[str, Any]:
     """Convert an Event model to a dict of SQLite bind parameters."""
     return {
@@ -210,8 +240,56 @@ class Database:
     async def upsert_event(self, event: Event) -> str:
         """Insert or update an event, keyed on (source, source_id).
 
-        Returns the event id (existing id if already present).
+        Also applies cross-source dedupe using fuzzy match on title/date/city.
+        Returns the canonical event id (existing id if deduped).
         """
+        # 1) strict dedupe for source-local IDs
+        async with self.db.execute(
+            "SELECT id FROM events WHERE source = :source AND source_id = :source_id",
+            {"source": event.source, "source_id": event.source_id},
+        ) as cursor:
+            existing = await cursor.fetchone()
+        if existing:
+            event.id = existing["id"]
+
+        # 2) cross-source fuzzy dedupe (only if this source/source_id is new)
+        if not existing:
+            canonical_id = await self._find_duplicate_event_id(event)
+            if canonical_id:
+                params = _event_to_params(event)
+                params["canonical_id"] = canonical_id
+                await self.db.execute(
+                    """
+                    UPDATE events
+                    SET description = CASE
+                            WHEN (description IS NULL OR description = '') AND :description != '' THEN :description
+                            ELSE description
+                        END,
+                        location_name = CASE
+                            WHEN (location_name IS NULL OR location_name = '') AND :location_name != '' THEN :location_name
+                            ELSE location_name
+                        END,
+                        location_address = CASE
+                            WHEN (location_address IS NULL OR location_address = '') AND :location_address != '' THEN :location_address
+                            ELSE location_address
+                        END,
+                        latitude = COALESCE(latitude, :latitude),
+                        longitude = COALESCE(longitude, :longitude),
+                        end_time = COALESCE(end_time, :end_time),
+                        image_url = COALESCE(image_url, :image_url),
+                        scraped_at = CASE
+                            WHEN scraped_at < :scraped_at THEN :scraped_at
+                            ELSE scraped_at
+                        END,
+                        tags = COALESCE(tags, :tags),
+                        attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
+                    WHERE id = :canonical_id
+                    """,
+                    params,
+                )
+                await self.db.commit()
+                return canonical_id
+
         params = _event_to_params(event)
 
         await self.db.execute(
@@ -261,7 +339,45 @@ class Database:
             {"source": event.source, "source_id": event.source_id},
         ) as cursor:
             row = await cursor.fetchone()
-            return row["id"]  # type: ignore[index]
+            return row["id"] if row else event.id
+
+    async def _find_duplicate_event_id(self, event: Event) -> str | None:
+        """Find a likely duplicate event across sources."""
+        start = event.start_time - timedelta(hours=4)
+        end = event.start_time + timedelta(hours=4)
+        async with self.db.execute(
+            """
+            SELECT id, title, source, source_id, start_time, location_city
+            FROM events
+            WHERE location_city = :city
+              AND start_time >= :start
+              AND start_time <= :end
+            """,
+            {
+                "city": event.location_city,
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+            },
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        fp = _event_fingerprint(event)
+        for row in rows:
+            candidate_fp = hashlib.sha1(
+                (
+                    f"{_canonicalize_title(str(row['title']))}|"
+                    f"{datetime.fromisoformat(str(row['start_time'])).date().isoformat()}|"
+                    f"{str(row['location_city']).lower().strip()}"
+                ).encode()
+            ).hexdigest()
+            if candidate_fp == fp:
+                return str(row["id"])
+
+        for row in rows:
+            if _title_similarity(event.title, str(row["title"])) >= 0.75:
+                return str(row["id"])
+
+        return None
 
     # ------------------------------------------------------------------
     # Queries
