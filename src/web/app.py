@@ -11,6 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote_plus
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -49,6 +50,7 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 logger = logging.getLogger("uvicorn.error")
 
 _rate_limit_store: dict[str, deque[float]] = {}
+_bulk_unattend_undo_store: dict[str, list[str]] = {}
 
 
 def _toast(
@@ -791,7 +793,39 @@ async def api_unattend_bulk(request: Request):
         [(eid,) for eid in event_ids],
     )
     await db.db.commit()
-    return _toast(f"Updated {len(event_ids)} event(s)")
+
+    undo_token = str(uuid4())
+    _bulk_unattend_undo_store[undo_token] = event_ids
+    payload = json.dumps(
+        {
+            "showToast": {
+                "message": f"Updated {len(event_ids)} event(s)",
+                "variant": "success",
+                "undo": {"path": f"/api/unattend-bulk/undo/{undo_token}", "label": "Undo"},
+            }
+        }
+    )
+    return HTMLResponse(content="", status_code=200, headers={"HX-Trigger": payload})
+
+
+@app.post("/api/unattend-bulk/undo/{undo_token}", response_class=HTMLResponse)
+async def api_unattend_bulk_undo(request: Request, undo_token: str):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_unattend_bulk_undo"):
+        return throttled
+
+    event_ids = _bulk_unattend_undo_store.pop(undo_token, [])
+    if not event_ids:
+        return _toast("Nothing to undo", "warning")
+
+    await db.db.executemany(
+        "UPDATE events SET attended = 1 WHERE id = ?",
+        [(eid,) for eid in event_ids],
+    )
+    await db.db.commit()
+    return _toast(f"Restored {len(event_ids)} event(s)")
 
 
 @app.get("/api/events")

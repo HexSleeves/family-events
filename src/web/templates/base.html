@@ -150,12 +150,6 @@
           {{ label }}
         </a>
         {% endfor %}
-        {% if current_user %}
-        <a href="/profile"
-          class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == 'admin' %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-          Admin
-        </a>
-        {% endif %}
       </div>
     </nav>
 
@@ -294,11 +288,11 @@
       try {
         var data = JSON.parse(trigger);
         if (data.changeTheme) changeTheme(data.changeTheme.theme);
-        if (data.showToast) showToast(data.showToast.message, data.showToast.variant);
+        if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
       } catch (e) { }
     });
 
-    function showToast(message, variant) {
+    function showToast(message, variant, undo) {
       var container = document.getElementById('toast-container');
       var colors = {
         success: 'bg-[#059669] text-white',
@@ -316,6 +310,19 @@
       el.className = 'toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + (colors[variant] || colors.info);
       el.style.minWidth = '250px';
       el.innerHTML = '<span class="text-base">' + (icons[variant] || icons.info) + '</span><span>' + message + '</span>';
+
+      if (undo && undo.path) {
+        var undoBtn = document.createElement('button');
+        undoBtn.type = 'button';
+        undoBtn.className = 'ml-auto underline underline-offset-2 text-white/90 hover:text-white';
+        undoBtn.textContent = (undo.label || 'Undo');
+        undoBtn.onclick = function (e) {
+          e.stopPropagation();
+          fetch(undo.path, { method: 'POST' }).then(function () { window.location.reload(); });
+        };
+        el.appendChild(undoBtn);
+      }
+
       el.onclick = function () {
         el.classList.remove('toast-enter');
         el.classList.add('toast-exit');
