@@ -1,12 +1,18 @@
 {# Events results: card grid + pagination #}
 
-{# Result count #}
+{% if total == 0 %}
+<section class="rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-10 text-center shadow-[var(--shadow-xs)] animate-fade-in-up">
+  <div class="text-4xl mb-3">🔍</div>
+  <h2 class="text-lg font-semibold text-[var(--color-heading)]">No events found</h2>
+  <p class="mt-1 text-sm text-[var(--color-muted)]">Try broadening your filters or resetting search.</p>
+</section>
+{% else %}
 <p class="text-sm text-[var(--color-muted)] mb-4">
   Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} events
 </p>
 
 {% if attended == 'yes' %}
-<form id="bulk-unattend-form" class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3">
+<form id="bulk-unattend-form" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-xs)]">
   <label class="inline-flex items-center gap-2 text-sm text-[var(--color-body)]">
     <input id="select-all-attended" type="checkbox" class="rounded border-[var(--color-edge)]" />
     Select all on page
@@ -29,50 +35,42 @@
                   else "score-high" if score is not none and score <= 8
                   else "score-top" if score is not none
                   else "" %}
-  {% set score_bg = "score-bg-low" if score is not none and score <= 3
-                else "score-bg-mid" if score is not none and score <= 6
-                else "score-bg-high" if score is not none and score <= 8
-                else "score-bg-top" if score is not none
-                else "" %}
 
-  <div
-     class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}">
+  <article class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}">
+    <a href="/event/{{ event.id }}" class="block">
+      <div class="relative aspect-[16/10] overflow-hidden">
+        {% if attended == 'yes' %}
+        <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm" onclick="event.stopPropagation();">
+          <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" />
+          Select
+        </label>
+        {% endif %}
 
-    {# Image #}
-    <div class="relative aspect-[16/10] overflow-hidden">
-      {% if attended == 'yes' %}
-      <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm">
-        <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" />
-        Select
-      </label>
-      {% endif %}
-      {% if event.image_url %}
-      <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-      {% else %}
-      <div class="img-placeholder w-full h-full text-2xl">
-        {% if event.tags and event.tags.categories %}{{ {'play': '🎪', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
+        {% if event.image_url %}
+        <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+        {% else %}
+        <div class="img-placeholder w-full h-full text-2xl">
+          {% if event.tags and event.tags.categories %}{{ {'play': '🎪', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
+        </div>
+        {% endif %}
+
+        {% if score is not none %}
+        <div class="absolute top-2.5 left-2.5">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold bg-white/90 backdrop-blur-sm shadow-xs {{ score_class }}">
+            {% if score >= 9 %}⭐{% endif %}{{ score }}
+          </span>
+        </div>
+        {% endif %}
+
+        {% if event.is_free %}
+        <span class="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-success)] text-white shadow-xs">Free</span>
+        {% endif %}
+        {% if event.attended %}
+        <span class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-info-light)] text-[var(--color-info)] shadow-xs">Attended</span>
+        {% endif %}
       </div>
-      {% endif %}
+    </a>
 
-      {# Score badge #}
-      {% if score is not none %}
-      <div class="absolute top-2.5 left-2.5">
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold bg-white/90 backdrop-blur-sm shadow-xs {{ score_class }}">
-          {% if score >= 9 %}⭐{% endif %}{{ score }}
-        </span>
-      </div>
-      {% endif %}
-
-      {# Free badge #}
-      {% if event.is_free %}
-      <span class="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-success)] text-white shadow-xs">Free</span>
-      {% endif %}
-      {% if event.attended %}
-      <span class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-info-light)] text-[var(--color-info)] shadow-xs">Attended</span>
-      {% endif %}
-    </div>
-
-    {# Content #}
     <div class="p-3.5">
       <div class="flex items-center gap-2 text-xs text-[var(--color-faint)] mb-1.5">
         <span>{{ event.start_time.strftime('%a %b %d') }}</span>
@@ -93,7 +91,7 @@
       </div>
       {% endif %}
     </div>
-  </div>
+  </article>
   {% endfor %}
 </div>
 
@@ -129,7 +127,6 @@
 {# ═══ PAGINATION ═══ #}
 {% if total_pages > 1 %}
 <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Pagination">
-  {# Previous #}
   {% if page > 1 %}
   <button hx-get="/events?page={{ page - 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
@@ -138,7 +135,6 @@
   </button>
   {% endif %}
 
-  {# Page numbers #}
   {% for p in range(1, total_pages + 1) %}
     {% if p == page %}
     <span class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg bg-[var(--color-brand)] text-white text-sm font-semibold">{{ p }}</span>
@@ -153,7 +149,6 @@
     {% endif %}
   {% endfor %}
 
-  {# Next #}
   {% if page < total_pages %}
   <button hx-get="/events?page={{ page + 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
@@ -162,4 +157,5 @@
   </button>
   {% endif %}
 </nav>
+{% endif %}
 {% endif %}

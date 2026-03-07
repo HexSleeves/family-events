@@ -2,16 +2,33 @@
 {% block title %}Browse Events{% endblock %}
 {% block content %}
 
-<div class="animate-fade-in">
-  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">
-    {{ 'Attended Events' if attended == 'yes' else 'All Events' }}
-    <span class="text-[var(--color-faint)] font-normal">({{ total }})</span>
-  </h1>
+{% set in_attended = attended == 'yes' %}
+
+<div class="animate-fade-in space-y-5">
+  <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">
+        {{ 'Attended Events' if in_attended else 'Browse Events' }}
+      </h1>
+      <p class="mt-1 text-sm text-[var(--color-muted)]">Refine by city, score, source, and attendance state.</p>
+    </div>
+
+    <div class="inline-flex items-center rounded-xl border border-[var(--color-edge)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-xs)]">
+      <a href="/events"
+        class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {% if not in_attended %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+        All ({{ total }})
+      </a>
+      <a href="/events?attended=yes"
+        class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors {% if in_attended %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+        Attended
+      </a>
+    </div>
+  </section>
 
   {# ═══ FILTER BAR ═══ #}
   <form id="events-form" hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
       hx-trigger="submit, change from:.auto-submit" hx-indicator="#events-results-wrapper"
-      class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 space-y-3">
+      class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-4 space-y-3">
 
     {# Search bar #}
     <div class="relative">
@@ -24,20 +41,20 @@
           hx-trigger="keyup changed delay:300ms" hx-include="#events-form" hx-indicator="#events-results-wrapper" />
     </div>
 
-    {# Filter chips row #}
-    <div class="flex flex-wrap gap-2 items-end">
+    {# Filters #}
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
       {% for name, label, options in [
         ('city', 'Location', cities),
         ('source', 'Source', sources),
-        ('tagged', 'Status', ['yes', 'no']),
+        ('tagged', 'Tagged', ['yes', 'no']),
         ('attended', 'Attended', ['yes', 'no']),
         ('score_min', 'Min Score', range(1, 11)),
         ('sort', 'Sort', [('start_time', 'Date ↑'), ('-start_time', 'Date ↓'), ('-score', 'Score ↓'), ('title', 'Title')])
       ] %}
-      <div class="flex flex-col">
-        <label class="text-xs text-[var(--color-faint)] font-medium mb-1">{{ label }}</label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs text-[var(--color-faint)] font-medium">{{ label }}</span>
         <select name="{{ name }}"
-            class="auto-submit border border-[var(--color-edge)] rounded-lg px-3 py-1.5 text-sm bg-[var(--color-surface)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30">
+            class="auto-submit border border-[var(--color-edge)] rounded-lg px-3 py-2 text-sm bg-[var(--color-surface)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30">
           {% if name == 'sort' %}
             {% for val, lbl in options %}
             <option value="{{ val }}" {{ 'selected' if sort==val }}>{{ lbl }}</option>
@@ -49,31 +66,36 @@
           {% elif name == 'attended' %}
             <option value="">All</option>
             <option value="yes" {{ 'selected' if attended=='yes' }}>Attended</option>
-            <option value="no" {{ 'selected' if attended=='no' }}>Not Attended</option>
+            <option value="no" {{ 'selected' if attended=='no' }}>Not attended</option>
           {% elif name == 'score_min' %}
             <option value="">Any</option>
             {% for v in options %}
             <option value="{{ v }}" {{ 'selected' if score_min is not none and score_min==v }}>{{ v }}+</option>
             {% endfor %}
           {% elif name == 'city' %}
-            <option value="">All Cities</option>
+            <option value="">All cities</option>
             {% for c in options %}
             <option value="{{ c }}" {{ 'selected' if city==c }}>{{ c }}</option>
             {% endfor %}
           {% else %}
-            <option value="">All Sources</option>
+            <option value="">All sources</option>
             {% for s in options %}
             <option value="{{ s }}" {{ 'selected' if source==s }}>{{ s }}</option>
             {% endfor %}
           {% endif %}
         </select>
-      </div>
+      </label>
       {% endfor %}
+    </div>
+
+    <div class="flex items-center justify-between gap-3">
+      <p class="text-xs text-[var(--color-faint)]">Filters auto-apply as you type/select.</p>
+      <a href="/events" class="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)]">Reset filters</a>
     </div>
   </form>
 
   {# ═══ RESULTS ═══ #}
-  <div id="events-results-wrapper" class="relative">
+  <div id="events-results-wrapper" class="relative min-h-48">
     {# Skeleton overlay #}
     <div class="skeleton-overlay">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
