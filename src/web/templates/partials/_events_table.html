@@ -5,6 +5,21 @@
   Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }} events
 </p>
 
+{% if attended == 'yes' %}
+<form id="bulk-unattend-form" class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3">
+  <label class="inline-flex items-center gap-2 text-sm text-[var(--color-body)]">
+    <input id="select-all-attended" type="checkbox" class="rounded border-[var(--color-edge)]" />
+    Select all on page
+  </label>
+  <button
+    type="button"
+    onclick="bulkUnattend()"
+    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
+    ↩ Unattend selected
+  </button>
+</form>
+{% endif %}
+
 {# ═══ CARD GRID ═══ #}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
   {% for event in events %}
@@ -20,11 +35,17 @@
                 else "score-bg-top" if score is not none
                 else "" %}
 
-  <a href="/event/{{ event.id }}"
+  <div
      class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}">
 
     {# Image #}
     <div class="relative aspect-[16/10] overflow-hidden">
+      {% if attended == 'yes' %}
+      <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm">
+        <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" />
+        Select
+      </label>
+      {% endif %}
       {% if event.image_url %}
       <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
       {% else %}
@@ -46,6 +67,9 @@
       {% if event.is_free %}
       <span class="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-success)] text-white shadow-xs">Free</span>
       {% endif %}
+      {% if event.attended %}
+      <span class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-info-light)] text-[var(--color-info)] shadow-xs">Attended</span>
+      {% endif %}
     </div>
 
     {# Content #}
@@ -56,7 +80,7 @@
         <span class="capitalize">{{ event.source }}</span>
       </div>
       <h3 class="font-semibold text-[var(--color-heading)] text-sm leading-snug line-clamp-2 group-hover:text-[var(--color-brand)] transition-colors mb-1.5">
-        {{ event.title }}
+        <a href="/event/{{ event.id }}">{{ event.title }}</a>
       </h3>
       <p class="text-xs text-[var(--color-muted)] truncate">
         📍 {{ event.location_name or event.location_city }}, {{ event.location_city }}
@@ -69,9 +93,38 @@
       </div>
       {% endif %}
     </div>
-  </a>
+  </div>
   {% endfor %}
 </div>
+
+{% if attended == 'yes' %}
+<script>
+  (function () {
+    var selectAll = document.getElementById('select-all-attended');
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        document.querySelectorAll('.attended-select').forEach(function (el) {
+          el.checked = selectAll.checked;
+        });
+      });
+    }
+  })();
+
+  function bulkUnattend() {
+    var ids = Array.from(document.querySelectorAll('.attended-select:checked')).map(function (el) { return el.value; });
+    if (!ids.length) {
+      showToast('Select at least one event', 'warning');
+      return;
+    }
+    var body = ids.map(function (id) { return 'event_ids=' + encodeURIComponent(id); }).join('&');
+    fetch('/api/unattend-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    }).then(function () { window.location.reload(); });
+  }
+</script>
+{% endif %}
 
 {# ═══ PAGINATION ═══ #}
 {% if total_pages > 1 %}

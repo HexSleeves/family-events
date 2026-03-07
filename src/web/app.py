@@ -277,7 +277,7 @@ async def profile_page(request: Request):
     sources = await db.get_user_sources(user.id)
     return templates.TemplateResponse(
         "profile.html",
-        {**await _ctx(request, active_page="admin"), "sources": sources},
+        {**await _ctx(request, active_page="profile"), "sources": sources},
     )
 
 
@@ -720,6 +720,20 @@ async def api_tag(request: Request):
     return _toast(f"Tagged {count} events")
 
 
+@app.post("/api/dedupe", response_class=HTMLResponse)
+async def api_dedupe(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_dedupe"):
+        return throttled
+
+    result = await db.dedupe_existing_events()
+    return _toast(
+        f"Dedupe complete: merged {result['merged']} of {result['total_scanned']} scanned events"
+    )
+
+
 @app.post("/api/notify", response_class=HTMLResponse)
 async def api_notify(request: Request):
     user = await get_current_user(request, db)
@@ -757,6 +771,27 @@ async def api_unattend(request: Request, event_id: str):
     await db.db.execute("UPDATE events SET attended = 0 WHERE id = :id", {"id": event_id})
     await db.db.commit()
     return _toast("Marked as not attended")
+
+
+@app.post("/api/unattend-bulk", response_class=HTMLResponse)
+async def api_unattend_bulk(request: Request):
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return denied
+    if throttled := _check_rate_limit(request, "api_unattend_bulk"):
+        return throttled
+
+    form = await request.form()
+    event_ids = [str(eid) for eid in form.getlist("event_ids") if str(eid).strip()]
+    if not event_ids:
+        return _toast("Select at least one event", "warning")
+
+    await db.db.executemany(
+        "UPDATE events SET attended = 0 WHERE id = ?",
+        [(eid,) for eid in event_ids],
+    )
+    await db.db.commit()
+    return _toast(f"Updated {len(event_ids)} event(s)")
 
 
 @app.get("/api/events")

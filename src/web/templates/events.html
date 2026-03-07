@@ -3,7 +3,10 @@
 {% block content %}
 
 <div class="animate-fade-in">
-  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">All Events <span class="text-[var(--color-faint)] font-normal">({{ total }})</span></h1>
+  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">
+    {{ 'Attended Events' if attended == 'yes' else 'All Events' }}
+    <span class="text-[var(--color-faint)] font-normal">({{ total }})</span>
+  </h1>
 
   {# ═══ FILTER BAR ═══ #}
   <form id="events-form" hx-get="/events" hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
