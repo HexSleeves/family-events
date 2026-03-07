@@ -1,15 +1,16 @@
-{# Stats cards for admin dashboard #}
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up">
-    {% set stats = [
-        (total, 'Events', '📋', ''),
-        (tagged, 'Tagged', '🏷️', ''),
-        (untagged, 'Untagged', '⏳', ''),
-        (sources, 'Sources', '📡', '')
-    ] %}
-    {% for value, label, icon, sub in stats %}
-    <div class="bg-[var(--color-surface)] rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
-        <p class="text-sm font-medium text-[var(--color-muted)] mb-1">{{ icon }} {{ label }}</p>
-        <p class="text-3xl font-bold text-[var(--color-heading)]">{{ value }}</p>
-    </div>
-    {% endfor %}
+{# Stats cards for dashboard actions section #}
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+  {% set stats = [
+    (total, 'Events', 'text-[var(--color-brand)]'),
+    (tagged, 'Tagged', 'text-[var(--color-success)]'),
+    (untagged, 'Untagged', 'text-[var(--color-warning)]'),
+    (sources, 'Sources', 'text-[var(--color-info)]')
+  ] %}
+
+  {% for value, label, value_class in stats %}
+  <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
+    <div class="text-2xl font-bold {{ value_class }}">{{ value }}</div>
+    <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">{{ label }}</div>
+  </div>
+  {% endfor %}
 </div>
