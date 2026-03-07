@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import re
 from datetime import UTC, datetime, timedelta
@@ -15,6 +16,8 @@ import aiosqlite
 from .models import Event, EventTags, InterestProfile, Source, User
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "family_events.db")
+DEDUP_DEBUG = os.environ.get("DEDUP_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+logger = logging.getLogger("uvicorn.error")
 
 _CREATE_EVENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS events (
@@ -254,7 +257,7 @@ class Database:
 
         # 2) cross-source fuzzy dedupe (only if this source/source_id is new)
         if not existing:
-            canonical_id = await self._find_duplicate_event_id(event)
+            canonical_id, dedupe_reason = await self._find_duplicate_event_id(event)
             if canonical_id:
                 params = _event_to_params(event)
                 params["canonical_id"] = canonical_id
@@ -288,6 +291,15 @@ class Database:
                     params,
                 )
                 await self.db.commit()
+                if DEDUP_DEBUG:
+                    logger.info(
+                        "dedupe: merged event source=%s source_id=%s into id=%s reason=%s title=%s",
+                        event.source,
+                        event.source_id,
+                        canonical_id,
+                        dedupe_reason or "unknown",
+                        event.title,
+                    )
                 return canonical_id
 
         params = _event_to_params(event)
@@ -341,8 +353,11 @@ class Database:
             row = await cursor.fetchone()
             return row["id"] if row else event.id
 
-    async def _find_duplicate_event_id(self, event: Event) -> str | None:
-        """Find a likely duplicate event across sources."""
+    async def _find_duplicate_event_id(self, event: Event) -> tuple[str | None, str | None]:
+        """Find a likely duplicate event across sources.
+
+        Returns (event_id, reason).
+        """
         start = event.start_time - timedelta(hours=4)
         end = event.start_time + timedelta(hours=4)
         async with self.db.execute(
@@ -371,13 +386,14 @@ class Database:
                 ).encode()
             ).hexdigest()
             if candidate_fp == fp:
-                return str(row["id"])
+                return str(row["id"]), "fingerprint"
 
         for row in rows:
-            if _title_similarity(event.title, str(row["title"])) >= 0.75:
-                return str(row["id"])
+            similarity = _title_similarity(event.title, str(row["title"]))
+            if similarity >= 0.75:
+                return str(row["id"]), f"title_similarity:{similarity:.2f}"
 
-        return None
+        return None, None
 
     # ------------------------------------------------------------------
     # Queries
@@ -834,3 +850,88 @@ class Database:
 
     async def __aexit__(self, *exc: Any) -> None:
         await self.close()
+
+    async def dedupe_existing_events(self) -> dict[str, int]:
+        """One-time backfill dedupe across already-stored events.
+
+        Keeps earliest-created canonical event id and merges newer duplicates into it.
+        """
+        async with self.db.execute(
+            "SELECT * FROM events ORDER BY start_time, scraped_at"
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        events = [_row_to_event(r) for r in rows]
+        total = len(events)
+        merged = 0
+
+        # group by rough time bucket + city to keep complexity reasonable
+        buckets: dict[str, list[Event]] = {}
+        for event in events:
+            bucket_key = (
+                f"{event.location_city.lower().strip()}|"
+                f"{event.start_time.date().isoformat()}|"
+                f"{event.start_time.hour // 2}"
+            )
+            buckets.setdefault(bucket_key, []).append(event)
+
+        for bucket_events in buckets.values():
+            if len(bucket_events) < 2:
+                continue
+            canonical: list[Event] = []
+            for event in bucket_events:
+                duplicate_of: Event | None = None
+                for c in canonical:
+                    fp_a = _event_fingerprint(event)
+                    fp_b = _event_fingerprint(c)
+                    sim = _title_similarity(event.title, c.title)
+                    if fp_a == fp_b or sim >= 0.75:
+                        duplicate_of = c
+                        break
+                if not duplicate_of:
+                    canonical.append(event)
+                    continue
+
+                params = _event_to_params(event)
+                params["canonical_id"] = duplicate_of.id
+                await self.db.execute(
+                    """
+                    UPDATE events
+                    SET description = CASE
+                            WHEN (description IS NULL OR description = '') AND :description != '' THEN :description
+                            ELSE description
+                        END,
+                        location_name = CASE
+                            WHEN (location_name IS NULL OR location_name = '') AND :location_name != '' THEN :location_name
+                            ELSE location_name
+                        END,
+                        location_address = CASE
+                            WHEN (location_address IS NULL OR location_address = '') AND :location_address != '' THEN :location_address
+                            ELSE location_address
+                        END,
+                        latitude = COALESCE(latitude, :latitude),
+                        longitude = COALESCE(longitude, :longitude),
+                        end_time = COALESCE(end_time, :end_time),
+                        image_url = COALESCE(image_url, :image_url),
+                        scraped_at = CASE
+                            WHEN scraped_at < :scraped_at THEN :scraped_at
+                            ELSE scraped_at
+                        END,
+                        tags = COALESCE(tags, :tags),
+                        attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
+                    WHERE id = :canonical_id
+                    """,
+                    params,
+                )
+                await self.db.execute("DELETE FROM events WHERE id = :id", {"id": event.id})
+                merged += 1
+                if DEDUP_DEBUG:
+                    logger.info(
+                        "dedupe_backfill: merged id=%s into canonical=%s title=%s",
+                        event.id,
+                        duplicate_of.id,
+                        event.title,
+                    )
+
+        await self.db.commit()
+        return {"total_scanned": total, "merged": merged, "remaining": total - merged}

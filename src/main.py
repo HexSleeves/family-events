@@ -18,6 +18,7 @@ def cli() -> None:
     pipeline_p.add_argument("--name", default="Your Little One", help="Child's name")
     sub.add_parser("serve", help="Start the web server")
     sub.add_parser("events", help="List upcoming events")
+    sub.add_parser("dedupe", help="Backfill-dedupe existing events in database")
 
     args = parser.parse_args()
 
@@ -46,6 +47,9 @@ def cli() -> None:
 
     elif args.command == "events":
         asyncio.run(_list_events())
+
+    elif args.command == "dedupe":
+        asyncio.run(_dedupe_events())
 
     else:
         parser.print_help()
@@ -78,6 +82,17 @@ def _serve() -> None:
         host=settings.host,
         port=settings.port,
         reload=True,
+    )
+
+
+async def _dedupe_events() -> None:
+    from src.db.database import Database
+
+    async with Database() as db:
+        result = await db.dedupe_existing_events()
+    print(
+        "Dedupe complete: "
+        f"scanned={result['total_scanned']} merged={result['merged']} remaining={result['remaining']}"
     )
 
 
