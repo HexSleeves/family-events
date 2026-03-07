@@ -28,32 +28,37 @@
   </script>
 </head>
 
-<body hx-indicator="#global-progress" class="min-h-screen">
+<body hx-indicator="#global-progress" class="min-h-screen bg-[var(--color-surface-secondary)] text-[var(--color-body)]">
   {# ── Progress bar ── #}
   <div id="global-progress">
     <div class="bar"></div>
   </div>
 
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[10000] focus:rounded-md focus:bg-[var(--color-heading)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--color-surface)]">Skip to content</a>
+
   {# ═══ HEADER ═══ #}
-  <header class="sticky top-0 z-50 bg-[var(--color-surface)]/95 backdrop-blur-md border-b border-[var(--color-edge)]">
+  <header class="sticky top-0 z-50 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-edge)] shadow-[var(--shadow-xs)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         {# Logo #}
-        <a href="/" class="flex items-center gap-2 shrink-0">
+        <a href="/" class="flex items-center gap-2 shrink-0 rounded-lg px-1 py-0.5 hover:bg-[var(--color-surface-tertiary)] transition-colors">
           <span class="text-2xl">🎈</span>
-          <span class="font-bold text-xl text-[var(--color-heading)]">Family Events</span>
+          <div class="leading-tight">
+            <span class="block font-bold text-lg text-[var(--color-heading)]">Family Events</span>
+            <span class="hidden lg:block text-[11px] text-[var(--color-faint)]">Toddler-friendly plans, faster</span>
+          </div>
         </a>
 
         {# Desktop Search #}
-        <div class="hidden md:flex flex-1 max-w-md mx-8">
+        <div class="hidden md:flex flex-1 max-w-xl mx-6 lg:mx-8">
           <div class="relative w-full">
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
               stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="search" name="q" placeholder="Search events..."
-              class="w-full pl-10 pr-4 py-2 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+            <input type="search" name="q" placeholder="Search events by title, place, or city..."
+              class="w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
               hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
               hx-select="#main-content" hx-swap="innerHTML" />
           </div>
@@ -136,18 +141,19 @@
 
     {# Navigation tabs #}
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
-      <div class="flex gap-1 -mb-px">
+      <div class="flex items-center gap-1 -mb-px">
         {% set nav_items = [
-        ('/', 'Discover', 'discover'),
-        ('/events', 'Browse', 'events'),
-        ('/events?attended=yes', 'Attended', 'attended'),
-        ('/weekend', 'This Weekend', 'weekend'),
-        ('/sources', 'Sources', 'sources')
+        ('/', 'Discover', 'discover', '🏠'),
+        ('/events', 'Browse', 'events', '📋'),
+        ('/events?attended=yes', 'Attended', 'attended', '✅'),
+        ('/weekend', 'This Weekend', 'weekend', '🗓️'),
+        ('/sources', 'Sources', 'sources', '📡')
         ] %}
-        {% for url, label, key in nav_items %}
+        {% for url, label, key, icon in nav_items %}
         <a href="{{ url }}"
-          class="nav-tab px-4 py-3 text-sm font-medium{% if active_page == key %} active{% else %} text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-          {{ label }}
+          class="nav-tab inline-flex items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-t-lg {% if active_page == key %}active{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+          <span aria-hidden="true">{{ icon }}</span>
+          <span>{{ label }}</span>
         </a>
         {% endfor %}
       </div>
@@ -166,7 +172,7 @@
           </svg>
           <input type="search" placeholder="Search events..."
             class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30"
-            hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true" />
+            hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true" hx-select="#main-content" hx-swap="innerHTML" />
         </div>
         <a href="/"
           class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'discover' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🏠
@@ -197,17 +203,18 @@
   </header>
 
   {# ═══ MAIN CONTENT ═══ #}
-  <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
     {% block content %}{% endblock %}
   </main>
 
   {# ═══ FOOTER ═══ #}
-  <footer class="border-t border-[var(--color-edge-subtle)] mt-12">
+  <footer class="border-t border-[var(--color-edge-subtle)] mt-16 bg-[var(--color-surface)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[var(--color-faint)]">
         <p>🎈 Family Events — Curated for your little one</p>
         <p>Lafayette & Baton Rouge, Louisiana</p>
       </div>
+      <p class="mt-3 text-xs text-[var(--color-faint)]/80">Built with FastAPI, HTMX, and Tailwind.</p>
     </div>
   </footer>
 
