@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+
+<div class="animate-fade-in space-y-5">
+  <section class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">Event Calendar</h1>
+      <p class="mt-1 text-sm text-[var(--color-muted)]">Monthly family-event view with quick calendar export.</p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <a href="/calendar.ics?month={{ month_start.strftime('%Y-%m') }}{% if attended %}&attended={{ attended }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
+        📅 Download iCal (.ics)
+      </a>
+      <a href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl" target="_blank" rel="noreferrer"
+         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
+        ↗ Add to Google Calendar
+      </a>
+    </div>
+  </section>
+
+  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-4 sm:p-5 space-y-4">
+    <p class="text-xs text-[var(--color-faint)]">
+      Tip: Download <strong>.ics</strong> and import into Apple/Google Calendar. For live auto-sync, subscribe to
+      <code class="px-1 py-0.5 rounded bg-[var(--color-surface-secondary)] text-[var(--color-muted)]">/calendar.ics</code>
+      from a publicly reachable app URL.
+    </p>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="inline-flex items-center rounded-xl border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] p-1">
+        <a href="/calendar?month={{ prev_month.strftime('%Y-%m') }}{% if attended %}&attended={{ attended }}{% endif %}"
+           class="px-3 py-1.5 rounded-lg text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)]">←</a>
+        <div class="px-3 py-1.5 text-sm font-semibold text-[var(--color-heading)] min-w-[170px] text-center">
+          {{ month_start.strftime('%B %Y') }}
+        </div>
+        <a href="/calendar?month={{ next_month.strftime('%Y-%m') }}{% if attended %}&attended={{ attended }}{% endif %}"
+           class="px-3 py-1.5 rounded-lg text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)]">→</a>
+      </div>
+
+      <div class="inline-flex items-center rounded-xl border border-[var(--color-edge)] bg-[var(--color-surface)] p-1">
+        <a href="/calendar?month={{ month_start.strftime('%Y-%m') }}"
+           class="px-3 py-1.5 rounded-lg text-sm font-medium {% if attended != 'yes' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-muted)]{% endif %}">
+          All
+        </a>
+        <a href="/calendar?month={{ month_start.strftime('%Y-%m') }}&attended=yes"
+           class="px-3 py-1.5 rounded-lg text-sm font-medium {% if attended == 'yes' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-muted)]{% endif %}">
+          Attended
+        </a>
+      </div>
+    </div>
+
+    <p class="text-sm text-[var(--color-muted)]">{{ total_events }} event{{ '' if total_events == 1 else 's' }} this month.</p>
+
+    {% include "partials/_calendar_grid.html" %}
+  </section>
+</div>
+
+{% endblock %}

@@ -468,6 +468,34 @@ class Database:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
 
+    async def get_events_between(
+        self,
+        start: datetime,
+        end: datetime,
+        *,
+        attended: str = "",
+    ) -> list[Event]:
+        """Return events in [start, end), optionally filtering attended status."""
+        conditions = ["start_time >= :start", "start_time < :end"]
+        params: dict[str, Any] = {"start": start.isoformat(), "end": end.isoformat()}
+
+        if attended == "yes":
+            conditions.append("attended = 1")
+        elif attended == "no":
+            conditions.append("attended = 0")
+
+        where = " AND ".join(conditions)
+        async with self.db.execute(
+            f"""
+            SELECT * FROM events
+            WHERE {where}
+            ORDER BY start_time
+            """,
+            params,
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_event(r) for r in rows]
+
     async def search_events(
         self,
         *,

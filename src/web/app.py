@@ -8,13 +8,14 @@ import time
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
+from io import StringIO
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import quote_plus
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -606,6 +607,140 @@ async def event_detail(request: Request, event_id: str):
             related_events=related_events,
             score_breakdown=score_breakdown,
         ),
+    )
+
+
+@app.get("/calendar", response_class=HTMLResponse)
+async def calendar_page(request: Request, month: str = "", attended: str = ""):
+    today = datetime.now(tz=UTC).date()
+    if month:
+        try:
+            month_date = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC).date()
+            month_start = month_date.replace(day=1)
+        except ValueError:
+            month_start = today.replace(day=1)
+    else:
+        month_start = today.replace(day=1)
+
+    if month_start.month == 12:
+        next_month_start = month_start.replace(year=month_start.year + 1, month=1, day=1)
+    else:
+        next_month_start = month_start.replace(month=month_start.month + 1, day=1)
+
+    prev_month = (
+        month_start.replace(year=month_start.year - 1, month=12, day=1)
+        if month_start.month == 1
+        else month_start.replace(month=month_start.month - 1, day=1)
+    )
+
+    events = await db.get_events_between(
+        datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),
+        datetime.combine(next_month_start, datetime.min.time(), tzinfo=UTC),
+        attended=attended,
+    )
+
+    events_by_day: dict[str, list[Any]] = {}
+    for event in events:
+        key = event.start_time.date().isoformat()
+        events_by_day.setdefault(key, []).append(event)
+
+    first_weekday = month_start.weekday()  # Monday=0
+    grid_start = month_start - timedelta(days=first_weekday)
+    days: list[dict[str, Any]] = []
+    for i in range(42):
+        day = grid_start + timedelta(days=i)
+        key = day.isoformat()
+        days.append(
+            {
+                "date": day,
+                "key": key,
+                "in_month": day.month == month_start.month,
+                "is_today": day == today,
+                "events": events_by_day.get(key, []),
+            }
+        )
+
+    ctx = await _ctx(
+        request,
+        active_page="calendar",
+        month_start=month_start,
+        prev_month=prev_month,
+        next_month=next_month_start,
+        attended=attended,
+        total_events=len(events),
+        days=days,
+    )
+
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse("partials/_calendar_grid.html", ctx)
+
+    return templates.TemplateResponse("calendar.html", ctx)
+
+
+@app.get("/calendar.ics")
+async def calendar_ics(request: Request, month: str = "", attended: str = ""):
+    today = datetime.now(tz=UTC).date()
+    if month:
+        try:
+            month_date = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC).date()
+            month_start = month_date.replace(day=1)
+        except ValueError:
+            month_start = today.replace(day=1)
+    else:
+        month_start = today.replace(day=1)
+
+    if month_start.month == 12:
+        next_month_start = month_start.replace(year=month_start.year + 1, month=1, day=1)
+    else:
+        next_month_start = month_start.replace(month=month_start.month + 1, day=1)
+
+    events = await db.get_events_between(
+        datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),
+        datetime.combine(next_month_start, datetime.min.time(), tzinfo=UTC),
+        attended=attended,
+    )
+
+    def esc(value: str) -> str:
+        return (
+            value.replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace("\n", "\\n")
+        )
+
+    out = StringIO()
+    out.write("BEGIN:VCALENDAR\r\n")
+    out.write("VERSION:2.0\r\n")
+    out.write("PRODID:-//Family Events//Calendar Export//EN\r\n")
+    out.write("CALSCALE:GREGORIAN\r\n")
+    generated = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+
+    for event in events:
+        start = event.start_time.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+        end_dt = event.end_time or (event.start_time + timedelta(hours=2))
+        end = end_dt.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+        out.write("BEGIN:VEVENT\r\n")
+        out.write(f"UID:{event.id}@family-events\r\n")
+        out.write(f"DTSTAMP:{generated}\r\n")
+        out.write(f"DTSTART:{start}\r\n")
+        out.write(f"DTEND:{end}\r\n")
+        out.write(f"SUMMARY:{esc(event.title)}\r\n")
+        location = ", ".join(
+            [v for v in [event.location_name, event.location_address, event.location_city] if v]
+        )
+        if location:
+            out.write(f"LOCATION:{esc(location)}\r\n")
+        if event.description:
+            out.write(f"DESCRIPTION:{esc(event.description)}\r\n")
+        out.write(f"URL:{esc(event.source_url)}\r\n")
+        out.write("END:VEVENT\r\n")
+
+    out.write("END:VCALENDAR\r\n")
+    filename = f"family-events-{month_start.strftime('%Y-%m')}.ics"
+    return Response(
+        content=out.getvalue(),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

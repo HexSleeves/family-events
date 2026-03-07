@@ -1,0 +1,30 @@
+<div class="grid grid-cols-7 gap-2">
+  {% for wday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+  <div class="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-faint)]">{{ wday }}</div>
+  {% endfor %}
+
+  {% for cell in days %}
+  <div class="min-h-30 rounded-lg border p-2 {% if cell.in_month %}bg-[var(--color-surface)] border-[var(--color-edge-subtle)]{% else %}bg-[var(--color-surface-secondary)] border-[var(--color-edge-subtle)] opacity-70{% endif %}">
+    <div class="mb-2 flex items-center justify-between">
+      <span class="text-xs font-semibold {% if cell.is_today %}text-[var(--color-brand)]{% else %}text-[var(--color-muted)]{% endif %}">
+        {{ cell.date.day }}
+      </span>
+      {% if cell.events %}
+      <span class="text-[10px] text-[var(--color-faint)]">{{ cell.events|length }}</span>
+      {% endif %}
+    </div>
+
+    <div class="space-y-1">
+      {% for event in cell.events[:3] %}
+      <a href="/event/{{ event.id }}" class="block rounded-md bg-[var(--color-surface-secondary)] border border-[var(--color-edge-subtle)] px-2 py-1 hover:border-[var(--color-brand)] transition-colors">
+        <p class="text-[11px] font-medium text-[var(--color-heading)] line-clamp-1">{{ event.title }}</p>
+        <p class="text-[10px] text-[var(--color-faint)]">{{ event.start_time.strftime('%-I:%M%p') }}</p>
+      </a>
+      {% endfor %}
+      {% if cell.events|length > 3 %}
+      <p class="text-[10px] text-[var(--color-faint)] px-1">+{{ cell.events|length - 3 }} more</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>

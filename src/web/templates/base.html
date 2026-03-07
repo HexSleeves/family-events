@@ -145,8 +145,9 @@
         {% set nav_items = [
         ('/', 'Discover', 'discover', '🏠'),
         ('/events', 'Browse', 'events', '📋'),
+        ('/calendar', 'Calendar', 'calendar', '🗓️'),
         ('/events?attended=yes', 'Attended', 'attended', '✅'),
-        ('/weekend', 'This Weekend', 'weekend', '🗓️'),
+        ('/weekend', 'This Weekend', 'weekend', '⭐'),
         ('/sources', 'Sources', 'sources', '📡')
         ] %}
         {% for url, label, key, icon in nav_items %}
@@ -180,11 +181,14 @@
         <a href="/events"
           class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'events' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📋
           Browse All</a>
+        <a href="/calendar"
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'calendar' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🗓️
+          Calendar</a>
         <a href="/events?attended=yes"
           class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'attended' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">✅
           Attended</a>
         <a href="/weekend"
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'weekend' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">🗓️
+          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'weekend' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">⭐
           This Weekend</a>
         <a href="/sources"
           class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == 'sources' %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">📡
