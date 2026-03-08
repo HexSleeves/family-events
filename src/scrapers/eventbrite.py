@@ -1,12 +1,4 @@
-"""Eventbrite scraper for Lafayette + Baton Rouge family events.
-
-Scrapes the public search pages:
-- https://www.eventbrite.com/d/la--lafayette/family-events/
-- https://www.eventbrite.com/d/la--baton-rouge/family-events/
-
-Eventbrite embeds structured JSON-LD and/or a __SERVER_DATA__ blob in the
-page.  We try to extract that first; fall back to HTML card parsing.
-"""
+"""Eventbrite scraper parameterized by source metadata."""
 
 from __future__ import annotations
 
@@ -15,56 +7,46 @@ import hashlib
 import json
 import re
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from src.db.models import Event
+from src.db.models import Event, Source
 
 from .base import BaseScraper
 
-SEARCH_URLS: dict[str, str] = {
-    "Lafayette": "https://www.eventbrite.com/d/la--lafayette/family-events/",
-    "Baton Rouge": "https://www.eventbrite.com/d/la--baton-rouge/family-events/",
-}
+_EVENTBRITE_PATH_RE = re.compile(r"/d/(?P<state>[a-z]{2})--(?P<city>[a-z0-9-]+)/")
 
 
 class EventbriteScraper(BaseScraper):
-    source_name = "eventbrite"
+    def __init__(self, source: Source) -> None:
+        self.source = source
+        self.city = source.city.strip()
+        self.search_url = source.url
+        match = _EVENTBRITE_PATH_RE.search(urlparse(source.url).path.lower())
+        if not match:
+            raise ValueError(f"Unsupported Eventbrite search URL: {source.url}")
+        self.state_slug = match.group("state")
+        self.city_slug = match.group("city")
+        self.source_name = f"builtin:eventbrite:{self.state_slug}:{self.city_slug}"
 
     async def scrape(self) -> list[Event]:
-        all_events: list[Event] = []
-        for city, url in SEARCH_URLS.items():
-            try:
-                events = await self._scrape_city(city, url)
-                self.log(f"{city}: found {len(events)} events.")
-                all_events.extend(events)
-            except Exception as exc:
-                self.log(f"{city} scrape failed: {exc}")
-        return all_events
-
-    async def _scrape_city(self, city: str, url: str) -> list[Event]:
         async with self._client() as client:
-            resp = await client.get(url)
+            resp = await client.get(self.search_url)
             resp.raise_for_status()
 
         html = resp.text
-
-        # --- Try JSON-LD first ----------------------------------------------
-        events = self._extract_json_ld(html, city)
+        events = self._extract_json_ld(html)
         if events:
             return events
 
-        # --- Try __SERVER_DATA__ / window.__PRELOADED_STATE__ ---------------
-        events = self._extract_server_data(html, city)
+        events = self._extract_server_data(html)
         if events:
             return events
 
-        # --- Fallback: parse HTML cards -------------------------------------
-        return self._parse_html_cards(html, city)
+        return self._parse_html_cards(html)
 
-    # -- JSON-LD extraction --------------------------------------------------
-
-    def _extract_json_ld(self, html: str, city: str) -> list[Event]:
+    def _extract_json_ld(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
         events: list[Event] = []
         for script in soup.select('script[type="application/ld+json"]'):
@@ -76,13 +58,10 @@ class EventbriteScraper(BaseScraper):
             for item in items:
                 if item.get("@type") != "Event":
                     continue
-                try:
-                    events.append(self._ld_to_event(item, city))
-                except Exception as exc:
-                    self.log(f"JSON-LD parse error: {exc}")
+                events.append(self._ld_to_event(item))
         return events
 
-    def _ld_to_event(self, ld: dict, city: str) -> Event:
+    def _ld_to_event(self, ld: dict) -> Event:
         title = ld.get("name", "Untitled")
         start = ld.get("startDate", "")
         end = ld.get("endDate")
@@ -93,28 +72,22 @@ class EventbriteScraper(BaseScraper):
             image = image[0] if image else None
 
         location = ld.get("location", {})
-        loc_name = location.get("name", "")
-        address_obj = location.get("address", {})
+        loc_name = location.get("name", "") if isinstance(location, dict) else ""
+        address_obj = location.get("address", {}) if isinstance(location, dict) else {}
         loc_address = (
-            address_obj.get("streetAddress", "")
-            if isinstance(address_obj, dict)
-            else str(address_obj)
+            address_obj.get("streetAddress", "") if isinstance(address_obj, dict) else str(address_obj)
         )
 
         offers = ld.get("offers", {})
         if isinstance(offers, list):
             offers = offers[0] if offers else {}
-        price_str = offers.get("price", "")
-        is_free = str(price_str) in ("", "0", "0.00", "Free")
+        price_str = offers.get("price", "") if isinstance(offers, dict) else ""
+        is_free = str(price_str).lower() in ("", "0", "0.00", "free")
         price_val = None
         with contextlib.suppress(ValueError, TypeError):
             price_val = float(price_str)
 
-        sid = (
-            hashlib.md5(url.encode()).hexdigest()
-            if url
-            else hashlib.md5(title.encode()).hexdigest()
-        )
+        sid = hashlib.md5((url or title).encode()).hexdigest()
 
         return Event(
             source=self.source_name,
@@ -124,7 +97,7 @@ class EventbriteScraper(BaseScraper):
             description=description[:2000].strip(),
             location_name=loc_name,
             location_address=loc_address,
-            location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+            location_city=self.city,
             start_time=self._parse_dt(start),
             end_time=self._parse_dt(end) if end else None,
             is_free=is_free,
@@ -133,10 +106,7 @@ class EventbriteScraper(BaseScraper):
             raw_data=ld,
         )
 
-    # -- __SERVER_DATA__ extraction ------------------------------------------
-
-    def _extract_server_data(self, html: str, city: str) -> list[Event]:
-        # Eventbrite sometimes embeds data in a window.__SERVER_DATA__ variable
+    def _extract_server_data(self, html: str) -> list[Event]:
         match = re.search(r"window\.__SERVER_DATA__\s*=\s*({.+?});\s*</script>", html, re.DOTALL)
         if not match:
             return []
@@ -145,39 +115,27 @@ class EventbriteScraper(BaseScraper):
         except json.JSONDecodeError:
             return []
 
-        # Navigate into the nested structure - path may change
         search_data = data.get("search_data", data.get("searchData", {}))
         event_list = search_data.get("events", {}).get("results", [])
         if not event_list:
             return []
 
-        events: list[Event] = []
-        for item in event_list:
-            try:
-                events.append(self._server_item_to_event(item, city))
-            except Exception as exc:
-                self.log(f"Server data parse error: {exc}")
-        return events
+        return [self._server_item_to_event(item) for item in event_list]
 
-    def _server_item_to_event(self, item: dict, city: str) -> Event:
+    def _server_item_to_event(self, item: dict) -> Event:
         title = item.get("name", "Untitled")
         url = item.get("url", "")
         start = item.get("start_date") or item.get("start", {}).get("local", "")
         end = item.get("end_date") or item.get("end", {}).get("local")
-        image = (
-            item.get("image", {}).get("url")
-            if isinstance(item.get("image"), dict)
-            else item.get("image")
-        )
+        image = item.get("image", {})
+        if isinstance(image, dict):
+            image = image.get("url")
         is_free = item.get("is_free", True)
         venue = item.get("primary_venue", {}) or {}
         loc_name = venue.get("name", "")
         address = venue.get("address", {})
-        loc_address = (
-            address.get("localized_address_display", "") if isinstance(address, dict) else ""
-        )
-
-        sid = str(item.get("id", hashlib.md5(url.encode()).hexdigest()))
+        loc_address = address.get("localized_address_display", "") if isinstance(address, dict) else ""
+        sid = str(item.get("id", hashlib.md5((url or title).encode()).hexdigest()))
 
         return Event(
             source=self.source_name,
@@ -186,7 +144,7 @@ class EventbriteScraper(BaseScraper):
             title=title.strip(),
             location_name=loc_name,
             location_address=loc_address,
-            location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+            location_city=self.city,
             start_time=self._parse_dt(start),
             end_time=self._parse_dt(end) if end else None,
             is_free=is_free,
@@ -194,13 +152,8 @@ class EventbriteScraper(BaseScraper):
             raw_data=item,
         )
 
-    # -- HTML card fallback --------------------------------------------------
-
-    def _parse_html_cards(self, html: str, city: str) -> list[Event]:
+    def _parse_html_cards(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
-        events: list[Event] = []
-
-        # Eventbrite uses various card selectors; try several
         cards = soup.select(
             "div.search-event-card-wrapper, "
             "article.eds-event-card, "
@@ -209,47 +162,31 @@ class EventbriteScraper(BaseScraper):
             "div.discover-search-desktop-card"
         )
         self.log(f"HTML fallback: {len(cards)} cards found.")
+        return [self._card_to_event(card) for card in cards]
 
-        for card in cards:
-            try:
-                events.append(self._card_to_event(card, city))
-            except Exception as exc:
-                self.log(f"Card parse error: {exc}")
-        return events
-
-    def _card_to_event(self, card, city: str) -> Event:
-        # Title
+    def _card_to_event(self, card) -> Event:
         title_el = card.select_one("h2, h3, .event-card__title, [data-testid='event-name']")
         title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-        # Link
-        link_el = card.select_one("a[href*='eventbrite.com/e/']")
-        url = link_el["href"] if link_el else ""
+        link_el = card.select_one("a[href]")
+        url = link_el["href"] if link_el else self.search_url
 
-        # Date
         date_el = card.select_one("p[class*='date'], time, .event-card__date")
         date_text = date_el.get_text(strip=True) if date_el else ""
 
-        # Location
         loc_el = card.select_one(
             "p[class*='location'], .event-card__location, .card-text--truncated__one"
         )
         loc_text = loc_el.get_text(strip=True) if loc_el else ""
 
-        # Price
         price_el = card.select_one("p[class*='price'], .event-card__price")
         price_text = price_el.get_text(strip=True) if price_el else ""
         is_free = "free" in price_text.lower() if price_text else True
 
-        # Image
         img_el = card.select_one("img")
         image = img_el.get("src") if img_el else None
 
-        sid = (
-            hashlib.md5(url.encode()).hexdigest()
-            if url
-            else hashlib.md5(title.encode()).hexdigest()
-        )
+        sid = hashlib.md5((url or title).encode()).hexdigest()
 
         return Event(
             source=self.source_name,
@@ -257,13 +194,11 @@ class EventbriteScraper(BaseScraper):
             source_id=sid,
             title=title,
             location_name=loc_text,
-            location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+            location_city=self.city,
             start_time=self._parse_dt(date_text) if date_text else datetime.now(tz=UTC),
             is_free=is_free,
             image_url=image,
         )
-
-    # -- utils ---------------------------------------------------------------
 
     @staticmethod
     def _parse_dt(raw: str) -> datetime:

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup, Tag
 
-from src.db.models import Event
+from src.db.models import Event, Source
 
 from .base import BaseScraper
 
@@ -23,7 +23,9 @@ CALENDAR_URL = f"{BASE_URL}/calendar"
 
 
 class BrecScraper(BaseScraper):
-    source_name = "brec"
+    def __init__(self, source: Source) -> None:
+        self.source = source
+        self.source_name = f"builtin:brec:{source.id}"
 
     async def scrape(self, enrich: bool = False) -> list[Event]:
         """Scrape current month + next month from BREC calendar.
@@ -171,7 +173,7 @@ class BrecScraper(BaseScraper):
 
         return Event(
             source=self.source_name,
-            source_url=href or CALENDAR_URL,
+            source_url=href or self.source.url,
             source_id=source_id,
             title=title,
             description="",  # description is on the detail page

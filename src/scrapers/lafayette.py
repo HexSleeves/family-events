@@ -17,7 +17,7 @@ from datetime import datetime
 
 from bs4 import BeautifulSoup, Tag
 
-from src.db.models import Event
+from src.db.models import Event, Source
 
 from .base import BaseScraper
 
@@ -44,19 +44,17 @@ MEC_SOURCES = [
 
 
 class LafayetteScraper(BaseScraper):
-    source_name = "lafayette"
+    def __init__(self, source: Source) -> None:
+        self.source = source
+        self.source_name = f"builtin:mec:{source.id}"
+        self.mec_source = next((item for item in MEC_SOURCES if item["url"] == source.url), None)
+        if self.mec_source is None:
+            raise ValueError(f"Unsupported MEC source: {source.url}")
 
     async def scrape(self) -> list[Event]:
-        all_events: list[Event] = []
-        for src in MEC_SOURCES:
-            try:
-                events = await self._scrape_mec(src)
-                self.log(f"{src['name']}: {len(events)} events")
-                all_events.extend(events)
-            except Exception as exc:
-                self.log(f"{src['name']} failed: {exc}")
-        self.log(f"Total Lafayette: {len(all_events)}")
-        return all_events
+        events = await self._scrape_mec(self.mec_source)
+        self.log(f"{self.mec_source['name']}: {len(events)} events")
+        return events
 
     async def _scrape_mec(self, src: dict) -> list[Event]:
         async with self._client() as client:
@@ -134,7 +132,7 @@ class LafayetteScraper(BaseScraper):
             title=title,
             description=desc,
             location_name=src["name"],
-            location_city="Lafayette",
+            location_city=self.source.city,
             start_time=start_time,
             image_url=image,
             raw_data={
@@ -186,7 +184,7 @@ class LafayetteScraper(BaseScraper):
                     source_id=sid,
                     title=text,
                     location_name=src["name"],
-                    location_city="Lafayette",
+                    location_city=self.source.city,
                     start_time=start_time,
                     raw_data={"sub": src["sub"], "venue": src["name"]},
                 )

@@ -1,11 +1,4 @@
-"""AllEvents.in scraper for family events in Lafayette & Baton Rouge.
-
-Targets:
-- https://allevents.in/lafayette/family
-- https://allevents.in/baton-rouge/family
-
-AllEvents renders event cards in the HTML with structured data.
-"""
+"""AllEvents scraper parameterized by source metadata."""
 
 from __future__ import annotations
 
@@ -13,51 +6,39 @@ import contextlib
 import hashlib
 import json
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from src.db.models import Event
+from src.db.models import Event, Source
 
 from .base import BaseScraper
 
-SEARCH_URLS: dict[str, str] = {
-    "Lafayette": "https://allevents.in/lafayette/family",
-    "Baton Rouge": "https://allevents.in/baton-rouge/family",
-}
-
 
 class AllEventsScraper(BaseScraper):
-    source_name = "allevents"
+    def __init__(self, source: Source) -> None:
+        self.source = source
+        self.city = source.city.strip()
+        path = urlparse(source.url).path.strip("/")
+        parts = [part for part in path.split("/") if part]
+        if len(parts) < 2:
+            raise ValueError(f"Unsupported AllEvents URL: {source.url}")
+        self.city_slug = parts[0]
+        self.category_slug = parts[1]
+        self.source_name = f"builtin:allevents:{self.city_slug}:{self.category_slug}"
 
     async def scrape(self) -> list[Event]:
-        all_events: list[Event] = []
-        for city, url in SEARCH_URLS.items():
-            try:
-                events = await self._scrape_city(city, url)
-                self.log(f"{city}: {len(events)} events.")
-                all_events.extend(events)
-            except Exception as exc:
-                self.log(f"{city} failed: {exc}")
-        return all_events
-
-    async def _scrape_city(self, city: str, url: str) -> list[Event]:
         async with self._client() as client:
-            resp = await client.get(url)
+            resp = await client.get(self.source.url)
             resp.raise_for_status()
 
         html = resp.text
-
-        # Try JSON-LD first (AllEvents often embeds it)
-        events = self._extract_json_ld(html, city)
+        events = self._extract_json_ld(html)
         if events:
             return events
+        return self._parse_html_cards(html)
 
-        # Fall back to HTML card parsing
-        return self._parse_html_cards(html, city)
-
-    # -- JSON-LD -------------------------------------------------------------
-
-    def _extract_json_ld(self, html: str, city: str) -> list[Event]:
+    def _extract_json_ld(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
         events: list[Event] = []
 
@@ -74,21 +55,16 @@ class AllEventsScraper(BaseScraper):
                 if data.get("@type") == "Event":
                     items = [data]
                 elif "itemListElement" in data:
-                    items = [
-                        el.get("item", el) for el in data["itemListElement"] if isinstance(el, dict)
-                    ]
+                    items = [el.get("item", el) for el in data["itemListElement"] if isinstance(el, dict)]
 
             for item in items:
                 if item.get("@type") != "Event":
                     continue
-                try:
-                    events.append(self._ld_to_event(item, city))
-                except Exception as exc:
-                    self.log(f"JSON-LD error: {exc}")
+                events.append(self._ld_to_event(item))
 
         return events
 
-    def _ld_to_event(self, ld: dict, city: str) -> Event:
+    def _ld_to_event(self, ld: dict) -> Event:
         title = ld.get("name", "Untitled")
         start = ld.get("startDate", "")
         end = ld.get("endDate")
@@ -104,10 +80,7 @@ class AllEventsScraper(BaseScraper):
         if isinstance(location, dict):
             loc_name = location.get("name", "")
             address_obj = location.get("address", {})
-            if isinstance(address_obj, dict):
-                loc_address = address_obj.get("streetAddress", "")
-            else:
-                loc_address = str(address_obj)
+            loc_address = address_obj.get("streetAddress", "") if isinstance(address_obj, dict) else str(address_obj)
         else:
             loc_name = str(location)
             loc_address = ""
@@ -121,11 +94,7 @@ class AllEventsScraper(BaseScraper):
         with contextlib.suppress(ValueError, TypeError):
             price_val = float(price_str)
 
-        sid = (
-            hashlib.md5(url.encode()).hexdigest()
-            if url
-            else hashlib.md5(f"{title}{start}".encode()).hexdigest()
-        )
+        sid = hashlib.md5((url or f"{title}{start}").encode()).hexdigest()
 
         return Event(
             source=self.source_name,
@@ -135,7 +104,7 @@ class AllEventsScraper(BaseScraper):
             description=description[:2000].strip(),
             location_name=loc_name,
             location_address=loc_address,
-            location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+            location_city=self.city,
             start_time=_parse_dt(start),
             end_time=_parse_dt(end) if end else None,
             is_free=is_free,
@@ -144,78 +113,56 @@ class AllEventsScraper(BaseScraper):
             raw_data=ld,
         )
 
-    # -- HTML cards ----------------------------------------------------------
-
-    def _parse_html_cards(self, html: str, city: str) -> list[Event]:
+    def _parse_html_cards(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
-        events: list[Event] = []
-
-        # AllEvents.in uses various card structures
         cards = soup.select(
             ".event-card, .item.event, .event-item, "
             "div[itemtype*='Event'], a[class*='event'], "
             ".search-result, .listing-item"
         )
-        self.log(f"HTML fallback ({city}): {len(cards)} cards.")
+        self.log(f"HTML fallback ({self.city_slug}): {len(cards)} cards.")
+        return [self._card_to_event(card) for card in cards]
 
-        for card in cards:
-            try:
-                events.append(self._card_to_event(card, city))
-            except Exception as exc:
-                self.log(f"Card error: {exc}")
-        return events
-
-    def _card_to_event(self, card, city: str) -> Event:
-        # Title
+    def _card_to_event(self, card) -> Event:
         title_el = card.select_one("h3, h2, h4, .title, .event-title, a")
         title = title_el.get_text(strip=True) if title_el else card.get_text(strip=True)[:120]
 
-        # Link
         link = card.get("href", "")
         if not link and title_el and title_el.name == "a":
             link = title_el.get("href", "")
         if link and not link.startswith("http"):
             link = f"https://allevents.in{link}"
 
-        # Date
         date_el = card.select_one(".date, time, .event-date, [datetime], .start-date")
         date_text = ""
         if date_el:
             date_text = date_el.get("datetime", "") or date_el.get_text(strip=True)
 
-        # Location
         loc_el = card.select_one(".location, .event-location, .venue, .place")
         loc_text = loc_el.get_text(strip=True) if loc_el else ""
 
-        # Image
         img_el = card.select_one("img")
         image = None
         if img_el:
             image = img_el.get("data-src") or img_el.get("src")
 
-        # Price
         price_el = card.select_one(".price, .event-price, .ticket-price")
         price_text = price_el.get_text(strip=True) if price_el else ""
         is_free = not price_text or "free" in price_text.lower()
 
-        sid = hashlib.md5(f"{title}{date_text}{city}".encode()).hexdigest()
+        sid = hashlib.md5(f"{title}{date_text}{self.city_slug}".encode()).hexdigest()
 
         return Event(
             source=self.source_name,
-            source_url=link or SEARCH_URLS.get(city, ""),
+            source_url=link or self.source.url,
             source_id=sid,
             title=title,
             location_name=loc_text,
-            location_city=city if city in ("Lafayette", "Baton Rouge") else "Other",
+            location_city=self.city,
             start_time=_parse_dt(date_text) if date_text else datetime.now(tz=UTC),
             is_free=is_free,
             image_url=image,
         )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _parse_dt(raw: str) -> datetime:

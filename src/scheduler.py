@@ -6,28 +6,16 @@ from datetime import date, datetime, timedelta
 
 from src.config import settings
 from src.db.database import Database
-from src.db.models import InterestProfile, User
+from src.db.models import InterestProfile, Source, User
 from src.notifications.dispatcher import NotificationDispatcher
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events, score_event_breakdown
 from src.ranker.weather import WeatherService
-from src.scrapers.allevents import AllEventsScraper
-from src.scrapers.brec import BrecScraper
-from src.scrapers.eventbrite import EventbriteScraper
 from src.scrapers.generic import GenericScraper
-from src.scrapers.lafayette import LafayetteScraper
-from src.scrapers.library import LibraryScraper
 from src.scrapers.recipe import ScrapeRecipe
+from src.scrapers.router import get_builtin_scraper
 from src.tagger.llm import EventTagger
 from src.tagger.taxonomy import TAGGING_VERSION
-
-ALL_SCRAPERS = [
-    LafayetteScraper(),
-    EventbriteScraper(),
-    AllEventsScraper(),
-    BrecScraper(),
-    LibraryScraper(),
-]
 
 
 async def run_scrape(db: Database | None = None) -> int:
@@ -38,35 +26,15 @@ async def run_scrape(db: Database | None = None) -> int:
         await db.connect()
 
     total = 0
+    all_sources = await db.get_all_sources()
 
-    # 1. Built-in scrapers
-    for scraper in ALL_SCRAPERS:
+    for source in all_sources:
+        if not source.enabled:
+            continue
         try:
+            scraper = _build_scraper(source)
             print(f"\n{'=' * 40}")
-            print(f"Scraping: {scraper.source_name}")
-            print(f"{'=' * 40}")
-            events = await scraper.scrape()
-            for event in events:
-                await db.upsert_event(event)
-            total += len(events)
-            print(f"  ✓ {len(events)} events from {scraper.source_name}")
-        except Exception as e:
-            print(f"  ✗ {scraper.source_name} error: {e}")
-
-    # 2. User-defined sources
-    sources = await db.get_enabled_sources()
-    for source in sources:
-        try:
-            if not source.recipe_json:
-                continue
-            recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
-            scraper = GenericScraper(
-                url=source.url,
-                source_id=source.id,
-                recipe=recipe,
-            )
-            print(f"\n{'=' * 40}")
-            print(f"Scraping custom: {source.name}")
+            print(f"Scraping: {source.name}")
             print(f"{'=' * 40}")
             events = await scraper.scrape()
             for event in events:
@@ -83,6 +51,18 @@ async def run_scrape(db: Database | None = None) -> int:
 
     print(f"\nTotal events upserted: {total}")
     return total
+
+
+def _build_scraper(source: Source):
+    if source.builtin:
+        scraper = get_builtin_scraper(source)
+        if scraper is None:
+            raise ValueError(f"No built-in scraper for {source.url}")
+        return scraper
+    if not source.recipe_json:
+        raise ValueError(f"Custom source missing recipe: {source.url}")
+    recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
+    return GenericScraper(url=source.url, source_id=source.id, recipe=recipe)
 
 
 async def run_tag(
@@ -189,24 +169,21 @@ async def run_notify(
         db = Database()
         await db.connect()
 
-    # Resolve settings from user profile or defaults
     profile = user.interest_profile if user else InterestProfile()
     channels = user.notification_channels if user else ["console"]
     email_to = user.email_to if user else ""
     sms_to = user.sms_to if user else ""
     name = user.child_name if user else child_name
 
-    # Find next weekend
     today = date.today()
     days_until_sat = (5 - today.weekday()) % 7
     if days_until_sat == 0 and datetime.now().hour >= 12:
-        days_until_sat = 7  # if it's Saturday afternoon, look at next weekend
+        days_until_sat = 7
     saturday = today + timedelta(days=days_until_sat)
     sunday = saturday + timedelta(days=1)
 
     print(f"\nWeekend: {saturday} / {sunday}")
 
-    # Get weather
     weather_svc = WeatherService()
     weather = await weather_svc.get_weekend_forecast(saturday, sunday)
     print(
@@ -214,11 +191,9 @@ async def run_notify(
         f"Sun {weather['sunday'].icon} {weather['sunday'].temp_high_f:.0f}°F"
     )
 
-    # Get weekend events
     events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())
     print(f"Weekend events: {len(events)}")
 
-    # If few weekend events, supplement with upcoming week
     if len(events) < 10:
         print("Few weekend events, adding upcoming week...")
         upcoming = await db.get_recent_events(days=14)
@@ -227,7 +202,6 @@ async def run_notify(
             if e.id not in existing_ids:
                 events.append(e)
 
-    # Filter to tagged events only
     tagged_events = [e for e in events if e.tags is not None]
     print(f"Found {len(tagged_events)} tagged events for ranking.")
 
@@ -238,13 +212,9 @@ async def run_notify(
             await db.close()
         return msg
 
-    # Rank using user's interest profile
     ranked = rank_events(tagged_events, profile, weather)
-
-    # Format message
     message = format_console_message(ranked, weather, name)
 
-    # Dispatch to user's chosen channels
     dispatcher = NotificationDispatcher()
     results = await dispatcher.dispatch(
         message,
@@ -258,11 +228,3 @@ async def run_notify(
         await db.close()
 
     return message
-
-
-async def run_full_pipeline(*, user: User | None = None) -> str:
-    """Run the complete pipeline: scrape → tag → notify."""
-    async with Database() as db:
-        await run_scrape(db)
-        await run_tag(db)
-        return await run_notify(db, user=user)

@@ -3,6 +3,32 @@ from __future__ import annotations
 from src.db.models import Source
 from src.scrapers.router import extract_domain
 
+
+def _eventbrite_source(key: str, city: str, state_slug: str, city_slug: str) -> dict[str, str]:
+    return {
+        "key": key,
+        "city": city,
+        "category": "aggregator",
+        "name": f"Eventbrite {city} Family",
+        "url": f"https://www.eventbrite.com/d/{state_slug}--{city_slug}/family-events/",
+        "description": f"Family-friendly Eventbrite listings for {city}",
+        "state_slug": state_slug,
+        "city_slug": city_slug,
+    }
+
+
+def _allevents_source(key: str, city: str, city_slug: str) -> dict[str, str]:
+    return {
+        "key": key,
+        "city": city,
+        "category": "aggregator",
+        "name": f"AllEvents {city} Family",
+        "url": f"https://allevents.in/{city_slug}/family",
+        "description": f"AllEvents family listings for {city}",
+        "city_slug": city_slug,
+    }
+
+
 PREDEFINED_SOURCE_CATALOG: list[dict[str, str]] = [
     {
         "key": "baton-rouge-brec",
@@ -12,22 +38,8 @@ PREDEFINED_SOURCE_CATALOG: list[dict[str, str]] = [
         "url": "https://www.brec.org/calendar",
         "description": "Baton Rouge parks and recreation calendar",
     },
-    {
-        "key": "baton-rouge-eventbrite",
-        "city": "Baton Rouge",
-        "category": "aggregator",
-        "name": "Eventbrite Baton Rouge Family",
-        "url": "https://www.eventbrite.com/d/la--baton-rouge/family-events/",
-        "description": "Family-friendly Eventbrite listings for Baton Rouge",
-    },
-    {
-        "key": "baton-rouge-allevents",
-        "city": "Baton Rouge",
-        "category": "aggregator",
-        "name": "AllEvents Baton Rouge Family",
-        "url": "https://allevents.in/baton-rouge/family",
-        "description": "AllEvents family listings for Baton Rouge",
-    },
+    _eventbrite_source("baton-rouge-eventbrite", "Baton Rouge", "la", "baton-rouge"),
+    _allevents_source("baton-rouge-allevents", "Baton Rouge", "baton-rouge"),
     {
         "key": "baton-rouge-library",
         "city": "Baton Rouge",
@@ -60,22 +72,8 @@ PREDEFINED_SOURCE_CATALOG: list[dict[str, str]] = [
         "url": "https://lafayettesciencemuseum.org/events",
         "description": "Science museum family events",
     },
-    {
-        "key": "lafayette-eventbrite",
-        "city": "Lafayette",
-        "category": "aggregator",
-        "name": "Eventbrite Lafayette Family",
-        "url": "https://www.eventbrite.com/d/la--lafayette/family-events/",
-        "description": "Family-friendly Eventbrite listings for Lafayette",
-    },
-    {
-        "key": "lafayette-allevents",
-        "city": "Lafayette",
-        "category": "aggregator",
-        "name": "AllEvents Lafayette Family",
-        "url": "https://allevents.in/lafayette/family",
-        "description": "AllEvents family listings for Lafayette",
-    },
+    _eventbrite_source("lafayette-eventbrite", "Lafayette", "la", "lafayette"),
+    _allevents_source("lafayette-allevents", "Lafayette", "lafayette"),
     {
         "key": "lafayette-library",
         "city": "Lafayette",
@@ -84,86 +82,16 @@ PREDEFINED_SOURCE_CATALOG: list[dict[str, str]] = [
         "url": "https://lafayettela.libcal.com/rss.php",
         "description": "Library story times and kids programming",
     },
-    {
-        "key": "new-orleans-eventbrite",
-        "city": "New Orleans",
-        "category": "aggregator",
-        "name": "Eventbrite New Orleans Family",
-        "url": "https://www.eventbrite.com/d/la--new-orleans/family-events/",
-        "description": "Family-friendly Eventbrite listings for New Orleans",
-    },
-    {
-        "key": "new-orleans-allevents",
-        "city": "New Orleans",
-        "category": "aggregator",
-        "name": "AllEvents New Orleans Family",
-        "url": "https://allevents.in/new-orleans/family",
-        "description": "AllEvents family listings for New Orleans",
-    },
-    {
-        "key": "houston-eventbrite",
-        "city": "Houston",
-        "category": "aggregator",
-        "name": "Eventbrite Houston Family",
-        "url": "https://www.eventbrite.com/d/tx--houston/family-events/",
-        "description": "Family-friendly Eventbrite listings for Houston",
-    },
-    {
-        "key": "houston-allevents",
-        "city": "Houston",
-        "category": "aggregator",
-        "name": "AllEvents Houston Family",
-        "url": "https://allevents.in/houston/family",
-        "description": "AllEvents family listings for Houston",
-    },
-    {
-        "key": "austin-eventbrite",
-        "city": "Austin",
-        "category": "aggregator",
-        "name": "Eventbrite Austin Family",
-        "url": "https://www.eventbrite.com/d/tx--austin/family-events/",
-        "description": "Family-friendly Eventbrite listings for Austin",
-    },
-    {
-        "key": "austin-allevents",
-        "city": "Austin",
-        "category": "aggregator",
-        "name": "AllEvents Austin Family",
-        "url": "https://allevents.in/austin/family",
-        "description": "AllEvents family listings for Austin",
-    },
-    {
-        "key": "dallas-eventbrite",
-        "city": "Dallas",
-        "category": "aggregator",
-        "name": "Eventbrite Dallas Family",
-        "url": "https://www.eventbrite.com/d/tx--dallas/family-events/",
-        "description": "Family-friendly Eventbrite listings for Dallas",
-    },
-    {
-        "key": "dallas-allevents",
-        "city": "Dallas",
-        "category": "aggregator",
-        "name": "AllEvents Dallas Family",
-        "url": "https://allevents.in/dallas/family",
-        "description": "AllEvents family listings for Dallas",
-    },
-    {
-        "key": "atlanta-eventbrite",
-        "city": "Atlanta",
-        "category": "aggregator",
-        "name": "Eventbrite Atlanta Family",
-        "url": "https://www.eventbrite.com/d/ga--atlanta/family-events/",
-        "description": "Family-friendly Eventbrite listings for Atlanta",
-    },
-    {
-        "key": "atlanta-allevents",
-        "city": "Atlanta",
-        "category": "aggregator",
-        "name": "AllEvents Atlanta Family",
-        "url": "https://allevents.in/atlanta/family",
-        "description": "AllEvents family listings for Atlanta",
-    },
+    _eventbrite_source("new-orleans-eventbrite", "New Orleans", "la", "new-orleans"),
+    _allevents_source("new-orleans-allevents", "New Orleans", "new-orleans"),
+    _eventbrite_source("houston-eventbrite", "Houston", "tx", "houston"),
+    _allevents_source("houston-allevents", "Houston", "houston"),
+    _eventbrite_source("austin-eventbrite", "Austin", "tx", "austin"),
+    _allevents_source("austin-allevents", "Austin", "austin"),
+    _eventbrite_source("dallas-eventbrite", "Dallas", "tx", "dallas"),
+    _allevents_source("dallas-allevents", "Dallas", "dallas"),
+    _eventbrite_source("atlanta-eventbrite", "Atlanta", "ga", "atlanta"),
+    _allevents_source("atlanta-allevents", "Atlanta", "atlanta"),
 ]
 
 
