@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import secrets
-import time
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
@@ -16,16 +14,14 @@ from urllib.parse import quote_plus
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.datastructures import FormData
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.config import settings
 from src.db.database import Database
-from src.db.models import Constraints, InterestProfile, Job, Source, User
+from src.db.models import Constraints, InterestProfile, User
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import (
     _city_score,
@@ -36,11 +32,7 @@ from src.ranker.scoring import (
     rank_events,
 )
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
-from src.scrapers.analyzer import PageAnalyzer, validate_public_http_url
-from src.scrapers.recipe import ScrapeRecipe
-from src.scrapers.router import extract_domain, is_builtin_domain
 from src.web.auth import (
-    ensure_csrf_token,
     get_current_user,
     hash_password,
     login_session,
@@ -49,7 +41,21 @@ from src.web.auth import (
     validate_password,
     verify_password,
 )
-from src.web.jobs import job_registry
+from src.web.common import (
+    change_theme,
+    check_rate_limit,
+    ctx,
+    format_ts,
+    null_response,
+    require_csrf,
+    require_login_and_csrf,
+    toast,
+)
+from src.web.jobs_ui import job_template_context, render_job_cards, start_background_job
+from src.web.middleware import RequestLoggingMiddleware
+from src.web.routes.auth import router as auth_router
+from src.web.routes.profile import router as profile_router
+from src.web.routes.sources import router as sources_router
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -59,244 +65,11 @@ logger = logging.getLogger("uvicorn.error")
 _rate_limit_store: dict[str, deque[float]] = {}
 _bulk_unattend_undo_store: dict[str, list[str]] = {}
 
-
-def _toast(
-    message: str,
-    variant: str = "success",
-    *,
-    status_code: int = 200,
-    body: str = "",
-) -> HTMLResponse:
-    """Return an HTMLResponse that triggers a toast notification via HX-Trigger."""
-    payload = json.dumps({"showToast": {"message": message, "variant": variant}})
-    return HTMLResponse(
-        content=body,
-        status_code=status_code,
-        headers={"HX-Trigger": payload},
-    )
-
-
-def _change_theme(theme: str) -> HTMLResponse:
-    """Return an HTMLResponse that triggers a theme change + toast via HX-Trigger."""
-    label = {"light": "Light", "dark": "Dark", "auto": "System"}.get(theme, theme)
-    payload = json.dumps(
-        {
-            "changeTheme": {"theme": theme},
-            "showToast": {"message": f"Theme set to {label}", "variant": "success"},
-        }
-    )
-    return HTMLResponse(
-        content="",
-        status_code=200,
-        headers={"HX-Trigger": payload},
-    )
-
-
-def _null_response() -> HTMLResponse:
-    """Return an HTMLResponse that does nothing."""
-    return HTMLResponse(
-        content="",
-        status_code=204,
-        headers={"HX-Trigger": json.dumps({})},
-    )
-
-
-def _fmt_job_time(value: datetime | None) -> str:
-    """Format job timestamps for UI."""
-    return value.astimezone(UTC).strftime("%b %d, %I:%M:%S %p UTC") if value else "—"
-
-
-def _job_result_value(job: Job) -> Any:
-    """Parse persisted JSON job result when present."""
-    if not job.result_json:
-        return None
-    try:
-        return json.loads(job.result_json)
-    except json.JSONDecodeError:
-        return job.result_json
-
-
-def _job_result_summary(job: Job) -> str | None:
-    """Return a concise success summary for structured job results."""
-    result = _job_result_value(job)
-    if isinstance(result, int):
-        noun = {
-            "scrape": "events scraped",
-            "tag": "events tagged",
-            "dedupe": "events merged",
-            "source-test": "events found",
-        }.get(job.kind, "items processed")
-        return f"{result} {noun}"
-    if isinstance(result, str) and result.strip():
-        return result
-    if isinstance(result, dict):
-        if job.kind == "source-test":
-            count = result.get("count")
-            if isinstance(count, int):
-                return f"{count} events found"
-        if job.kind == "source-analyze":
-            strategy = result.get("strategy")
-            confidence = result.get("confidence")
-            if isinstance(confidence, (int, float)):
-                if strategy:
-                    return f"{strategy} strategy at {confidence:.0%} confidence"
-                return f"{confidence:.0%} confidence"
-        summary = result.get("summary")
-        if isinstance(summary, str) and summary.strip():
-            return summary
-    return None
-
-
-def _job_status_message(job: Job) -> str:
-    """Return human-readable job status text."""
-    if job.state == "running":
-        return f"{job.label} is running…"
-    if job.state == "failed":
-        return f"{job.label} failed: {job.error or 'Unknown error'}"
-    summary = _job_result_summary(job)
-    return f"{job.label} completed: {summary}" if summary else f"{job.label} completed"
-
-
-def _require_login(user: User | None) -> HTMLResponse | None:
-    """Require an authenticated user for API routes."""
-    if user:
-        return None
-    return _toast("Please log in first", "error", status_code=401)
-
-
-def _client_ip(request: Request) -> str:
-    """Return best-effort client IP, honoring one trusted forwarded header value."""
-    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    if forwarded:
-        return forwarded
-    return request.client.host if request.client else "unknown"
-
-
-def _rate_limit_key(request: Request, route: str) -> str:
-    """Build per-IP, per-route rate limit key."""
-    return f"{_client_ip(request)}:{route}"
-
-
-def _check_rate_limit(
-    request: Request,
-    route: str,
-    *,
-    limit: int | None = None,
-    window: int | None = None,
-    message: str = "Too many requests. Try again in a moment.",
-) -> HTMLResponse | None:
-    """Simple sliding-window in-memory rate limiter."""
-    limit = max(1, limit or settings.rate_limit_max_requests)
-    window = max(1, window or settings.rate_limit_window_seconds)
-
-    now = time.monotonic()
-    key = _rate_limit_key(request, route)
-    hits = _rate_limit_store.setdefault(key, deque())
-
-    cutoff = now - window
-    while hits and hits[0] < cutoff:
-        hits.popleft()
-
-    if len(hits) >= limit:
-        return _toast(message, "warning", status_code=429)
-
-    hits.append(now)
-    return None
-
-
-def _format_ts(ts: datetime | None) -> str | None:
-    """Format UTC timestamps for health payload."""
-    if not ts:
-        return None
-    return ts.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _expected_origin(request: Request) -> str:
-    """Return the expected origin for same-origin checks."""
-    base_url = settings.app_base_url.strip().rstrip("/") or str(request.base_url).rstrip("/")
-    return base_url
-
-
-def _require_safe_origin(request: Request) -> HTMLResponse | None:
-    """Basic origin/referer check for unsafe methods."""
-    expected = _expected_origin(request)
-    for header in ("origin", "referer"):
-        value = request.headers.get(header)
-        if not value:
-            continue
-        if value.startswith(expected):
-            return None
-        return _toast("Request blocked by origin policy", "error", status_code=403)
-    return None
-
-
-async def _require_csrf(request: Request) -> tuple[FormData | None, HTMLResponse | None]:
-    """Return parsed form plus any CSRF denial response."""
-    form = await request.form()
-    if denied := _require_safe_origin(request):
-        return form, denied
-    expected = request.session.get("csrf_token")
-    provided = (
-        request.headers.get("X-CSRF-Token", "").strip() or str(form.get("csrf_token", "")).strip()
-    )
-    if not expected or not provided or not secrets.compare_digest(str(expected), provided):
-        return (
-            form,
-            _toast(
-                "Security check failed. Refresh the page and try again.",
-                "error",
-                status_code=403,
-            ),
-        )
-    return form, None
-
-
-async def _require_login_and_csrf(
-    request: Request,
-) -> tuple[User | None, FormData | None, HTMLResponse | None]:
-    """Return current user, parsed form, plus any auth/csrf denial response."""
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
-        return user, None, denied
-    form, denied = await _require_csrf(request)
-    return user, form, denied
-
-
-def _validate_source_url(url: str) -> str | None:
-    """Return error message if source URL is unsafe or invalid."""
-    if len(url) > 2048:
-        return "URL is too long"
-    try:
-        validate_public_http_url(url)
-    except ValueError as exc:
-        return str(exc)
-    return None
-
-
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log each request with status and duration."""
-
-    async def dispatch(self, request: Request, call_next):
-        start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - start) * 1000
-        ip = _client_ip(request)
-        logger.info(
-            "%s %s status=%s duration_ms=%.1f ip=%s",
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration_ms,
-            ip,
-        )
-        return response
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db.connect()
+    await cast(Database, app.state.db).connect()
     yield
-    await db.close()
+    await cast(Database, app.state.db).close()
 
 
 app = FastAPI(title="Family Events", lifespan=lifespan)
@@ -314,101 +87,10 @@ app.add_middleware(
     https_only=settings.session_cookie_secure,
     domain=settings.session_cookie_domain or None,
 )
-
-
-async def _ctx(request: Request, **extra: object) -> dict:
-    """Build base template context with current user."""
-    user = await get_current_user(request, db)
-    csrf_token = ensure_csrf_token(request)
-    return {
-        "request": request,
-        "current_user": user,
-        "csrf_token": csrf_token,
-        "active_page": extra.pop("active_page", ""),
-        **extra,
-    }
-
-
-def _job_template_context(
-    job: Job,
-    *,
-    target_id: str,
-    refresh_path: str = "",
-    refresh_select: str = "",
-    refresh_target_id: str = "",
-    auto_refresh_history: bool = False,
-) -> dict[str, Any]:
-    """Build a shared template context for rendering a job card."""
-    return {
-        "job": job,
-        "target_id": target_id,
-        "message": _job_status_message(job),
-        "started_at": _fmt_job_time(job.started_at or job.created_at),
-        "finished_at": _fmt_job_time(job.finished_at),
-        "result": _job_result_value(job),
-        "result_summary": _job_result_summary(job),
-        "refresh_path": refresh_path,
-        "refresh_select": refresh_select,
-        "refresh_target_id": refresh_target_id,
-        "auto_refresh_history": auto_refresh_history,
-    }
-
-
-def _render_job_cards(
-    jobs: list[Job],
-    *,
-    target_prefix: str,
-    refresh_path: str = "",
-    refresh_select: str = "",
-    refresh_target_id: str = "",
-    auto_refresh_history: bool = False,
-) -> list[dict[str, Any]]:
-    """Prepare template contexts for a collection of jobs."""
-    return [
-        _job_template_context(
-            job,
-            target_id=f"{target_prefix}{job.id}",
-            refresh_path=refresh_path,
-            refresh_select=refresh_select,
-            refresh_target_id=refresh_target_id,
-            auto_refresh_history=auto_refresh_history,
-        )
-        for job in jobs
-    ]
-
-
-async def _start_background_job(
-    request: Request,
-    *,
-    user: User,
-    kind: str,
-    key: str,
-    label: str,
-    runner,
-    target_id: str,
-    source_id: str | None = None,
-) -> HTMLResponse:
-    """Start or reuse a background job and return an HTMX polling shell."""
-    job, created = await job_registry.start_unique(
-        kind=kind,
-        job_key=key,
-        label=label,
-        owner_user_id=user.id,
-        source_id=source_id,
-        runner=runner,
-    )
-    if created:
-        message = f"{label} started in the background"
-        variant = "info"
-    else:
-        message = f"{label} is already running"
-        variant = "warning"
-
-    body = templates.get_template("partials/_job_status.html").render(
-        request=request,
-        **_job_template_context(job, target_id=target_id),
-    )
-    return _toast(message, variant, body=body)
+app.state.db = db
+app.state.templates = templates
+app.state.rate_limit_store = _rate_limit_store
+app.state.bulk_unattend_undo_store = _bulk_unattend_undo_store
 
 
 # ----- Auth Pages -----
@@ -419,15 +101,15 @@ async def login_page(request: Request):
     user = await get_current_user(request, db)
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return templates.TemplateResponse("login.html", await _ctx(request, active_page="auth"))
+    return templates.TemplateResponse("login.html", await ctx(request, active_page="auth"))
 
 
 @app.post("/login", response_class=HTMLResponse)
 async def login_submit(request: Request):
-    form, denied = await _require_csrf(request)
+    form, denied = await require_csrf(request)
     if denied:
         return denied
-    if throttled := _check_rate_limit(
+    if throttled := check_rate_limit(
         request,
         "login_submit",
         limit=settings.auth_rate_limit_max_requests,
@@ -444,7 +126,7 @@ async def login_submit(request: Request):
     if not user or not verify_password(password, user.password_hash):
         return templates.TemplateResponse(
             "login.html",
-            {**await _ctx(request, active_page="auth"), "error": "Invalid email or password."},
+            {**await ctx(request, active_page="auth"), "error": "Invalid email or password."},
         )
 
     login_session(request, user)
@@ -457,15 +139,15 @@ async def signup_page(request: Request):
     user = await get_current_user(request, db)
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return templates.TemplateResponse("signup.html", await _ctx(request, active_page="auth"))
+    return templates.TemplateResponse("signup.html", await ctx(request, active_page="auth"))
 
 
 @app.post("/signup", response_class=HTMLResponse)
 async def signup_submit(request: Request):
-    form, denied = await _require_csrf(request)
+    form, denied = await require_csrf(request)
     if denied:
         return denied
-    if throttled := _check_rate_limit(
+    if throttled := check_rate_limit(
         request,
         "signup_submit",
         limit=settings.auth_rate_limit_max_requests,
@@ -495,7 +177,7 @@ async def signup_submit(request: Request):
         return templates.TemplateResponse(
             "signup.html",
             {
-                **await _ctx(request, active_page="auth"),
+                **await ctx(request, active_page="auth"),
                 "errors": errors,
                 "email": email,
                 "display_name": display_name,
@@ -515,7 +197,7 @@ async def signup_submit(request: Request):
 
 @app.post("/logout")
 async def logout(request: Request):
-    _user, _form, denied = await _require_login_and_csrf(request)
+    _user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     logout_session(request)
@@ -533,13 +215,13 @@ async def profile_page(request: Request):
     sources = await db.get_user_sources(user.id)
     return templates.TemplateResponse(
         "profile.html",
-        {**await _ctx(request, active_page="profile"), "sources": sources},
+        {**await ctx(request, active_page="profile"), "sources": sources},
     )
 
 
 @app.post("/api/profile/location", response_class=HTMLResponse)
 async def api_update_location(request: Request):
-    user, form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
@@ -549,12 +231,12 @@ async def api_update_location(request: Request):
     if not preferred:
         preferred = [home_city]
     await db.update_user(user.id, home_city=home_city, preferred_cities=preferred)
-    return _toast("Location updated")
+    return toast("Location updated")
 
 
 @app.post("/api/profile/preferences", response_class=HTMLResponse)
 async def api_update_preferences(request: Request):
-    user, form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
@@ -580,28 +262,28 @@ async def api_update_preferences(request: Request):
         ),
     )
     await db.update_user(user.id, interest_profile=profile)
-    return _toast("Preferences updated")
+    return toast("Preferences updated")
 
 
 @app.post("/api/profile/theme", response_class=HTMLResponse)
 async def api_update_theme(request: Request):
-    user, form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
     user_theme = user.theme
     theme = str(form.get("theme", user_theme)).strip()
     if theme == user_theme:
-        return _null_response()
+        return null_response()
     if theme not in ("light", "dark", "auto"):
         theme = "auto"
     await db.update_user(user.id, theme=theme)
-    return _change_theme(theme)
+    return change_theme(theme)
 
 
 @app.post("/api/profile/notifications", response_class=HTMLResponse)
 async def api_update_notifications(request: Request):
-    user, form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
@@ -612,9 +294,9 @@ async def api_update_notifications(request: Request):
     sms_to = str(form.get("sms_to", "")).strip()
     child_name = str(form.get("child_name", "")).strip() or "Your Little One"
     if "email" in channels and not email_to:
-        return _toast("Add a notification email to enable email delivery", "error")
+        return toast("Add a notification email to enable email delivery", "error")
     if "sms" in channels and not sms_to:
-        return _toast("Add a phone number to enable SMS delivery", "error")
+        return toast("Add a phone number to enable SMS delivery", "error")
     await db.update_user(
         user.id,
         notification_channels=[str(c) for c in channels],
@@ -622,12 +304,12 @@ async def api_update_notifications(request: Request):
         sms_to=sms_to,
         child_name=child_name,
     )
-    return _toast("Notification settings updated")
+    return toast("Notification settings updated")
 
 
 @app.post("/api/profile/password", response_class=HTMLResponse)
 async def api_update_password(request: Request):
-    user, form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
@@ -635,14 +317,19 @@ async def api_update_password(request: Request):
     new_pw = str(form.get("new_password", ""))
     confirm = str(form.get("confirm_password", ""))
     if not verify_password(current, user.password_hash):
-        return _toast("Current password is incorrect", "error")
+        return toast("Current password is incorrect", "error")
     password_errors = validate_password(new_pw)
     if password_errors:
-        return _toast(password_errors[0], "error")
+        return toast(password_errors[0], "error")
     if new_pw != confirm:
-        return _toast("Passwords don't match", "error")
+        return toast("Passwords don't match", "error")
     await db.update_user(user.id, password_hash=hash_password(new_pw))
-    return _toast("Password changed")
+    return toast("Password changed")
+
+
+app.include_router(auth_router)
+app.include_router(profile_router)
+app.include_router(sources_router)
 
 
 # ----- Pages -----
@@ -677,7 +364,7 @@ async def health_check() -> JSONResponse:
             "database": {
                 "ok": db_ok,
                 "event_count": event_count,
-                "latest_scraped_at": _format_ts(latest_scrape_at),
+                "latest_scraped_at": format_ts(latest_scrape_at),
             }
         },
     }
@@ -688,13 +375,13 @@ async def health_check() -> JSONResponse:
 async def dashboard(request: Request):
     events = await db.get_recent_events(days=30)
     total = len(events)
-    tagged = sum(1 for e in events if e.tags)
+    tagged = sum(1 for event in events if event.tags)
     untagged = total - tagged
-    sources = len(set(e.source for e in events))
+    sources = len(set(event.source for event in events))
     timestamps = await db.get_pipeline_timestamps()
     user = await get_current_user(request, db)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=8) if user else []
-    recent_job_cards = _render_job_cards(
+    recent_job_cards = render_job_cards(
         recent_jobs,
         target_prefix="job-history-",
         refresh_path="/",
@@ -703,36 +390,40 @@ async def dashboard(request: Request):
     )
 
     top_events = sorted(
-        [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
+        [event for event in events if event.tags],
+        key=lambda event: event.tags.toddler_score,
+        reverse=True,
     )[:5]
-
-    # Also grab category sections for discover page
     arts_events = sorted(
-        [e for e in events if e.tags and "arts" in (e.tags.categories or [])],
-        key=lambda e: e.tags.toddler_score,
+        [event for event in events if event.tags and "arts" in (event.tags.categories or [])],
+        key=lambda event: event.tags.toddler_score,
         reverse=True,
     )[:8]
     outdoor_events = sorted(
-        [e for e in events if e.tags and e.tags.indoor_outdoor in ("outdoor", "both")],
-        key=lambda e: e.tags.toddler_score,
+        [
+            event
+            for event in events
+            if event.tags and event.tags.indoor_outdoor in ("outdoor", "both")
+        ],
+        key=lambda event: event.tags.toddler_score,
         reverse=True,
     )[:8]
     nature_events = sorted(
-        [e for e in events if e.tags and "nature" in (e.tags.categories or [])],
-        key=lambda e: e.tags.toddler_score,
+        [event for event in events if event.tags and "nature" in (event.tags.categories or [])],
+        key=lambda event: event.tags.toddler_score,
         reverse=True,
     )[:8]
 
     near_city = user.home_city if user else "Lafayette"
     near_you_events = sorted(
-        [e for e in events if e.tags and e.location_city == near_city],
-        key=lambda e: e.tags.toddler_score,
+        [event for event in events if event.tags and event.location_city == near_city],
+        key=lambda event: event.tags.toddler_score,
         reverse=True,
     )[:8]
 
     return templates.TemplateResponse(
         "dashboard.html",
-        await _ctx(
+        await ctx(
             request,
             active_page="discover",
             total=total,
@@ -781,10 +472,9 @@ async def events_page(
     )
     total_pages = max(1, (total + per_page - 1) // per_page)
     filters = await db.get_filter_options()
-
     active_page = "attended" if attended == "yes" else "events"
 
-    ctx = await _ctx(
+    page_ctx = await ctx(
         request,
         active_page=active_page,
         events=events,
@@ -803,11 +493,9 @@ async def events_page(
         sources=filters["sources"],
     )
 
-    # HTMX partial: only return the table + pagination fragment
     if request.headers.get("HX-Request"):
-        return templates.TemplateResponse("partials/_events_table.html", ctx)
-
-    return templates.TemplateResponse("events.html", ctx)
+        return templates.TemplateResponse("partials/_events_table.html", page_ctx)
+    return templates.TemplateResponse("events.html", page_ctx)
 
 
 @app.get("/event/{event_id}", response_class=HTMLResponse)
@@ -827,7 +515,7 @@ async def event_detail(request: Request, event_id: str):
     raw_data = json.dumps(event.raw_data, indent=2, default=str)[:3000]
 
     map_query = ", ".join(
-        [v for v in [event.location_name, event.location_address, event.location_city] if v]
+        [value for value in [event.location_name, event.location_address, event.location_city] if value]
     )
     maps_url = (
         f"https://www.google.com/maps/search/?api=1&query={quote_plus(map_query)}"
@@ -856,19 +544,25 @@ async def event_detail(request: Request, event_id: str):
 
         candidates = await db.get_recent_events(days=30)
         related = [
-            e
-            for e in candidates
-            if e.id != event.id
-            and e.tags
-            and e.location_city == event.location_city
-            and abs((e.start_time - event.start_time).days) <= 14
+            candidate
+            for candidate in candidates
+            if candidate.id != event.id
+            and candidate.tags
+            and candidate.location_city == event.location_city
+            and abs((candidate.start_time - event.start_time).days) <= 14
         ]
-        related.sort(key=lambda e: e.tags.toddler_score if e.tags else 0, reverse=True)
-        related_events = [(e, float(e.tags.toddler_score if e.tags else 0)) for e in related[:4]]
+        related.sort(
+            key=lambda candidate: candidate.tags.toddler_score if candidate.tags else 0,
+            reverse=True,
+        )
+        related_events = [
+            (candidate, float(candidate.tags.toddler_score if candidate.tags else 0))
+            for candidate in related[:4]
+        ]
 
     return templates.TemplateResponse(
         "event_detail.html",
-        await _ctx(
+        await ctx(
             request,
             active_page="events",
             event=event,
@@ -922,11 +616,11 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
         key = event.start_time.date().isoformat()
         events_by_day.setdefault(key, []).append(event)
 
-    first_weekday = month_start.weekday()  # Monday=0
+    first_weekday = month_start.weekday()
     grid_start = month_start - timedelta(days=first_weekday)
     days: list[dict[str, Any]] = []
-    for i in range(42):
-        day = grid_start + timedelta(days=i)
+    for offset in range(42):
+        day = grid_start + timedelta(days=offset)
         key = day.isoformat()
         day_events = events_by_day.get(key, [])
         days.append(
@@ -951,7 +645,7 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
     featured_days = sorted(active_days, key=lambda day: day["event_count"], reverse=True)[:3]
     upcoming_events = [event for event in events if event.start_time.date() >= today][:8]
 
-    ctx = await _ctx(
+    page_ctx = await ctx(
         request,
         active_page="calendar",
         month_start=month_start,
@@ -974,9 +668,8 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
     )
 
     if request.headers.get("HX-Request"):
-        return templates.TemplateResponse("partials/_calendar_grid.html", ctx)
-
-    return templates.TemplateResponse("calendar.html", ctx)
+        return templates.TemplateResponse("partials/_calendar_grid.html", page_ctx)
+    return templates.TemplateResponse("calendar.html", page_ctx)
 
 
 @app.get("/calendar.ics")
@@ -1004,7 +697,10 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
 
     def esc(value: str) -> str:
         return (
-            value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+            value.replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace("\n", "\\n")
         )
 
     out = StringIO()
@@ -1025,7 +721,7 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
         out.write(f"DTEND:{end}\r\n")
         out.write(f"SUMMARY:{esc(event.title)}\r\n")
         location = ", ".join(
-            [v for v in [event.location_name, event.location_address, event.location_city] if v]
+            [value for value in [event.location_name, event.location_address, event.location_city] if value]
         )
         if location:
             out.write(f"LOCATION:{esc(location)}\r\n")
@@ -1050,25 +746,22 @@ async def weekend_page(request: Request):
     saturday = today + timedelta(days=days_until_sat)
     sunday = saturday + timedelta(days=1)
 
-    weather_svc = WeatherService()
-    weather = await weather_svc.get_weekend_forecast(saturday, sunday)
-
+    weather = await WeatherService().get_weekend_forecast(saturday, sunday)
     events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())
     if not events:
         events = await db.get_recent_events(days=14)
 
-    tagged = [e for e in events if e.tags]
+    tagged = [event for event in events if event.tags]
     user = await get_current_user(request, db)
     profile = user.interest_profile if user else InterestProfile()
     child_name = user.child_name if user else "Your Little One"
     ranked = rank_events(tagged, profile, weather)
     message = format_console_message(ranked, weather, child_name)
-
     weather_summary, weather_tone, weather_tips = summarize_weekend_recommendation(weather)
 
     return templates.TemplateResponse(
         "weekend.html",
-        await _ctx(
+        await ctx(
             request,
             active_page="weekend",
             saturday=saturday,
@@ -1083,78 +776,7 @@ async def weekend_page(request: Request):
     )
 
 
-# ----- Sources Pages -----
-
-
-@app.get("/sources", response_class=HTMLResponse)
-async def sources_page(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-    sources = await db.get_user_sources(user.id)
-    builtin_stats = await db.get_filter_options()
-    recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=10)
-    recent_job_cards = _render_job_cards(
-        recent_jobs,
-        target_prefix="job-history-",
-        refresh_path="/sources",
-        refresh_select="#sources-jobs-panel",
-        refresh_target_id="sources-jobs-panel",
-    )
-    return templates.TemplateResponse(
-        "sources.html",
-        await _ctx(
-            request,
-            active_page="sources",
-            sources=sources,
-            builtin_stats=builtin_stats,
-            recent_jobs=recent_jobs,
-            recent_job_cards=recent_job_cards,
-        ),
-    )
-
-
-@app.get("/source/{source_id}", response_class=HTMLResponse)
-async def source_detail(request: Request, source_id: str):
-    user = await get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    source = await db.get_source(source_id)
-    if not source:
-        return HTMLResponse("Source not found", status_code=404)
-    if source.user_id and source.user_id != user.id:
-        return HTMLResponse("Forbidden", status_code=403)
-
-    events_from_source, _ = await db.search_events(
-        days=90, source=f"custom:{source_id}", per_page=10
-    )
-    recipe = None
-    if source.recipe_json:
-        recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
-    recent_jobs = await db.list_jobs(owner_user_id=user.id, source_id=source.id, limit=10)
-    recent_job_cards = _render_job_cards(
-        recent_jobs,
-        target_prefix="job-history-",
-        refresh_path=f"/source/{source.id}",
-        refresh_select="#source-job-history-panel",
-        refresh_target_id="source-job-history-panel",
-    )
-    return templates.TemplateResponse(
-        "source_detail.html",
-        await _ctx(
-            request,
-            active_page="sources",
-            source=source,
-            recipe=recipe,
-            events=events_from_source,
-            recent_jobs=recent_jobs,
-            recent_job_cards=recent_job_cards,
-        ),
-    )
-
-
-# ----- API Endpoints (return HTML snippets for HTMX) -----
+# ----- API Endpoints -----
 
 
 @app.get("/api/jobs/{job_id}", response_class=HTMLResponse)
@@ -1162,12 +784,14 @@ async def api_job_status(request: Request, job_id: str, target_id: str = "job-st
     user = await get_current_user(request, db)
     if not user:
         return HTMLResponse("", status_code=401)
+
     job = await db.get_job(job_id)
     if not job or job.owner_user_id != user.id:
         return HTMLResponse("", status_code=404)
+
     return templates.TemplateResponse(
         "partials/_job_status.html",
-        {"request": request, **_job_template_context(job, target_id=target_id)},
+        {"request": request, **job_template_context(job, target_id=target_id)},
     )
 
 
@@ -1196,7 +820,7 @@ async def jobs_page(
         q=search_query,
         limit=100,
     )
-    job_cards = _render_job_cards(
+    job_cards = render_job_cards(
         jobs,
         target_prefix="jobs-page-",
         refresh_path=f"/jobs?state={quote_plus(state)}&kind={quote_plus(kind)}&source_id={quote_plus(source_id)}&q={quote_plus(q)}",
@@ -1209,7 +833,7 @@ async def jobs_page(
 
     return templates.TemplateResponse(
         "jobs.html",
-        await _ctx(
+        await ctx(
             request,
             active_page="jobs",
             jobs=jobs,
@@ -1226,140 +850,158 @@ async def jobs_page(
 
 @app.post("/api/scrape", response_class=HTMLResponse)
 async def api_scrape(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_scrape"):
+    if throttled := check_rate_limit(request, "api_scrape"):
         return throttled
 
     from src.scheduler import run_scrape
 
-    return await _start_background_job(
+    db_path = db.db_path
+
+    async def runner() -> int:
+        async with Database(db_path) as job_db:
+            return await run_scrape(job_db)
+
+    return await start_background_job(
         request,
         user=user,
         kind="scrape",
         key="pipeline:scrape",
         label="Scrape job",
-        runner=run_scrape,
+        runner=runner,
         target_id="dashboard-job-status",
     )
 
 
 @app.post("/api/tag", response_class=HTMLResponse)
 async def api_tag(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_tag"):
+    if throttled := check_rate_limit(request, "api_tag"):
         return throttled
 
     from src.scheduler import run_tag
 
-    return await _start_background_job(
+    db_path = db.db_path
+
+    async def runner() -> int:
+        async with Database(db_path) as job_db:
+            return await run_tag(job_db)
+
+    return await start_background_job(
         request,
         user=user,
         kind="tag",
         key="pipeline:tag",
         label="Tag job",
-        runner=run_tag,
+        runner=runner,
         target_id="dashboard-job-status",
     )
 
 
 @app.post("/api/dedupe", response_class=HTMLResponse)
 async def api_dedupe(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_dedupe"):
+    if throttled := check_rate_limit(request, "api_dedupe"):
         return throttled
 
-    async def _runner() -> int:
-        async with Database() as job_db:
+    db_path = db.db_path
+
+    async def runner() -> int:
+        async with Database(db_path) as job_db:
             result = await job_db.dedupe_existing_events()
             return int(result["merged"])
 
-    return await _start_background_job(
+    return await start_background_job(
         request,
         user=user,
         kind="dedupe",
         key="pipeline:dedupe",
         label="Dedupe job",
-        runner=_runner,
+        runner=runner,
         target_id="dashboard-job-status",
     )
 
 
 @app.post("/api/notify", response_class=HTMLResponse)
 async def api_notify(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_notify"):
+    if throttled := check_rate_limit(request, "api_notify"):
         return throttled
 
     from src.scheduler import run_notify
 
-    return await _start_background_job(
+    db_path = db.db_path
+
+    async def runner() -> str:
+        async with Database(db_path) as job_db:
+            return await run_notify(job_db, user=user)
+
+    return await start_background_job(
         request,
         user=user,
         kind="notify",
         key=f"pipeline:notify:{user.id}",
         label="Notification job",
-        runner=lambda: run_notify(user=user),
+        runner=runner,
         target_id="dashboard-job-status",
     )
 
 
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
 async def api_attend(request: Request, event_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_attend"):
+    if throttled := check_rate_limit(request, "api_attend"):
         return throttled
 
     await db.mark_attended(event_id)
-    return _toast("Marked attended")
+    return toast("Marked attended")
 
 
 @app.post("/api/unattend/{event_id}", response_class=HTMLResponse)
 async def api_unattend(request: Request, event_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_unattend"):
+    if throttled := check_rate_limit(request, "api_unattend"):
         return throttled
 
     await db.db.execute("UPDATE events SET attended = 0 WHERE id = :id", {"id": event_id})
     await db.db.commit()
-    return _toast("Marked as not attended")
+    return toast("Marked as not attended")
 
 
 @app.post("/api/unattend-bulk", response_class=HTMLResponse)
 async def api_unattend_bulk(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_unattend_bulk"):
+    assert user is not None and form is not None
+    if throttled := check_rate_limit(request, "api_unattend_bulk"):
         return throttled
 
-    event_ids = [
-        str(eid) for eid in (_form.getlist("event_ids") if _form else []) if str(eid).strip()
-    ]
+    event_ids = [str(event_id) for event_id in form.getlist("event_ids") if str(event_id).strip()]
     if not event_ids:
-        return _toast("Select at least one event", "warning")
+        return toast("Select at least one event", "warning")
 
     await db.db.executemany(
         "UPDATE events SET attended = 0 WHERE id = ?",
-        [(eid,) for eid in event_ids],
+        [(event_id,) for event_id in event_ids],
     )
     await db.db.commit()
 
@@ -1379,23 +1021,23 @@ async def api_unattend_bulk(request: Request):
 
 @app.post("/api/unattend-bulk/undo/{undo_token}", response_class=HTMLResponse)
 async def api_unattend_bulk_undo(request: Request, undo_token: str):
-    user, _form, denied = await _require_login_and_csrf(request)
+    user, _form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None
-    if throttled := _check_rate_limit(request, "api_unattend_bulk_undo"):
+    if throttled := check_rate_limit(request, "api_unattend_bulk_undo"):
         return throttled
 
     event_ids = _bulk_unattend_undo_store.pop(undo_token, [])
     if not event_ids:
-        return _toast("Nothing to undo", "warning")
+        return toast("Nothing to undo", "warning")
 
     await db.db.executemany(
         "UPDATE events SET attended = 1 WHERE id = ?",
-        [(eid,) for eid in event_ids],
+        [(event_id,) for event_id in event_ids],
     )
     await db.db.commit()
-    return _toast(f"Restored {len(event_ids)} event(s)")
+    return toast(f"Restored {len(event_ids)} event(s)")
 
 
 @app.get("/api/events")
@@ -1403,264 +1045,24 @@ async def api_events():
     events = await db.get_recent_events(days=30)
     return [
         {
-            "id": e.id,
-            "title": e.title,
-            "source": e.source,
-            "city": e.location_city,
-            "start_time": e.start_time.isoformat(),
-            "tagged": e.tags is not None,
-            "toddler_score": e.tags.toddler_score if e.tags else None,
+            "id": event.id,
+            "title": event.title,
+            "source": event.source,
+            "city": event.location_city,
+            "start_time": event.start_time.isoformat(),
+            "tagged": event.tags is not None,
+            "toddler_score": event.tags.toddler_score if event.tags else None,
         }
-        for e in events
+        for event in events
     ]
-
-
-# ----- Source API Endpoints -----
-
-
-@app.post("/api/sources", response_class=HTMLResponse)
-async def api_add_source(request: Request):
-    user, _form, denied = await _require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_add_source"):
-        return throttled
-
-    form = _form
-    url = str(form.get("url", "")).strip() if form else ""
-    name = str(form.get("name", "")).strip() if form else ""
-    if not url:
-        return _toast("Please enter a URL", "error")
-    if url_error := _validate_source_url(url):
-        return _toast(url_error, "error")
-
-    # Check for built-in domain
-    if is_builtin_domain(url):
-        return _toast("We already have built-in support for this site!", "info")
-
-    # Check for duplicate
-    existing = await db.get_source_by_url(url)
-    if existing:
-        return _toast("This URL has already been added", "warning")
-
-    # Create source
-    domain = extract_domain(url)
-    if not name:
-        name = domain.replace(".", " ").title()
-    source = Source(
-        name=name,
-        url=url,
-        domain=domain,
-        status="analyzing",
-        user_id=user.id,
-    )
-    await db.create_source(source)
-
-    async def _runner() -> dict[str, Any]:
-        async with Database() as job_db:
-            try:
-                analyzer = PageAnalyzer()
-                recipe = await analyzer.analyze(url)
-                await job_db.update_source_recipe(
-                    source.id,
-                    recipe.model_dump_json(),
-                    status="active" if recipe.confidence >= 0.3 else "failed",
-                )
-                return {
-                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
-                    "strategy": recipe.strategy,
-                    "confidence": recipe.confidence,
-                    "notes": recipe.notes,
-                    "recipe": recipe.model_dump(mode="json"),
-                }
-            except Exception as exc:
-                await job_db.update_source_status(source.id, status="failed", error=str(exc))
-                raise
-
-    return await _start_background_job(
-        request,
-        user=user,
-        kind="source-analyze",
-        key=f"source:analyze:{source.id}",
-        label=f"Analyzing {source.name}",
-        runner=_runner,
-        target_id=f"source-job-{source.id}",
-        source_id=source.id,
-    )
-
-
-@app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
-async def api_reanalyze(request: Request, source_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_reanalyze_source"):
-        return throttled
-
-    source = await db.get_source(source_id)
-    if not source:
-        return HTMLResponse("Not found", status_code=404)
-    if source.user_id and source.user_id != user.id:
-        return HTMLResponse("Forbidden", status_code=403)
-    await db.update_source_status(source_id, status="analyzing")
-
-    async def _runner() -> dict[str, Any]:
-        async with Database() as job_db:
-            source_for_job = await job_db.get_source(source_id)
-            if not source_for_job:
-                raise ValueError("Source not found")
-            try:
-                analyzer = PageAnalyzer()
-                recipe = await analyzer.analyze(source_for_job.url)
-                await job_db.update_source_recipe(
-                    source_id,
-                    recipe.model_dump_json(),
-                    status="active" if recipe.confidence >= 0.3 else "failed",
-                )
-                return {
-                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
-                    "strategy": recipe.strategy,
-                    "confidence": recipe.confidence,
-                    "notes": recipe.notes,
-                    "recipe": recipe.model_dump(mode="json"),
-                }
-            except Exception as exc:
-                await job_db.update_source_status(source_id, status="failed", error=str(exc))
-                raise
-
-    return await _start_background_job(
-        request,
-        user=user,
-        kind="source-analyze",
-        key=f"source:analyze:{source_id}",
-        label=f"Analyzing {source.name}",
-        runner=_runner,
-        target_id=f"source-job-{source_id}",
-        source_id=source_id,
-    )
-
-
-@app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
-async def api_test_source(request: Request, source_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_test_source"):
-        return throttled
-
-    source = await db.get_source(source_id)
-    if not source or not source.recipe_json:
-        return HTMLResponse("No recipe to test", status_code=400)
-    if source.user_id and source.user_id != user.id:
-        return HTMLResponse("Forbidden", status_code=403)
-
-    async def _runner() -> dict[str, Any]:
-        from src.scrapers.generic import GenericScraper
-
-        async with Database() as job_db:
-            source_for_job = await job_db.get_source(source_id)
-            if not source_for_job or not source_for_job.recipe_json:
-                raise ValueError("No recipe to test")
-            recipe = ScrapeRecipe.model_validate_json(source_for_job.recipe_json)
-            scraper = GenericScraper(
-                url=source_for_job.url,
-                source_id=source_for_job.id,
-                recipe=recipe,
-            )
-            events = await scraper.scrape()
-            sample_events = [
-                {
-                    "title": event.title,
-                    "start_time": event.start_time.isoformat(),
-                    "location_name": event.location_name,
-                    "location_city": event.location_city,
-                    "source_url": event.source_url,
-                }
-                for event in events[:5]
-            ]
-            return {
-                "summary": f"{len(events)} events found",
-                "count": len(events),
-                "sample_events": sample_events,
-                "source_url": source_for_job.url,
-                "strategy": recipe.strategy,
-            }
-
-    return await _start_background_job(
-        request,
-        user=user,
-        kind="source-test",
-        key=f"source:test:{source_id}",
-        label=f"Testing {source.name}",
-        runner=_runner,
-        target_id=f"source-job-{source_id}",
-        source_id=source_id,
-    )
-
-
-@app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)
-async def api_toggle_source(request: Request, source_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_toggle_source"):
-        return throttled
-
-    source = await db.get_source(source_id)
-    if not source:
-        return HTMLResponse("Not found", status_code=404)
-    if source.user_id and source.user_id != user.id:
-        return HTMLResponse("Forbidden", status_code=403)
-
-    enabled = await db.toggle_source(source_id)
-    state = "enabled" if enabled else "disabled"
-    return _toast(
-        f"Source {state}",
-        body="<script>setTimeout(()=>location.reload(),500)</script>",
-    )
-
-
-@app.delete("/api/sources/{source_id}", response_class=HTMLResponse)
-async def api_delete_source(request: Request, source_id: str):
-    user, _form, denied = await _require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None
-    if throttled := _check_rate_limit(request, "api_delete_source"):
-        return throttled
-
-    source = await db.get_source(source_id)
-    if not source:
-        return HTMLResponse("Not found", status_code=404)
-    if source.user_id and source.user_id != user.id:
-        return HTMLResponse("Forbidden", status_code=403)
-
-    await db.delete_source(source_id)
-    return _toast(
-        "Source deleted",
-        body='<script>setTimeout(()=>location.href="/sources",500)</script>',
-    )
-
 
 @app.exception_handler(404)
 async def not_found_handler(request: Request, _exc: Exception) -> HTMLResponse:
     """Render friendly 404 page for missing routes."""
-    return templates.TemplateResponse(
-        "404.html",
-        await _ctx(request),
-        status_code=404,
-    )
+    return templates.TemplateResponse("404.html", await ctx(request), status_code=404)
 
 
 @app.exception_handler(500)
 async def server_error_handler(request: Request, _exc: Exception) -> HTMLResponse:
     """Render friendly 500 page for unhandled server errors."""
-    return templates.TemplateResponse(
-        "500.html",
-        await _ctx(request),
-        status_code=500,
-    )
+    return templates.TemplateResponse("500.html", await ctx(request), status_code=500)

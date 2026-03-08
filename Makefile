@@ -54,10 +54,10 @@ test-cov: ## Run tests with coverage
 # ──────────────────────────────────────────────
 
 run: ## Run the application
-	uv run python main.py
+	uv run python -m src.main serve
 
 dev: ## Run the application in development mode
-	uv run python main.py --reload
+	uv run uvicorn src.web.app:app --reload
 
 scrape: ## Run the scraper/cron job manually
 	uv run python -m src.cron
