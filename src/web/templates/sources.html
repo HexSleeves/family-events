@@ -5,89 +5,67 @@
 <div class="animate-fade-in">
   <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6"><span aria-hidden="true">📡</span> Event Sources</h1>
 
-  {# ═══ ADD SOURCE ═══ #}
   {% if current_user %}
   <div id="sources-job-status" class="mb-4"></div>
-  <form hx-post="/api/sources" hx-target="#sources-job-status" hx-swap="innerHTML" hx-indicator="#add-spinner"
-    class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 animate-fade-in-up stagger-1">
+
+  <section class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6">
+    <h2 class="font-semibold text-[var(--color-heading)] mb-3">Predefined Sources for {{ current_user.home_city or 'your city' }}</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for item in predefined_sources %}
+      <form hx-post="/api/sources/predefined" hx-target="#sources-job-status" hx-swap="innerHTML" class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <input type="hidden" name="source_key" value="{{ item.key }}" />
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ item.name }}</h3>
+            <p class="text-xs text-[var(--color-muted)]">{{ item.city }} · {{ item.category }}</p>
+          </div>
+          <button type="submit" class="px-3 py-1.5 rounded-lg bg-[var(--color-brand)] text-white text-xs font-semibold">Add</button>
+        </div>
+        <p class="text-xs text-[var(--color-muted)]">{{ item.description }}</p>
+      </form>
+      {% else %}
+      <div class="text-sm text-[var(--color-muted)] col-span-full">No predefined sources for this city yet. Add a custom source below.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <form hx-post="/api/sources" hx-target="#sources-job-status" hx-swap="innerHTML" hx-indicator="#add-spinner" class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <h3 class="font-semibold text-[var(--color-heading)] mb-3">Add Custom Source</h3>
     <div class="flex flex-col sm:flex-row gap-3">
-      <div class="flex-1">
-        <label for="source-url" class="sr-only">Source URL</label>
-        <input type="url" name="url" id="source-url" required placeholder="https://example.com/events"
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
-      </div>
-      <div class="w-full sm:w-48">
-        <label for="source-name" class="sr-only">Source name (optional)</label>
-        <input type="text" name="name" id="source-name" placeholder="Name (optional)"
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
-      </div>
-      <button type="submit"
-        class="px-5 py-2.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 touch-target">
-        Add Source
-        <span id="add-spinner" class="htmx-indicator spinner"></span>
-      </button>
+      <div class="flex-1"><input type="url" name="url" required placeholder="https://example.com/events" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]" /></div>
+      <div class="w-full sm:w-48"><input type="text" name="name" placeholder="Name (optional)" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]" /></div>
+      <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-sm flex items-center gap-2">Add Source <span id="add-spinner" class="htmx-indicator spinner"></span></button>
     </div>
   </form>
   {% endif %}
 
-  {# ═══ BUILT-IN SOURCES ═══ #}
-  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3 animate-fade-in-up stagger-2">Built-in Sources</h2>
-  <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8" role="list">
-    {% set builtins = [
-    ('BREC Parks', 'brec.org', 'Baton Rouge parks & recreation', '🏞️'),
-    ('Eventbrite', 'eventbrite.com', 'Both cities', '🎫'),
-    ('AllEvents.in', 'allevents.in', 'Both cities', '🌐'),
-    ('Lafayette Venues', 'Various', 'Moncus Park, Acadiana Arts, Science Museum', '🏠'),
-    ('Libraries', 'LibCal', 'Lafayette & BR libraries', '📚')
-    ] %}
-    {% for name, domain, desc, icon in builtins %}
-    <li
-      class="bg-[var(--color-surface)] rounded-xl p-4 border-l-4 border-l-[var(--color-accent)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-{{ loop.index + 2 }}">
-      <div class="flex items-center gap-3">
-        <span class="text-2xl" aria-hidden="true">{{ icon }}</span>
-        <div>
-          <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ name }}</h3>
-          <p class="text-xs text-[var(--color-muted)]">{{ desc }}</p>
-        </div>
-        <span class="ml-auto badge badge-success">Active</span>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-
   {% if recent_job_cards %}
   <section id="sources-jobs-panel" class="mb-8">
-    <div class="flex items-center justify-between mb-3 animate-fade-in-up stagger-3">
-      <h2 class="text-lg font-semibold text-[var(--color-heading)]">Recent Source Jobs</h2>
-      <a href="/jobs"
-        class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">View
-        all →</a>
-    </div>
+    <div class="flex items-center justify-between mb-3"><h2 class="text-lg font-semibold text-[var(--color-heading)]">Recent Source Jobs</h2><a href="/jobs" class="text-sm font-medium text-[var(--color-brand)]">View all →</a></div>
     <div class="space-y-3">
       {% for card in recent_job_cards %}
-      {% set job = card.job %}
-      {% set target_id = card.target_id %}
-      {% set message = card.message %}
-      {% set started_at = card.started_at %}
-      {% set finished_at = card.finished_at %}
-      {% set result = card.result %}
-      {% set progress = card.progress %}
-      {% set result_summary = card.result_summary %}
-      {% set refresh_path = card.refresh_path %}
-      {% set refresh_select = card.refresh_select %}
-      {% set refresh_target_id = card.refresh_target_id %}
-      {% set auto_refresh_history = false %}
-      {% include "partials/_job_status.html" %}
+        {% set job = card.job %}
+        {% set target_id = card.target_id %}
+        {% set message = card.message %}
+        {% set started_at = card.started_at %}
+        {% set finished_at = card.finished_at %}
+        {% set result = card.result %}
+        {% set progress = card.progress %}
+        {% set result_summary = card.result_summary %}
+        {% set refresh_path = card.refresh_path %}
+        {% set refresh_select = card.refresh_select %}
+        {% set refresh_target_id = card.refresh_target_id %}
+        {% set auto_refresh_history = false %}
+        {% include "partials/_job_status.html" %}
       {% endfor %}
     </div>
   </section>
   {% endif %}
 
-  {# ═══ CUSTOM SOURCES ═══ #}
   {% if sources %}
-  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3">Custom Sources</h2>
+  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3">Your Sources</h2>
   <div class="space-y-3">
     {% for source in sources %}
     {% include "partials/_source_card.html" %}

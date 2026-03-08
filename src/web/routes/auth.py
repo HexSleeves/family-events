@@ -7,6 +7,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.config import settings
 from src.db.models import User
+from src.onboarding import (
+    build_interest_profile_from_form,
+    ensure_predefined_sources,
+    normalize_city_list,
+    recommended_source_keys_for_city,
+    validate_onboarding_form,
+)
 from src.web.auth import (
     get_current_user,
     hash_password,
@@ -99,12 +106,19 @@ async def signup_submit(request: Request):
     display_name = str(form.get("display_name", "")).strip()
     password = str(form.get("password", ""))
     confirm = str(form.get("confirm_password", ""))
+    home_city = str(form.get("home_city", "")).strip()
+    preferred_cities = normalize_city_list(
+        str(form.get("preferred_cities", "")).strip(),
+        fallback_home_city=home_city,
+    )
+    child_name = str(form.get("child_name", "")).strip()
 
     errors: list[str] = []
     if not email or "@" not in email:
         errors.append("Valid email is required.")
     if not display_name:
         errors.append("Display name is required.")
+    errors.extend(validate_onboarding_form(form))
     errors.extend(validate_password(password))
     if password != confirm:
         errors.append("Passwords don't match.")
@@ -119,11 +133,34 @@ async def signup_submit(request: Request):
                 "errors": errors,
                 "email": email,
                 "display_name": display_name,
+                "home_city": home_city,
+                "preferred_cities": ", ".join(preferred_cities),
+                "child_name": child_name,
+                "temperament": str(form.get("temperament", "")).strip(),
             },
         )
 
-    user = User(email=email, display_name=display_name, password_hash=hash_password(password))
+    interest_profile = build_interest_profile_from_form(
+        form,
+        home_city=home_city,
+        preferred_cities=preferred_cities,
+    )
+    user = User(
+        email=email,
+        display_name=display_name,
+        password_hash=hash_password(password),
+        home_city=home_city,
+        preferred_cities=preferred_cities,
+        child_name=child_name,
+        onboarding_complete=True,
+        interest_profile=interest_profile,
+    )
     await db.create_user(user)
+    await ensure_predefined_sources(
+        db,
+        user=user,
+        source_keys=form.getlist("predefined_sources") or recommended_source_keys_for_city(home_city),
+    )
     login_session(request, user)
     rotate_csrf_token(request)
     return RedirectResponse("/profile", status_code=302)

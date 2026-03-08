@@ -236,12 +236,13 @@ def _logistics_score(tags: EventTags) -> float:
 
 def _city_score(event: Event, profile: InterestProfile) -> float:
     """Boost events in the user's home city, penalize far-away ones."""
-    home = profile.constraints.home_city
-    if event.location_city == home:
+    home = profile.constraints.home_city.strip()
+    preferred = profile.constraints.preferred_cities
+    if home and event.location_city == home:
         return 10.0
-    if event.location_city in profile.constraints.preferred_cities:
+    if event.location_city in preferred:
         return 6.0
-    return 1.0
+    return 3.0 if not home and not preferred else 1.0
 
 
 # ---------------------------------------------------------------------------

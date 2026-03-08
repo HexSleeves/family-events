@@ -9,9 +9,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.db.database import Database
 from src.db.models import Source
+from src.predefined_sources import (
+    get_predefined_source,
+    list_predefined_sources,
+    make_predefined_source,
+)
 from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
-from src.scrapers.router import extract_domain, is_builtin_domain
+from src.scrapers.router import BUILTIN_DOMAIN_MESSAGE, extract_domain, is_builtin_domain
 from src.web.auth import get_current_user
 from src.web.common import (
     check_rate_limit,
@@ -34,7 +39,7 @@ async def sources_page(request: Request):
     if not user:
         return RedirectResponse("/login", status_code=302)
     sources = await db.get_user_sources(user.id)
-    builtin_stats = await db.get_filter_options()
+    predefined_sources = list_predefined_sources(city=user.home_city)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=10)
     recent_job_cards = render_job_cards(
         recent_jobs,
@@ -49,7 +54,7 @@ async def sources_page(request: Request):
             request,
             active_page="sources",
             sources=sources,
-            builtin_stats=builtin_stats,
+            predefined_sources=predefined_sources,
             recent_jobs=recent_jobs,
             recent_job_cards=recent_job_cards,
         ),
@@ -112,16 +117,24 @@ async def api_add_source(request: Request):
     if url_error := validate_source_url(url):
         return toast(url_error, "error")
     if is_builtin_domain(url):
-        return toast("We already have built-in support for this site!", "info")
+        return toast(BUILTIN_DOMAIN_MESSAGE, "info")
 
-    existing = await db.get_source_by_url(url)
+    existing = await db.get_user_source_by_url(user.id, url)
     if existing:
         return toast("This URL has already been added", "warning")
 
     domain = extract_domain(url)
     if not name:
         name = domain.replace(".", " ").title()
-    source = Source(name=name, url=url, domain=domain, status="analyzing", user_id=user.id)
+    source = Source(
+        name=name,
+        url=url,
+        domain=domain,
+        city=user.home_city,
+        category="custom",
+        status="analyzing",
+        user_id=user.id,
+    )
     await db.create_source(source)
 
     db_path = db.db_path
@@ -318,4 +331,28 @@ async def api_delete_source(request: Request, source_id: str):
     return toast(
         "Source deleted",
         body='<script>setTimeout(()=>location.href="/sources",500)</script>',
+    )
+
+
+@router.post("/api/sources/predefined", response_class=HTMLResponse)
+async def api_add_predefined_source(request: Request):
+    db = get_db(request)
+    user, form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
+    source_key = str(form.get("source_key", "")).strip()
+    if not source_key:
+        return toast("Choose a source to add", "error")
+    try:
+        source_config = get_predefined_source(source_key)
+    except KeyError:
+        return toast("Unknown source", "error", status_code=404)
+    existing = await db.get_user_source_by_url(user.id, source_config["url"])
+    if existing:
+        return toast("Source already added", "warning")
+    await db.create_source(make_predefined_source(user_id=user.id, source_key=source_key))
+    return toast(
+        f"Added {source_config['name']}",
+        body='<script>setTimeout(()=>location.reload(),300)</script>',
     )

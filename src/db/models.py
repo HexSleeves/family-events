@@ -83,8 +83,8 @@ class Event(BaseModel):
 
 class Constraints(BaseModel):
     max_drive_time_minutes: int = 45
-    preferred_cities: list[str] = Field(default_factory=lambda: ["Lafayette", "Baton Rouge"])
-    home_city: str = "Lafayette"  # Primary city gets ranking boost
+    preferred_cities: list[str] = Field(default_factory=list)
+    home_city: str = ""  # Primary city gets ranking boost
     nap_time: str = "13:00-15:00"  # HH:MM-HH:MM
     bedtime: str = "19:30"  # HH:MM
     budget_per_event: float = 30.0
@@ -106,6 +106,11 @@ class Constraints(BaseModel):
 
 
 class InterestProfile(BaseModel):
+    child_age_years: int = 3
+    child_age_months: int = 0
+    temperament: str = "warm-up needed in new places"
+    sensory_notes: str = ""
+    accessibility_needs: str = ""
     loves: list[str] = Field(
         default_factory=lambda: [
             "animals",
@@ -120,6 +125,9 @@ class InterestProfile(BaseModel):
     dislikes: list[str] = Field(
         default_factory=lambda: ["loud_crowds", "sitting_still_long", "dark_spaces"]
     )
+    favorite_categories: list[str] = Field(default_factory=list)
+    avoid_categories: list[str] = Field(default_factory=list)
+    notes_for_recommendations: str = ""
     constraints: Constraints = Field(default_factory=Constraints)
 
 
@@ -133,13 +141,14 @@ class User(BaseModel):
     email: str
     display_name: str
     password_hash: str
-    home_city: str = "Lafayette"
-    preferred_cities: list[str] = Field(default_factory=lambda: ["Lafayette", "Baton Rouge"])
+    home_city: str = ""
+    preferred_cities: list[str] = Field(default_factory=list)
     theme: Literal["light", "dark", "auto"] = "auto"
     notification_channels: list[str] = Field(default_factory=lambda: ["console"])
     email_to: str = ""  # Notification recipient email
     sms_to: str = ""  # Notification recipient phone number (E.164 preferred)
     child_name: str = "Your Little One"  # Name used in notification messages
+    onboarding_complete: bool = False
     interest_profile: InterestProfile = Field(default_factory=InterestProfile)
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
@@ -186,6 +195,8 @@ class Source(BaseModel):
     name: str
     url: str
     domain: str
+    city: str = ""
+    category: str = "custom"
     user_id: str | None = None
     builtin: bool = False
     recipe_json: str | None = None  # JSON string of ScrapeRecipe

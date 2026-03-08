@@ -10,33 +10,48 @@ from typing import Literal
 from openai import AsyncOpenAI
 
 from src.config import settings
-from src.db.models import Event, EventTags
+from src.db.models import Event, EventTags, InterestProfile
 from src.tagger.taxonomy import (
-    CAUTION_RULES,
     CATEGORY_RULES,
+    CAUTION_RULES,
     EXCLUSION_RULES,
     POSITIVE_RULES,
     TAGGING_VERSION,
 )
 
-SYSTEM_PROMPT = """You are an expert at evaluating family events for toddler-friendliness. You have extensive experience with child development and understand the needs of a 3-year-old.
+SYSTEM_PROMPT_TEMPLATE = """You are an expert at evaluating family events for child-friendliness.
 
-Analyze the following event and provide structured tags. Consider:
+Analyze the following event for this specific child and family:
 
-FOR A 3-YEAR-OLD:
-- Attention span: 10-15 minutes per activity
-- Nap schedule: Usually needs afternoon nap (1-3pm is risky)
-- Noise sensitivity: Can be overwhelmed by loud environments
-- Mobility: Walks but tires easily, may need stroller
-- Interests: Animals, music, water play, playground, trains, art/mess-making
+CHILD PROFILE:
+- Age: {age_years} years {age_months} months
+- Temperament: {temperament}
+- Loves: {loves}
+- Likes: {likes}
+- Dislikes: {dislikes}
+- Favorite event categories: {favorite_categories}
+- Avoid event categories: {avoid_categories}
+- Sensory notes: {sensory_notes}
+- Accessibility needs: {accessibility_needs}
+- Extra family notes: {notes_for_recommendations}
 
-LOUISIANA CONTEXT:
-- Summer heat is extreme (May-September) — outdoor events need shade/water
-- Mosquitoes are a factor for evening outdoor events
-- Hurricane season (June-November) may affect outdoor events
+FAMILY CONSTRAINTS:
+- Home city: {home_city}
+- Preferred cities: {preferred_cities}
+- Max drive time: {max_drive_time_minutes} minutes
+- Nap window: {nap_time}
+- Bedtime: {bedtime}
+- Budget per event: ${budget_per_event}
+
+SCORING GUIDANCE:
+- Be specific to this child, not a generic toddler.
+- Favor events aligned with their temperament, interests, sensory profile, and routine.
+- Penalize events likely to trigger overwhelm, boredom, schedule conflicts, or mobility issues.
+- Consider local weather and logistics from the event details when relevant.
+- Be conservative: 8+ only if the fit is truly excellent for this child.
 
 Return ONLY a JSON object with these exact fields:
-{
+{{
   "tagging_version": "v2",
   "age_min_recommended": int,
   "age_max_recommended": int,
@@ -61,8 +76,8 @@ Return ONLY a JSON object with these exact fields:
   "positive_signals": [string],
   "caution_signals": [string],
   "exclusion_signals": [string],
-  "raw_rule_score": int (0-100, estimate the event's intrinsic toddler fit before personalization)
-}"""
+  "raw_rule_score": int (0-100, estimate the event's intrinsic child fit before personalization)
+}}"""
 
 INDOOR_TERMS = ("indoor", "library", "museum", "studio", "classroom", "gym")
 OUTDOOR_TERMS = ("outdoor", "park", "trail", "garden", "splash", "farm")
@@ -105,7 +120,8 @@ class RuleEvaluation:
 
 
 class EventTagger:
-    def __init__(self) -> None:
+    def __init__(self, profile: InterestProfile | None = None) -> None:
+        self.profile = profile or InterestProfile()
         self._use_llm = bool(settings.openai_api_key)
         self._concurrency = max(1, settings.tagger_concurrency)
         if self._use_llm:
@@ -123,6 +139,29 @@ class EventTagger:
         if not self._use_llm:
             return self._heuristic_tag(event)
         return await self._llm_tag(event)
+
+    def _system_prompt(self) -> str:
+        profile = self.profile
+        constraints = profile.constraints
+        return SYSTEM_PROMPT_TEMPLATE.format(
+            age_years=profile.child_age_years,
+            age_months=profile.child_age_months,
+            temperament=profile.temperament or "not provided",
+            loves=", ".join(profile.loves) or "not provided",
+            likes=", ".join(profile.likes) or "not provided",
+            dislikes=", ".join(profile.dislikes) or "not provided",
+            favorite_categories=", ".join(profile.favorite_categories) or "none specified",
+            avoid_categories=", ".join(profile.avoid_categories) or "none specified",
+            sensory_notes=profile.sensory_notes or "none provided",
+            accessibility_needs=profile.accessibility_needs or "none provided",
+            notes_for_recommendations=profile.notes_for_recommendations or "none provided",
+            home_city=constraints.home_city or "not provided",
+            preferred_cities=", ".join(constraints.preferred_cities) or "none specified",
+            max_drive_time_minutes=constraints.max_drive_time_minutes,
+            nap_time=constraints.nap_time,
+            bedtime=constraints.bedtime,
+            budget_per_event=constraints.budget_per_event,
+        )
 
     def _event_text(self, event: Event) -> str:
         return " ".join(
@@ -377,7 +416,7 @@ class EventTagger:
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": self._system_prompt()},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,

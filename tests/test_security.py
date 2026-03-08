@@ -140,8 +140,53 @@ def test_signup_rejects_missing_csrf(client):
             "display_name": "New Parent",
             "password": "Password123",
             "confirm_password": "Password123",
+            "home_city": "Lafayette",
+            "child_name": "Em",
+            "temperament": "curious",
         },
     )
 
     assert response.status_code == 403
     assert "Security check failed" in response.headers.get("hx-trigger", "")
+
+
+def test_signup_creates_onboarded_user_and_predefined_sources(client):
+    page = client.get("/signup")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(
+        "/signup",
+        data={
+            "csrf_token": csrf_token,
+            "email": "new@example.com",
+            "display_name": "New Parent",
+            "password": "Password123",
+            "confirm_password": "Password123",
+            "home_city": "Baton Rouge",
+            "preferred_cities": "Baton Rouge, Lafayette",
+            "child_name": "Em",
+            "temperament": "curious but sensitive to noise",
+            "child_age_years": "3",
+            "child_age_months": "6",
+            "loves": "animals, music",
+            "likes": "story_time",
+            "dislikes": "loud_crowds",
+            "favorite_categories": "animals, play",
+            "avoid_categories": "sports",
+            "nap_time": "13:00-15:00",
+            "bedtime": "19:30",
+            "budget": "25",
+            "max_drive": "35",
+            "predefined_sources": ["baton-rouge-brec", "lafayette-library"],
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    user = client.app.state.db
+    created = __import__("asyncio").run(user.get_user_by_email("new@example.com"))
+    assert created is not None
+    assert created.onboarding_complete is True
+    assert created.home_city == "Baton Rouge"
+    sources = __import__("asyncio").run(user.get_user_sources(created.id))
+    assert len(sources) == 2

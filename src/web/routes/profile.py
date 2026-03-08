@@ -5,7 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from src.db.models import Constraints, InterestProfile
+from src.onboarding import (
+    build_interest_profile_from_form,
+    normalize_city_list,
+    validate_onboarding_form,
+)
 from src.web.auth import get_current_user, hash_password, validate_password, verify_password
 from src.web.common import (
     change_theme,
@@ -33,52 +37,38 @@ async def profile_page(request: Request):
     )
 
 
-@router.post("/api/profile/location", response_class=HTMLResponse)
-async def api_update_location(request: Request):
+@router.post("/api/profile/onboarding", response_class=HTMLResponse)
+async def api_update_onboarding(request: Request):
     db = get_db(request)
     user, form, denied = await require_login_and_csrf(request)
     if denied:
         return denied
     assert user is not None and form is not None
-    home_city = str(form.get("home_city", "Lafayette")).strip()
-    pref_raw = str(form.get("preferred_cities", "")).strip()
-    preferred = [city.strip() for city in pref_raw.split(",") if city.strip()]
-    if not preferred:
-        preferred = [home_city]
-    await db.update_user(user.id, home_city=home_city, preferred_cities=preferred)
-    return toast("Location updated")
 
+    errors = validate_onboarding_form(form)
+    if errors:
+        return toast(errors[0], "error")
 
-@router.post("/api/profile/preferences", response_class=HTMLResponse)
-async def api_update_preferences(request: Request):
-    db = get_db(request)
-    user, form, denied = await require_login_and_csrf(request)
-    if denied:
-        return denied
-    assert user is not None and form is not None
-    loves = [item.strip() for item in str(form.get("loves", "")).split(",") if item.strip()]
-    likes = [item.strip() for item in str(form.get("likes", "")).split(",") if item.strip()]
-    dislikes = [item.strip() for item in str(form.get("dislikes", "")).split(",") if item.strip()]
-    nap_time = str(form.get("nap_time", "13:00-15:00")).strip()
-    bedtime = str(form.get("bedtime", "19:30")).strip()
-    budget = float(str(form.get("budget", "30.0")))
-    max_drive = int(str(form.get("max_drive", "45")))
-
-    profile = InterestProfile(
-        loves=loves or user.interest_profile.loves,
-        likes=likes or user.interest_profile.likes,
-        dislikes=dislikes or user.interest_profile.dislikes,
-        constraints=Constraints(
-            max_drive_time_minutes=max_drive,
-            preferred_cities=user.preferred_cities,
-            home_city=user.home_city,
-            nap_time=nap_time,
-            bedtime=bedtime,
-            budget_per_event=budget,
-        ),
+    home_city = str(form.get("home_city", "")).strip()
+    preferred_cities = normalize_city_list(
+        str(form.get("preferred_cities", "")).strip(),
+        fallback_home_city=home_city,
     )
-    await db.update_user(user.id, interest_profile=profile)
-    return toast("Preferences updated")
+    child_name = str(form.get("child_name", "")).strip()
+    profile = build_interest_profile_from_form(
+        form,
+        home_city=home_city,
+        preferred_cities=preferred_cities,
+    )
+    await db.update_user(
+        user.id,
+        home_city=home_city,
+        preferred_cities=preferred_cities,
+        child_name=child_name,
+        interest_profile=profile,
+        onboarding_complete=True,
+    )
+    return toast("Child profile updated")
 
 
 @router.post("/api/profile/theme", response_class=HTMLResponse)

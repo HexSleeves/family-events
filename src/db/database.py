@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS sources (
     name            TEXT NOT NULL,
     url             TEXT NOT NULL UNIQUE,
     domain          TEXT NOT NULL,
+    city            TEXT NOT NULL DEFAULT '',
+    category        TEXT NOT NULL DEFAULT 'custom',
+    user_id         TEXT,
     builtin         INTEGER NOT NULL DEFAULT 0,
     recipe_json     TEXT,
     enabled         INTEGER NOT NULL DEFAULT 1,
@@ -73,13 +76,14 @@ CREATE TABLE IF NOT EXISTS users (
     email                 TEXT NOT NULL UNIQUE,
     display_name          TEXT NOT NULL,
     password_hash         TEXT NOT NULL,
-    home_city             TEXT NOT NULL DEFAULT 'Lafayette',
-    preferred_cities      TEXT NOT NULL DEFAULT '["Lafayette", "Baton Rouge"]',
+    home_city             TEXT NOT NULL DEFAULT '',
+    preferred_cities      TEXT NOT NULL DEFAULT '[]',
     theme                 TEXT NOT NULL DEFAULT 'auto',
     notification_channels TEXT NOT NULL DEFAULT '["console"]',
     email_to              TEXT NOT NULL DEFAULT '',
     sms_to                TEXT NOT NULL DEFAULT '',
     child_name            TEXT NOT NULL DEFAULT 'Your Little One',
+    onboarding_complete   INTEGER NOT NULL DEFAULT 0,
     interest_profile      TEXT NOT NULL DEFAULT '{}',
     created_at            TEXT NOT NULL,
     updated_at            TEXT NOT NULL
@@ -143,6 +147,7 @@ def _row_to_user(row: aiosqlite.Row) -> User:
     d["preferred_cities"] = json.loads(str(d["preferred_cities"]))
     d["notification_channels"] = json.loads(str(d["notification_channels"]))
     d["sms_to"] = str(d.get("sms_to") or "")
+    d["onboarding_complete"] = bool(d.get("onboarding_complete", 0))
     raw_profile = json.loads(str(d["interest_profile"])) if d["interest_profile"] else {}
     d["interest_profile"] = (
         InterestProfile.model_validate(raw_profile) if raw_profile else InterestProfile()
@@ -157,6 +162,8 @@ def _row_to_source(row: aiosqlite.Row) -> Source:
     d = dict(row)
     d["builtin"] = bool(d["builtin"])
     d["enabled"] = bool(d["enabled"])
+    d["city"] = str(d.get("city") or "")
+    d["category"] = str(d.get("category") or "custom")
     d["last_scraped_at"] = (
         datetime.fromisoformat(str(d["last_scraped_at"])) if d["last_scraped_at"] else None
     )
@@ -252,9 +259,12 @@ class Database:
         # Migrations for existing databases
         for migration in [
             "ALTER TABLE sources ADD COLUMN user_id TEXT",
+            "ALTER TABLE sources ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE sources ADD COLUMN category TEXT NOT NULL DEFAULT 'custom'",
             "ALTER TABLE users ADD COLUMN email_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN sms_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN child_name TEXT NOT NULL DEFAULT 'Your Little One'",
+            "ALTER TABLE users ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE events ADD COLUMN tagged_at TEXT",
             "ALTER TABLE events ADD COLUMN score_breakdown TEXT",
         ]:
@@ -698,11 +708,11 @@ class Database:
         await self.db.execute(
             """
             INSERT INTO sources (
-                id, name, url, domain, user_id, builtin, recipe_json,
+                id, name, url, domain, city, category, user_id, builtin, recipe_json,
                 enabled, status, last_scraped_at, last_event_count,
                 last_error, created_at, updated_at
             ) VALUES (
-                :id, :name, :url, :domain, :user_id, :builtin, :recipe_json,
+                :id, :name, :url, :domain, :city, :category, :user_id, :builtin, :recipe_json,
                 :enabled, :status, :last_scraped_at, :last_event_count,
                 :last_error, :created_at, :updated_at
             )
@@ -712,6 +722,8 @@ class Database:
                 "name": source.name,
                 "url": source.url,
                 "domain": source.domain,
+                "city": source.city,
+                "category": source.category,
                 "user_id": source.user_id,
                 "builtin": int(source.builtin),
                 "recipe_json": source.recipe_json,
@@ -1004,12 +1016,12 @@ class Database:
             INSERT INTO users (
                 id, email, display_name, password_hash,
                 home_city, preferred_cities, theme,
-                notification_channels, email_to, sms_to, child_name,
+                notification_channels, email_to, sms_to, child_name, onboarding_complete,
                 interest_profile, created_at, updated_at
             ) VALUES (
                 :id, :email, :display_name, :password_hash,
                 :home_city, :preferred_cities, :theme,
-                :notification_channels, :email_to, :sms_to, :child_name,
+                :notification_channels, :email_to, :sms_to, :child_name, :onboarding_complete,
                 :interest_profile, :created_at, :updated_at
             )
             """,
@@ -1025,6 +1037,7 @@ class Database:
                 "email_to": user.email_to,
                 "sms_to": user.sms_to,
                 "child_name": user.child_name,
+                "onboarding_complete": int(user.onboarding_complete),
                 "interest_profile": json.dumps(user.interest_profile.model_dump()),
                 "created_at": user.created_at.isoformat(),
                 "updated_at": user.updated_at.isoformat(),
@@ -1058,6 +1071,7 @@ class Database:
             "email_to",
             "sms_to",
             "child_name",
+            "onboarding_complete",
             "interest_profile",
             "password_hash",
         }
@@ -1069,6 +1083,8 @@ class Database:
                 continue
             if key in ("preferred_cities", "notification_channels"):
                 val = json.dumps(val)
+            elif key == "onboarding_complete":
+                val = int(bool(val))
             elif key == "interest_profile":
                 val = json.dumps(val.model_dump() if hasattr(val, "model_dump") else val)
             sets.append(f"{key} = :{key}")
@@ -1086,11 +1102,20 @@ class Database:
     async def get_user_sources(self, user_id: str) -> list[Source]:
         """Get sources belonging to a specific user."""
         async with self.db.execute(
-            "SELECT * FROM sources WHERE user_id = :uid ORDER BY created_at DESC",
+            "SELECT * FROM sources WHERE user_id = :uid ORDER BY builtin DESC, city ASC, name ASC, created_at DESC",
             {"uid": user_id},
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_source(r) for r in rows]
+
+    async def get_user_source_by_url(self, user_id: str, url: str) -> Source | None:
+        """Get a source by URL scoped to a user."""
+        async with self.db.execute(
+            "SELECT * FROM sources WHERE user_id = :user_id AND url = :url",
+            {"user_id": user_id, "url": url},
+        ) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_source(row) if row else None
 
     # ------------------------------------------------------------------
     # Context manager support

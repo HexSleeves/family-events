@@ -11,6 +11,8 @@ from .eventbrite import EventbriteScraper
 from .lafayette import LafayetteScraper
 from .library import LibraryScraper
 
+BUILTIN_DOMAIN_MESSAGE = "We already have a predefined source for this site. Add it from the catalog instead."
+
 # Domain (sans www.) → built-in scraper class
 BUILTIN_DOMAINS: dict[str, type[BaseScraper]] = {
     "brec.org": BrecScraper,

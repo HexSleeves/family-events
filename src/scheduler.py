@@ -22,11 +22,11 @@ from src.tagger.llm import EventTagger
 from src.tagger.taxonomy import TAGGING_VERSION
 
 ALL_SCRAPERS = [
-    LafayetteScraper(),  # Lafayette-first: Moncus Park, Acadiana Arts, Science Museum
-    EventbriteScraper(),  # Both cities
-    AllEventsScraper(),  # Both cities
-    BrecScraper(),  # Baton Rouge
-    LibraryScraper(),  # Both cities (needs Playwright for full results)
+    LafayetteScraper(),
+    EventbriteScraper(),
+    AllEventsScraper(),
+    BrecScraper(),
+    LibraryScraper(),
 ]
 
 
