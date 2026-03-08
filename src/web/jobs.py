@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from src.config import settings
 from src.db.database import Database
 from src.db.models import Job
 
@@ -52,6 +53,7 @@ class JobRegistry:
                 self._active_by_id.pop(active_id, None)
 
             async with Database() as db:
+                await db.fail_stale_jobs(max_age_seconds=settings.background_job_timeout_seconds)
                 persisted = await db.get_active_job_by_key(job_key)
                 if persisted:
                     return persisted, False
@@ -78,7 +80,10 @@ class JobRegistry:
         async with Database() as db:
             await db.update_job(job_id, detail="Running…", started_at=started_at)
         try:
-            result = await runner()
+            result = await asyncio.wait_for(
+                runner(),
+                timeout=settings.background_job_timeout_seconds,
+            )
             async with Database() as db:
                 await db.update_job(
                     job_id,
@@ -87,6 +92,18 @@ class JobRegistry:
                     result_json=json.dumps(result),
                     finished_at=datetime.now(tz=UTC),
                     error="",
+                )
+        except TimeoutError:
+            async with Database() as db:
+                await db.update_job(
+                    job_id,
+                    state="failed",
+                    detail="Timed out",
+                    error=(
+                        "Job exceeded max runtime "
+                        f"({settings.background_job_timeout_seconds}s)"
+                    ),
+                    finished_at=datetime.now(tz=UTC),
                 )
         except Exception as exc:
             async with Database() as db:

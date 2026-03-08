@@ -68,6 +68,9 @@ _bulk_unattend_undo_store: dict[str, list[str]] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await cast(Database, app.state.db).connect()
+    await cast(Database, app.state.db).fail_stale_jobs(
+        max_age_seconds=settings.background_job_timeout_seconds
+    )
     yield
     await cast(Database, app.state.db).close()
 

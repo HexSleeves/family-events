@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from src.db.models import Event
 from src.tagger.llm import EventTagger
@@ -8,7 +9,7 @@ def _event(idx: int) -> Event:
     return Event(
         title=f"Event {idx}",
         description="Fun for families",
-        start_time=__import__("datetime").datetime(2026, 3, 8, 10, 0),
+        start_time=datetime(2026, 3, 8, 10, 0),
         end_time=None,
         source="test",
         source_url=f"https://example.com/{idx}",

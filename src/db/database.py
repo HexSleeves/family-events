@@ -930,6 +930,28 @@ class Database:
             rows = await cursor.fetchall()
             return [str(row["kind"]) for row in rows if row["kind"]]
 
+    async def fail_stale_jobs(self, *, max_age_seconds: int) -> int:
+        """Mark long-running jobs failed so stale records stop blocking new work."""
+        now = datetime.now(tz=UTC).isoformat()
+        cutoff = (datetime.now(tz=UTC) - timedelta(seconds=max_age_seconds)).isoformat()
+        async with self.db.execute(
+            """
+            UPDATE jobs
+            SET state = 'failed',
+                detail = 'Failed',
+                error = CASE
+                    WHEN error != '' THEN error
+                    ELSE 'Job exceeded max runtime or worker stopped unexpectedly'
+                END,
+                finished_at = :now
+            WHERE state = 'running'
+              AND COALESCE(started_at, created_at) < :cutoff
+            """,
+            {"now": now, "cutoff": cutoff},
+        ) as cursor:
+            await self.db.commit()
+            return cursor.rowcount or 0
+
     # ------------------------------------------------------------------
     # Users CRUD
     # ------------------------------------------------------------------

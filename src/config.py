@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = 20.0
     openai_max_retries: int = 1
     tagger_concurrency: int = 8
+    background_job_timeout_seconds: int = 3600
 
     # Weather
     weather_api_key: str = ""  # OpenWeatherMap
