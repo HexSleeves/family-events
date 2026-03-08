@@ -63,7 +63,8 @@
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="search" name="q"
+            <input type="search" name="q" data-global-event-search
+              value="{{ request.query_params.get('q', '') }}"
               aria-label="Search events by title, place, or city"
               placeholder="Search events by title, place, or city..."
               class="w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
@@ -190,7 +191,8 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <input type="search"
+          <input type="search" name="q" data-global-event-search
+            value="{{ request.query_params.get('q', '') }}"
             aria-label="Search events"
             placeholder="Search events..."
             class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
@@ -505,3 +507,37 @@
 </body>
 
 </html>
+
+<script>
+  (function () {
+    function syncGlobalSearchInputs() {
+      var value = new URLSearchParams(window.location.search).get('q') || '';
+      document.querySelectorAll('[data-global-event-search]').forEach(function (input) {
+        if (document.activeElement !== input) input.value = value;
+      });
+    }
+
+    function submitGlobalSearch(event) {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      var value = event.currentTarget.value || '';
+      window.location.href = '/events?q=' + encodeURIComponent(value);
+    }
+
+    document.addEventListener('keydown', function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (!target.matches('[data-global-event-search]')) return;
+      submitGlobalSearch(event);
+    });
+
+    document.addEventListener('DOMContentLoaded', syncGlobalSearchInputs);
+    document.body.addEventListener('htmx:afterSwap', function () {
+      syncGlobalSearchInputs();
+      var pageSearch = document.querySelector('#events-form input[name="q"]');
+      var value = new URLSearchParams(window.location.search).get('q') || '';
+      if (pageSearch && document.activeElement !== pageSearch) pageSearch.value = value;
+    });
+    window.addEventListener('popstate', syncGlobalSearchInputs);
+  })();
+</script>

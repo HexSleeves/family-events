@@ -59,3 +59,15 @@ def test_events_page_hx_global_search_returns_full_page(client) -> None:
     assert 'id="main-content"' in response.text
     assert "Browse Events" in response.text
     assert "Tennis Clinic" in response.text
+
+
+def test_events_page_renders_query_in_global_search_inputs(client) -> None:
+    import asyncio
+
+    asyncio.run(_create_event(client, title="Tennis Clinic"))
+
+    response = client.get("/events", params={"q": "Tennis"})
+
+    assert response.status_code == 200
+    assert response.text.count('data-global-event-search') >= 2
+    assert response.text.count('value="Tennis"') >= 2
