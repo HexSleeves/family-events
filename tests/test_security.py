@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import socket
 
+from src.db.models import Source
 from src.scrapers.analyzer import validate_public_http_url
+from src.scrapers.router import extract_domain
 
 
 def extract_csrf_token(html: str) -> str:
@@ -190,3 +193,53 @@ def test_signup_creates_onboarded_user_and_predefined_sources(client):
     assert created.home_city == "Baton Rouge"
     sources = __import__("asyncio").run(user.get_user_sources(created.id))
     assert len(sources) == 2
+
+
+def test_toggle_source_returns_refresh_trigger(client, create_user):
+    user = create_user(email="toggle@example.com")
+
+    source = Source(
+        name="Example",
+        url="https://example.com/events",
+        domain=extract_domain("https://example.com/events"),
+        user_id=user.id,
+        status="active",
+    )
+    asyncio.run(client.app.state.db.create_source(source))
+
+    login(client, email=user.email)
+    page = client.get("/sources")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(f"/api/sources/{source.id}/toggle", data={"csrf_token": csrf_token})
+
+    assert response.status_code == 200
+    assert "Disabled" in response.text
+    assert "Enable" in response.text
+    updated = asyncio.run(client.app.state.db.get_source(source.id))
+    assert updated is not None
+    assert updated.enabled is False
+
+
+def test_delete_source_returns_refresh_trigger(client, create_user):
+    user = create_user(email="delete@example.com")
+
+    source = Source(
+        name="Example",
+        url="https://example.com/events",
+        domain=extract_domain("https://example.com/events"),
+        user_id=user.id,
+        status="active",
+    )
+    asyncio.run(client.app.state.db.create_source(source))
+
+    login(client, email=user.email)
+    page = client.get("/sources")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.request("DELETE", f"/api/sources/{source.id}", data={"csrf_token": csrf_token})
+
+    assert response.status_code == 200
+    assert response.text == ""
+    deleted = asyncio.run(client.app.state.db.get_source(source.id))
+    assert deleted is None

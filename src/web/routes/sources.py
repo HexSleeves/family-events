@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -17,7 +18,7 @@ from src.predefined_sources import (
 from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import BUILTIN_DOMAIN_MESSAGE, extract_domain, is_builtin_domain
-from src.web.auth import get_current_user
+from src.web.auth import ensure_csrf_token, get_current_user
 from src.web.common import (
     check_rate_limit,
     ctx,
@@ -30,6 +31,14 @@ from src.web.common import (
 from src.web.jobs_ui import render_job_cards, start_background_job
 
 router = APIRouter()
+
+
+def _render_source_card(request: Request, source: Source) -> str:
+    return get_templates(request).get_template("partials/_source_card.html").render(
+        request=request,
+        source=source,
+        csrf_token=ensure_csrf_token(request),
+    )
 
 
 @router.get("/sources", response_class=HTMLResponse)
@@ -304,10 +313,19 @@ async def api_toggle_source(request: Request, source_id: str):
         return HTMLResponse("Forbidden", status_code=403)
 
     enabled = await db.toggle_source(source_id)
+    updated = await db.get_source(source_id)
+    if updated is None:
+        raise ValueError("Source disappeared after toggle")
     state = "enabled" if enabled else "disabled"
-    return toast(
-        f"Source {state}",
-        body="<script>setTimeout(()=>location.reload(),500)</script>",
+    return HTMLResponse(
+        content=_render_source_card(request, updated),
+        headers={
+            "HX-Trigger": json.dumps(
+                {
+                    "showToast": {"message": f"Source {state}", "variant": "success"},
+                }
+            )
+        },
     )
 
 
@@ -328,9 +346,15 @@ async def api_delete_source(request: Request, source_id: str):
         return HTMLResponse("Forbidden", status_code=403)
 
     await db.delete_source(source_id)
-    return toast(
-        "Source deleted",
-        body='<script>setTimeout(()=>location.href="/sources",500)</script>',
+    return HTMLResponse(
+        content="",
+        headers={
+            "HX-Trigger": json.dumps(
+                {
+                    "showToast": {"message": "Source deleted", "variant": "success"},
+                }
+            )
+        },
     )
 
 
