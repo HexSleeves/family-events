@@ -510,15 +510,14 @@ async def weekend_page(request: Request):
 
     weather = await WeatherService().get_weekend_forecast(saturday, sunday)
     events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())
-    if not events:
-        events = await db.get_recent_events(days=14)
 
     tagged = [event for event in events if event.tags]
+    untagged_count = len(events) - len(tagged)
     user = await get_current_user(request, db)
     profile = user.interest_profile if user else InterestProfile()
     child_name = user.child_name if user else "Your Little One"
     ranked = rank_events(tagged, profile, weather)
-    message = format_console_message(ranked, weather, child_name)
+    message = format_console_message(ranked, weather, child_name) if ranked else ""
     weather_summary, weather_tone, weather_tips = summarize_weekend_recommendation(weather)
 
     return templates.TemplateResponse(
@@ -530,6 +529,8 @@ async def weekend_page(request: Request):
             sunday=sunday,
             weather=weather,
             ranked=ranked,
+            weekend_event_count=len(events),
+            untagged_weekend_event_count=untagged_count,
             message=message,
             weather_summary=weather_summary,
             weather_tone=weather_tone,

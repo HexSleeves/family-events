@@ -300,3 +300,11 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
     updated = asyncio.run(client.app.state.db.get_event(event.id))
     assert updated is not None
     assert updated.attended is False
+
+
+def test_weekend_page_does_not_fall_back_to_recent_events_when_weekend_empty(client):
+    response = client.get("/weekend")
+
+    assert response.status_code == 200
+    assert "No weekend events yet" in response.text or "still need tagging" in response.text
+    assert "Top 3 Picks for Your Weekend" not in response.text
