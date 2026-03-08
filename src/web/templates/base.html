@@ -1,553 +1,772 @@
 <!doctype html>
-<html lang="en" class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}">
+<html
+  lang="en"
+  class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}"
+>
+  <head>
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Family Events — Discover toddler-friendly events in Lafayette & Baton Rouge, Louisiana. Browse, plan, and attend curated family activities."
+    />
+    <title>{% block title %}Family Events{% endblock %} — Family Events</title>
 
-<head>
-  <meta name="csrf-token" content="{{ csrf_token }}" />
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Family Events — Discover toddler-friendly events in Lafayette & Baton Rouge, Louisiana. Browse, plan, and attend curated family activities." />
-  <title>{% block title %}Family Events{% endblock %} — Family Events</title>
+    {# ── Font preconnects for performance ── #}
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  {# ── Font preconnects for performance ── #}
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 
-  <link rel="stylesheet" href="/static/styles.css" />
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-
-  <script>
-    // Apply theme immediately to prevent FOUC
-    (function () {
-      var theme = '{{ current_user.theme if current_user else "auto" }}';
-      if (theme === 'auto') {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
+    <script>
+      // Apply theme immediately to prevent FOUC
+      (function () {
+        var theme = '{{ current_user.theme if current_user else "auto" }}';
+        if (theme === "auto") {
+          if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } else if (theme === "dark") {
+          document.documentElement.classList.add("dark");
         } else {
-          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.remove("dark");
         }
-      } else if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-      document.documentElement.setAttribute('data-theme', theme);
-    })();
-  </script>
-</head>
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+  </head>
 
-<body hx-indicator="#global-progress" class="min-h-screen bg-[var(--color-surface-secondary)] text-[var(--color-body)]">
-  {# ── Progress bar ── #}
-  <div id="global-progress" role="progressbar" aria-label="Page loading">
-    <div class="bar"></div>
-  </div>
+  <body
+    hx-indicator="#global-progress"
+    class="min-h-screen bg-[var(--color-surface-secondary)] text-[var(--color-body)]"
+  >
+    {# ── Progress bar ── #}
+    <div id="global-progress" role="progressbar" aria-label="Page loading">
+      <div class="bar"></div>
+    </div>
 
-  {# ── Skip links ── #}
-  <a href="#main-content"
-    class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[10000] focus:rounded-md focus:bg-[var(--color-heading)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--color-surface)]">
-    Skip to content
-  </a>
-  <a href="#main-nav"
-    class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-14 focus:z-[10000] focus:rounded-md focus:bg-[var(--color-heading)] focus:px-3 focus:py-2 focus:text-sm focus:text-[var(--color-surface)]">
-    Skip to navigation
-  </a>
-
-  {# ═══ HEADER ═══ #}
-  <header role="banner" class="nav-bar sticky top-0 z-50 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-edge)] shadow-[var(--shadow-xs)]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
-
-        {# Logo #}
-        <a href="/" class="flex items-center gap-2 shrink-0 rounded-lg px-1 py-0.5 hover:bg-[var(--color-surface-tertiary)] transition-colors">
-          <span class="text-2xl" aria-hidden="true">🎈</span>
-          <div class="leading-tight">
-            <span class="block font-bold text-lg text-[var(--color-heading)]">Family Events</span>
-            <span class="hidden lg:block text-[11px] text-[var(--color-faint)]">Toddler-friendly plans, faster</span>
-          </div>
-        </a>
-
-        {# Desktop Search #}
-        <div class="hidden md:flex flex-1 max-w-xl mx-6 lg:mx-8">
-          <div class="relative w-full">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
-              stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input type="search" name="q"
-              aria-label="Search events by title, place, or city"
-              placeholder="Search events by title, place, or city..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-              hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
-              hx-select="#main-content" hx-swap="innerHTML" />
-          </div>
-        </div>
-
-        {# Right side actions #}
-        <div class="flex items-center gap-2">
-
-          {# Weekend CTA — desktop, accent teal to differentiate from brand coral #}
-          <a href="/weekend"
-            class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 transition-colors touch-target">
-            <span aria-hidden="true">🗓️</span> This Weekend
+    {# ═══ HEADER ═══ #}
+    <header
+      role="banner"
+      class="nav-bar sticky top-0 z-50 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-edge)] shadow-[var(--shadow-xs)]"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          {# Logo #}
+          <a
+            href="/"
+            class="flex items-center gap-2 shrink-0 rounded-lg px-1 py-0.5 hover:bg-[var(--color-surface-tertiary)] transition-colors"
+          >
+            <span class="text-2xl" aria-hidden="true">🎈</span>
+            <div class="leading-tight">
+              <span class="block font-bold text-lg text-[var(--color-heading)]"
+                >Family Events</span
+              >
+              <span
+                class="hidden lg:block text-[11px] text-[var(--color-faint)]"
+                >Toddler-friendly plans, faster</span
+              >
+            </div>
           </a>
 
-          {# Theme toggle #}
-          {% if current_user %}
-          <button id="theme-toggle"
-            class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
-            aria-label="Toggle theme"
-            aria-pressed="{{ 'true' if current_user.theme == 'dark' else 'false' }}"
-            onclick="quickToggleTheme()">
-            {# Moon icon — shown in light mode #}
-            <svg class="w-5 h-5 text-[var(--color-muted)] dark:hidden" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-            {# Sun icon — shown in dark mode #}
-            <svg class="w-5 h-5 text-[var(--color-muted)] hidden dark:block" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </button>
-          <span class="sr-only" aria-live="polite" id="theme-status"></span>
-          {% endif %}
-
-          {# User menu #}
-          {% if current_user %}
-          <div class="relative" id="user-menu">
-            <button id="user-menu-button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-controls="user-dropdown"
-              class="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target">
-              <div class="w-8 h-8 rounded-full bg-[var(--color-brand)] flex items-center justify-center">
-                <span class="text-sm font-medium text-white" aria-hidden="true">{{ current_user.display_name[:2]|upper }}</span>
-              </div>
-              <span class="hidden sm:block text-sm font-medium text-[var(--color-heading)]">{{ current_user.display_name }}</span>
-              <svg class="hidden sm:block w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor"
-                viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          {# Desktop Search #}
+          <div class="hidden md:flex flex-1 max-w-xl mx-6 lg:mx-8">
+            <div class="relative w-full">
+              <svg
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
-            </button>
-            <div id="user-dropdown"
-              role="menu"
-              aria-labelledby="user-menu-button"
-              class="hidden absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50 animate-scale-in">
-              <a href="/profile" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <span aria-hidden="true">⚙️</span> Settings
-              </a>
-              <a href="/sources" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <span aria-hidden="true">📡</span> Sources
-              </a>
-              <hr class="my-1 border-[var(--color-edge-subtle)]" role="separator" />
-              <form method="POST" action="/logout">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                <button type="submit" role="menuitem" tabindex="-1"
-                  class="block w-full text-left px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-                  <span aria-hidden="true">↩</span> Log Out
-                </button>
-              </form>
+              <input
+                type="search"
+                name="q"
+                aria-label="Search events by title, place, or city"
+                placeholder="Search events by title, place, or city..."
+                class="w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+                hx-get="/events"
+                hx-trigger="keyup changed delay:300ms"
+                hx-target="body"
+                hx-push-url="true"
+                hx-select="#main-content"
+                hx-swap="innerHTML"
+              />
             </div>
           </div>
-          {% else %}
-          <a href="/login"
-            class="text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors touch-target">
-            Log In
-          </a>
-          <a href="/signup"
-            class="px-4 py-2 rounded-lg bg-[var(--color-heading)] text-[var(--color-surface)] font-medium text-sm hover:opacity-90 transition-opacity touch-target">
-            Sign Up
-          </a>
-          {% endif %}
 
-          {# Mobile hamburger #}
-          <button id="menu-toggle"
-            class="md:hidden p-2 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
-            aria-label="Open navigation menu"
-            aria-expanded="false"
-            aria-controls="mobile-menu">
-            <svg class="w-5 h-5 text-[var(--color-heading)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+          {# Right side actions #}
+          <div class="flex items-center gap-2">
+            {# Weekend CTA — desktop, accent teal to differentiate from brand
+            coral #}
+            <a
+              href="/weekend"
+              class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 transition-colors touch-target"
+            >
+              <span aria-hidden="true">🗓️</span> This Weekend
+            </a>
 
-    {# Navigation tabs — desktop #}
-    <nav id="main-nav" aria-label="Main navigation" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
-      <div class="flex items-center gap-1 -mb-px">
-        {% set nav_items = [
-        ('/', 'Discover', 'discover', '🏠'),
-        ('/events', 'Browse', 'events', '📋'),
-        ('/calendar', 'Calendar', 'calendar', '🗓️'),
-        ('/events?attended=yes', 'Attended', 'attended', '✅'),
-        ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡')
-        ] %}
-        {% for url, label, key, icon in nav_items %}
-        <a href="{{ url }}"
-          {% if active_page == key %}aria-current="page"{% endif %}
-          class="nav-tab inline-flex items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-t-lg {% if active_page == key %}active{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-          <span aria-hidden="true">{{ icon }}</span>
-          <span>{{ label }}</span>
-        </a>
-        {% endfor %}
-      </div>
-    </nav>
-
-    {# Mobile nav menu #}
-    <div id="mobile-menu" role="navigation" aria-label="Mobile navigation"
-      class="hidden md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)] animate-slide-down">
-      <div class="px-4 py-3 space-y-1">
-
-        {# Mobile search #}
-        <div class="relative mb-3">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
-            stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input type="search"
-            aria-label="Search events"
-            placeholder="Search events..."
-            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-            hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
-            hx-select="#main-content" hx-swap="innerHTML" />
-        </div>
-
-        {% set mobile_nav = [
-        ('/', 'Discover', 'discover', '🏠'),
-        ('/events', 'Browse All', 'events', '📋'),
-        ('/calendar', 'Calendar', 'calendar', '🗓️'),
-        ('/events?attended=yes', 'Attended', 'attended', '✅'),
-        ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡')
-        ] %}
-        {% for url, label, key, icon in mobile_nav %}
-        <a href="{{ url }}"
-          {% if active_page == key %}aria-current="page"{% endif %}
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == key %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">
-          <span aria-hidden="true">{{ icon }}</span> {{ label }}
-        </a>
-        {% endfor %}
-
-        {% if current_user %}
-        <hr class="my-2 border-[var(--color-edge-subtle)]" />
-        <a href="/profile"
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-          <span aria-hidden="true">⚙️</span> Settings
-        </a>
-        <form method="POST" action="/logout">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-          <button type="submit"
-            class="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-            <span aria-hidden="true">↩</span> Log Out
-          </button>
-        </form>
-        {% endif %}
-      </div>
-    </div>
-  </header>
-
-  {# ═══ MAIN CONTENT ═══ #}
-  <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-    {% block content %}{% endblock %}
-  </main>
-
-  {# ═══ FOOTER ═══ #}
-  <footer role="contentinfo" class="border-t border-[var(--color-edge-subtle)] mt-16 bg-[var(--color-surface)]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-
-        {# Brand column #}
-        <div>
-          <div class="flex items-center gap-2 mb-3">
-            <span aria-hidden="true" class="text-xl">🎈</span>
-            <span class="font-bold text-[var(--color-heading)]">Family Events</span>
+            {# Theme toggle #} {% if current_user %}
+            <button
+              id="theme-toggle"
+              class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
+              aria-label="Toggle theme"
+              aria-pressed="{{ 'true' if current_user.theme == 'dark' else 'false' }}"
+              onclick="quickToggleTheme()"
+            >
+              {# Moon icon — shown in light mode #}
+              <svg
+                class="w-5 h-5 text-[var(--color-muted)] dark:hidden"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                />
+              </svg>
+              {# Sun icon — shown in dark mode #}
+              <svg
+                class="w-5 h-5 text-[var(--color-muted)] hidden dark:block"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                />
+              </svg>
+            </button>
+            <span class="sr-only" aria-live="polite" id="theme-status"></span>
+            {% endif %} {# User menu #} {% if current_user %}
+            <div class="relative" id="user-menu">
+              <button
+                id="user-menu-button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="user-dropdown"
+                class="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
+              >
+                <div
+                  class="w-8 h-8 rounded-full bg-[var(--color-brand)] flex items-center justify-center"
+                >
+                  <span
+                    class="text-sm font-medium text-white"
+                    aria-hidden="true"
+                    >{{ current_user.display_name[:2]|upper }}</span
+                  >
+                </div>
+                <span
+                  class="hidden sm:block text-sm font-medium text-[var(--color-heading)]"
+                  >{{ current_user.display_name }}</span
+                >
+                <svg
+                  class="hidden sm:block w-4 h-4 text-[var(--color-faint)]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+              <div
+                id="user-dropdown"
+                role="menu"
+                aria-labelledby="user-menu-button"
+                class="hidden absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50 animate-scale-in"
+              >
+                <a
+                  href="/profile"
+                  role="menuitem"
+                  tabindex="-1"
+                  class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors"
+                >
+                  <span aria-hidden="true">⚙️</span> Settings
+                </a>
+                <a
+                  href="/sources"
+                  role="menuitem"
+                  tabindex="-1"
+                  class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors"
+                >
+                  <span aria-hidden="true">📡</span> Sources
+                </a>
+                <hr
+                  class="my-1 border-[var(--color-edge-subtle)]"
+                  role="separator"
+                />
+                <form method="POST" action="/logout">
+                  <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                  />
+                  <button
+                    type="submit"
+                    role="menuitem"
+                    tabindex="-1"
+                    class="block w-full text-left px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors"
+                  >
+                    <span aria-hidden="true">↩</span> Log Out
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <a
+              href="/login"
+              class="text-sm font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors touch-target"
+            >
+              Log In
+            </a>
+            <a
+              href="/signup"
+              class="px-4 py-2 rounded-lg bg-[var(--color-heading)] text-[var(--color-surface)] font-medium text-sm hover:opacity-90 transition-opacity touch-target"
+            >
+              Sign Up
+            </a>
+            {% endif %} {# Mobile hamburger #}
+            <button
+              id="menu-toggle"
+              class="md:hidden p-2 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
+              aria-label="Open navigation menu"
+              aria-expanded="false"
+              aria-controls="mobile-menu"
+            >
+              <svg
+                class="w-5 h-5 text-[var(--color-heading)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
           </div>
-          <p class="text-sm text-[var(--color-muted)] leading-relaxed">
-            Curated toddler-friendly events for your little one in Lafayette &amp; Baton Rouge, Louisiana.
+        </div>
+      </div>
+
+      {# Navigation tabs — desktop #}
+      <nav
+        id="main-nav"
+        aria-label="Main navigation"
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block"
+      >
+        <div class="flex items-center gap-1 -mb-px">
+          {% set nav_items = [ ('/', 'Discover', 'discover', '🏠'), ('/events',
+          'Browse', 'events', '📋'), ('/calendar', 'Calendar', 'calendar',
+          '🗓️'), ('/events?attended=yes', 'Attended', 'attended', '✅'),
+          ('/weekend', 'This Weekend', 'weekend', '⭐'), ('/sources', 'Sources',
+          'sources', '📡') ] %} {% for url, label, key, icon in nav_items %}
+          <a
+            href="{{ url }}"
+            {% if active_page == key %}aria-current="page"{% endif %}
+            class="nav-tab inline-flex items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-t-lg {% if active_page == key %}active{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}"
+          >
+            <span aria-hidden="true">{{ icon }}</span>
+            <span>{{ label }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </nav>
+
+      {# Mobile nav menu #}
+      <div
+        id="mobile-menu"
+        role="navigation"
+        aria-label="Mobile navigation"
+        class="hidden md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)] animate-slide-down"
+      >
+        <div class="px-4 py-3 space-y-1">
+          {# Mobile search #}
+          <div class="relative mb-3">
+            <svg
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="search"
+              aria-label="Search events"
+              placeholder="Search events..."
+              class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+              hx-get="/events"
+              hx-trigger="keyup changed delay:300ms"
+              hx-target="body"
+              hx-push-url="true"
+              hx-select="#main-content"
+              hx-swap="innerHTML"
+            />
+          </div>
+
+          {% set mobile_nav = [ ('/', 'Discover', 'discover', '🏠'), ('/events',
+          'Browse All', 'events', '📋'), ('/calendar', 'Calendar', 'calendar',
+          '🗓️'), ('/events?attended=yes', 'Attended', 'attended', '✅'),
+          ('/weekend', 'This Weekend', 'weekend', '⭐'), ('/sources', 'Sources',
+          'sources', '📡') ] %} {% for url, label, key, icon in mobile_nav %}
+          <a
+            href="{{ url }}"
+            {% if active_page == key %}aria-current="page"{% endif %}
+            class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == key %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors"
+          >
+            <span aria-hidden="true">{{ icon }}</span> {{ label }}
+          </a>
+          {% endfor %} {% if current_user %}
+          <hr class="my-2 border-[var(--color-edge-subtle)]" />
+          <a
+            href="/profile"
+            class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors"
+          >
+            <span aria-hidden="true">⚙️</span> Settings
+          </a>
+          <form method="POST" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+            <button
+              type="submit"
+              class="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors"
+            >
+              <span aria-hidden="true">↩</span> Log Out
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    {# ═══ MAIN CONTENT ═══ #}
+    <main
+      id="main-content"
+      role="main"
+      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+    >
+      {% block content %}{% endblock %}
+    </main>
+
+    {# ═══ FOOTER ═══ #}
+    <footer
+      role="contentinfo"
+      class="border-t border-[var(--color-edge-subtle)] mt-16 bg-[var(--color-surface)]"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+          {# Brand column #}
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span aria-hidden="true" class="text-xl">🎈</span>
+              <span class="font-bold text-[var(--color-heading)]"
+                >Family Events</span
+              >
+            </div>
+            <p class="text-sm text-[var(--color-muted)] leading-relaxed">
+              Curated toddler-friendly events for your little one in Lafayette
+              &amp; Baton Rouge, Louisiana.
+            </p>
+          </div>
+
+          {# Quick links column #}
+          <nav aria-label="Footer navigation">
+            <h2 class="text-sm font-semibold text-[var(--color-heading)] mb-3">
+              Explore
+            </h2>
+            <ul class="space-y-2">
+              <li>
+                <a
+                  href="/"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >Discover</a
+                >
+              </li>
+              <li>
+                <a
+                  href="/events"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >Browse Events</a
+                >
+              </li>
+              <li>
+                <a
+                  href="/calendar"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >Calendar</a
+                >
+              </li>
+              <li>
+                <a
+                  href="/weekend"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >This Weekend</a
+                >
+              </li>
+            </ul>
+          </nav>
+
+          {# Info column #}
+          <div>
+            <h2 class="text-sm font-semibold text-[var(--color-heading)] mb-3">
+              About
+            </h2>
+            <ul class="space-y-2">
+              <li>
+                <a
+                  href="/sources"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >Event Sources</a
+                >
+              </li>
+              {% if current_user %}
+              <li>
+                <a
+                  href="/profile"
+                  class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors"
+                  >Settings</a
+                >
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+
+        <hr class="my-6 border-[var(--color-edge-subtle)]" />
+
+        <div
+          class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-faint)]"
+        >
+          <p>
+            &copy; {{ now().year if now is defined else '2025' }} Family Events.
+            Built with FastAPI, HTMX &amp; Tailwind.
           </p>
-        </div>
-
-        {# Quick links column #}
-        <nav aria-label="Footer navigation">
-          <h2 class="text-sm font-semibold text-[var(--color-heading)] mb-3">Explore</h2>
-          <ul class="space-y-2">
-            <li><a href="/" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Discover</a></li>
-            <li><a href="/events" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Browse Events</a></li>
-            <li><a href="/calendar" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Calendar</a></li>
-            <li><a href="/weekend" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">This Weekend</a></li>
-          </ul>
-        </nav>
-
-        {# Info column #}
-        <div>
-          <h2 class="text-sm font-semibold text-[var(--color-heading)] mb-3">About</h2>
-          <ul class="space-y-2">
-            <li><a href="/sources" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Event Sources</a></li>
-            {% if current_user %}
-            <li><a href="/profile" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Settings</a></li>
-            {% endif %}
-          </ul>
+          <p>Lafayette &amp; Baton Rouge, Louisiana</p>
         </div>
       </div>
+    </footer>
 
-      <hr class="my-6 border-[var(--color-edge-subtle)]" />
+    {# ═══ TOAST CONTAINER ═══ #}
+    <div
+      id="toast-container"
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
+      class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 md:top-20 md:right-6 max-sm:top-auto max-sm:bottom-4 max-sm:right-4 max-sm:left-4"
+    ></div>
 
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-faint)]">
-        <p>&copy; {{ now().year if now is defined else '2025' }} Family Events. Built with FastAPI, HTMX &amp; Tailwind.</p>
-        <p>Lafayette &amp; Baton Rouge, Louisiana</p>
-      </div>
-    </div>
-  </footer>
+    {# ═══ SCRIPTS ═══ #}
+    <script>
+      // ── Mobile menu toggle ──
+      (function () {
+        var toggle = document.getElementById("menu-toggle");
+        var menu = document.getElementById("mobile-menu");
+        if (toggle && menu) {
+          toggle.addEventListener("click", function () {
+            var isHidden = menu.classList.toggle("hidden");
+            var expanded = !isHidden;
+            toggle.setAttribute("aria-expanded", String(expanded));
+            toggle.setAttribute(
+              "aria-label",
+              expanded ? "Close navigation menu" : "Open navigation menu",
+            );
+          });
+        }
+      })();
 
-  {# ═══ TOAST CONTAINER ═══ #}
-  <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"
-    class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 md:top-20 md:right-6 max-sm:top-auto max-sm:bottom-4 max-sm:right-4 max-sm:left-4">
-  </div>
+      // ── User dropdown with full keyboard support ──
+      (function () {
+        var menuContainer = document.getElementById("user-menu");
+        var menuButton = document.getElementById("user-menu-button");
+        var dropdown = document.getElementById("user-dropdown");
+        if (!menuContainer || !menuButton || !dropdown) return;
 
-  {# ═══ SCRIPTS ═══ #}
-  <script>
-    // ── Mobile menu toggle ──
-    (function () {
-      var toggle = document.getElementById('menu-toggle');
-      var menu = document.getElementById('mobile-menu');
-      if (toggle && menu) {
-        toggle.addEventListener('click', function () {
-          var isHidden = menu.classList.toggle('hidden');
-          var expanded = !isHidden;
-          toggle.setAttribute('aria-expanded', String(expanded));
-          toggle.setAttribute('aria-label', expanded ? 'Close navigation menu' : 'Open navigation menu');
+        var menuItems = dropdown.querySelectorAll('[role="menuitem"]');
+
+        function openDropdown() {
+          dropdown.classList.remove("hidden");
+          menuButton.setAttribute("aria-expanded", "true");
+          if (menuItems.length) menuItems[0].focus();
+        }
+
+        function closeDropdown(returnFocus) {
+          dropdown.classList.add("hidden");
+          menuButton.setAttribute("aria-expanded", "false");
+          if (returnFocus) menuButton.focus();
+        }
+
+        function isOpen() {
+          return !dropdown.classList.contains("hidden");
+        }
+
+        // Toggle on click
+        menuButton.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (isOpen()) {
+            closeDropdown(true);
+          } else {
+            openDropdown();
+          }
+        });
+
+        // Keyboard on button
+        menuButton.addEventListener("keydown", function (e) {
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (!isOpen()) openDropdown();
+          } else if (e.key === "Escape") {
+            closeDropdown(true);
+          }
+        });
+
+        // Keyboard within menu items
+        dropdown.addEventListener("keydown", function (e) {
+          var items = Array.from(menuItems);
+          var idx = items.indexOf(document.activeElement);
+
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            var next = (idx + 1) % items.length;
+            items[next].focus();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            var prev = (idx - 1 + items.length) % items.length;
+            items[prev].focus();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            closeDropdown(true);
+          } else if (e.key === "Tab") {
+            closeDropdown(false);
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            items[0].focus();
+          } else if (e.key === "End") {
+            e.preventDefault();
+            items[items.length - 1].focus();
+          }
+        });
+
+        // Close on outside click
+        document.addEventListener("click", function (e) {
+          if (isOpen() && !menuContainer.contains(e.target)) {
+            closeDropdown(false);
+          }
+        });
+      })();
+
+      // ── Theme quick-toggle (cycles: current -> opposite) ──
+      function quickToggleTheme() {
+        var html = document.documentElement;
+        var isDark = html.classList.contains("dark");
+        var newTheme = isDark ? "light" : "dark";
+
+        if (isDark) {
+          html.classList.remove("dark");
+          html.setAttribute("data-theme", "light");
+        } else {
+          html.classList.add("dark");
+          html.setAttribute("data-theme", "dark");
+        }
+
+        // Update aria-pressed on the toggle button
+        var btn = document.getElementById("theme-toggle");
+        if (btn) btn.setAttribute("aria-pressed", String(!isDark));
+
+        // Announce theme change to screen readers
+        var status = document.getElementById("theme-status");
+        if (status)
+          status.textContent = "Theme changed to " + newTheme + " mode";
+
+        // Persist via API if logged in
+        var csrfToken =
+          document.querySelector('meta[name="csrf-token"]')?.content || "";
+        fetch("/api/profile/theme", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-Token": csrfToken,
+          },
+          body:
+            "theme=" +
+            encodeURIComponent(newTheme) +
+            "&csrf_token=" +
+            encodeURIComponent(csrfToken),
         });
       }
-    })();
 
-    // ── User dropdown with full keyboard support ──
-    (function () {
-      var menuContainer = document.getElementById('user-menu');
-      var menuButton = document.getElementById('user-menu-button');
-      var dropdown = document.getElementById('user-dropdown');
-      if (!menuContainer || !menuButton || !dropdown) return;
-
-      var menuItems = dropdown.querySelectorAll('[role="menuitem"]');
-
-      function openDropdown() {
-        dropdown.classList.remove('hidden');
-        menuButton.setAttribute('aria-expanded', 'true');
-        if (menuItems.length) menuItems[0].focus();
-      }
-
-      function closeDropdown(returnFocus) {
-        dropdown.classList.add('hidden');
-        menuButton.setAttribute('aria-expanded', 'false');
-        if (returnFocus) menuButton.focus();
-      }
-
-      function isOpen() {
-        return !dropdown.classList.contains('hidden');
-      }
-
-      // Toggle on click
-      menuButton.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (isOpen()) {
-          closeDropdown(true);
+      // ── Theme change from HTMX trigger ──
+      function changeTheme(theme) {
+        var html = document.documentElement;
+        html.setAttribute("data-theme", theme);
+        if (theme === "dark") {
+          html.classList.add("dark");
+        } else if (theme === "light") {
+          html.classList.remove("dark");
         } else {
-          openDropdown();
+          // auto
+          if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            html.classList.add("dark");
+          } else {
+            html.classList.remove("dark");
+          }
         }
-      });
-
-      // Keyboard on button
-      menuButton.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (!isOpen()) openDropdown();
-        } else if (e.key === 'Escape') {
-          closeDropdown(true);
-        }
-      });
-
-      // Keyboard within menu items
-      dropdown.addEventListener('keydown', function (e) {
-        var items = Array.from(menuItems);
-        var idx = items.indexOf(document.activeElement);
-
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          var next = (idx + 1) % items.length;
-          items[next].focus();
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          var prev = (idx - 1 + items.length) % items.length;
-          items[prev].focus();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          closeDropdown(true);
-        } else if (e.key === 'Tab') {
-          closeDropdown(false);
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          items[0].focus();
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          items[items.length - 1].focus();
-        }
-      });
-
-      // Close on outside click
-      document.addEventListener('click', function (e) {
-        if (isOpen() && !menuContainer.contains(e.target)) {
-          closeDropdown(false);
-        }
-      });
-    })();
-
-    // ── Theme quick-toggle (cycles: current -> opposite) ──
-    function quickToggleTheme() {
-      var html = document.documentElement;
-      var isDark = html.classList.contains('dark');
-      var newTheme = isDark ? 'light' : 'dark';
-
-      if (isDark) {
-        html.classList.remove('dark');
-        html.setAttribute('data-theme', 'light');
-      } else {
-        html.classList.add('dark');
-        html.setAttribute('data-theme', 'dark');
+        // Update aria-pressed
+        var btn = document.getElementById("theme-toggle");
+        if (btn)
+          btn.setAttribute(
+            "aria-pressed",
+            String(html.classList.contains("dark")),
+          );
       }
 
-      // Update aria-pressed on the toggle button
-      var btn = document.getElementById('theme-toggle');
-      if (btn) btn.setAttribute('aria-pressed', String(!isDark));
+      // ── OS theme listener for auto mode ──
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", function (e) {
+          if (document.documentElement.getAttribute("data-theme") === "auto") {
+            if (e.matches) {
+              document.documentElement.classList.add("dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+            }
+          }
+        });
 
-      // Announce theme change to screen readers
-      var status = document.getElementById('theme-status');
-      if (status) status.textContent = 'Theme changed to ' + newTheme + ' mode';
-
-      // Persist via API if logged in
-      var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-      fetch('/api/profile/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
-        body: 'theme=' + encodeURIComponent(newTheme) + '&csrf_token=' + encodeURIComponent(csrfToken)
+      // ── Toast notifications + theme changes via HX-Trigger ──
+      document.body.addEventListener("htmx:afterRequest", function (evt) {
+        var trigger = evt.detail.xhr?.getResponseHeader("HX-Trigger");
+        if (!trigger) return;
+        try {
+          var data = JSON.parse(trigger);
+          if (data.changeTheme) changeTheme(data.changeTheme.theme);
+          if (data.showToast)
+            showToast(
+              data.showToast.message,
+              data.showToast.variant,
+              data.showToast.undo,
+            );
+        } catch (e) {}
       });
-    }
 
-    // ── Theme change from HTMX trigger ──
-    function changeTheme(theme) {
-      var html = document.documentElement;
-      html.setAttribute('data-theme', theme);
-      if (theme === 'dark') {
-        html.classList.add('dark');
-      } else if (theme === 'light') {
-        html.classList.remove('dark');
-      } else {
-        // auto
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          html.classList.add('dark');
-        } else {
-          html.classList.remove('dark');
-        }
-      }
-      // Update aria-pressed
-      var btn = document.getElementById('theme-toggle');
-      if (btn) btn.setAttribute('aria-pressed', String(html.classList.contains('dark')));
-    }
-
-    // ── OS theme listener for auto mode ──
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-      if (document.documentElement.getAttribute('data-theme') === 'auto') {
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
-    });
-
-    // ── Toast notifications + theme changes via HX-Trigger ──
-    document.body.addEventListener('htmx:afterRequest', function (evt) {
-      var trigger = evt.detail.xhr?.getResponseHeader('HX-Trigger');
-      if (!trigger) return;
-      try {
-        var data = JSON.parse(trigger);
-        if (data.changeTheme) changeTheme(data.changeTheme.theme);
-        if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
-      } catch (e) { }
-    });
-
-    function showToast(message, variant, undo) {
-      var container = document.getElementById('toast-container');
-      var colors = {
-        success: 'bg-[var(--color-success)] text-white',
-        error: 'bg-[var(--color-danger)] text-white',
-        warning: 'bg-[var(--color-warning)] text-white',
-        info: 'bg-[var(--color-info)] text-white'
-      };
-      var icons = {
-        success: '✓',
-        error: '✗',
-        warning: '⚠',
-        info: 'ℹ'
-      };
-      var el = document.createElement('div');
-      el.setAttribute('role', 'alert');
-      el.className = 'toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + (colors[variant] || colors.info);
-      el.style.minWidth = '250px';
-      el.innerHTML = '<span class="text-base" aria-hidden="true">' + (icons[variant] || icons.info) + '</span><span>' + message + '</span>';
-
-      if (undo && undo.path) {
-        var undoBtn = document.createElement('button');
-        undoBtn.type = 'button';
-        undoBtn.className = 'ml-auto underline underline-offset-2 text-white/90 hover:text-white';
-        undoBtn.textContent = (undo.label || 'Undo');
-        undoBtn.onclick = function (e) {
-          e.stopPropagation();
-          var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-          fetch(undo.path, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
-            body: 'csrf_token=' + encodeURIComponent(csrfToken)
-          }).then(function () { window.location.reload(); });
+      function showToast(message, variant, undo) {
+        var container = document.getElementById("toast-container");
+        var colors = {
+          success: "bg-[var(--color-success)] text-white",
+          error: "bg-[var(--color-danger)] text-white",
+          warning: "bg-[var(--color-warning)] text-white",
+          info: "bg-[var(--color-info)] text-white",
         };
-        el.appendChild(undoBtn);
+        var icons = {
+          success: "✓",
+          error: "✗",
+          warning: "⚠",
+          info: "ℹ",
+        };
+        var el = document.createElement("div");
+        el.setAttribute("role", "alert");
+        el.className =
+          "toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium " +
+          (colors[variant] || colors.info);
+        el.style.minWidth = "250px";
+        el.innerHTML =
+          '<span class="text-base" aria-hidden="true">' +
+          (icons[variant] || icons.info) +
+          "</span><span>" +
+          message +
+          "</span>";
+
+        if (undo && undo.path) {
+          var undoBtn = document.createElement("button");
+          undoBtn.type = "button";
+          undoBtn.className =
+            "ml-auto underline underline-offset-2 text-white/90 hover:text-white";
+          undoBtn.textContent = undo.label || "Undo";
+          undoBtn.onclick = function (e) {
+            e.stopPropagation();
+            var csrfToken =
+              document.querySelector('meta[name="csrf-token"]')?.content || "";
+            fetch(undo.path, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-CSRF-Token": csrfToken,
+              },
+              body: "csrf_token=" + encodeURIComponent(csrfToken),
+            }).then(function () {
+              window.location.reload();
+            });
+          };
+          el.appendChild(undoBtn);
+        }
+
+        // Dismiss on click
+        el.addEventListener("click", function () {
+          el.classList.remove("toast-enter");
+          el.classList.add("toast-exit");
+          setTimeout(function () {
+            el.remove();
+          }, 250);
+        });
+
+        // Dismiss on Escape while focused
+        el.setAttribute("tabindex", "0");
+        el.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") {
+            el.classList.remove("toast-enter");
+            el.classList.add("toast-exit");
+            setTimeout(function () {
+              el.remove();
+            }, 250);
+          }
+        });
+
+        container.appendChild(el);
+
+        // Auto-dismiss after 3.5s
+        setTimeout(function () {
+          if (el.parentNode) {
+            el.classList.remove("toast-enter");
+            el.classList.add("toast-exit");
+            setTimeout(function () {
+              el.remove();
+            }, 250);
+          }
+        }, 3500);
       }
-
-      // Dismiss on click
-      el.addEventListener('click', function () {
-        el.classList.remove('toast-enter');
-        el.classList.add('toast-exit');
-        setTimeout(function () { el.remove(); }, 250);
-      });
-
-      // Dismiss on Escape while focused
-      el.setAttribute('tabindex', '0');
-      el.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-          el.classList.remove('toast-enter');
-          el.classList.add('toast-exit');
-          setTimeout(function () { el.remove(); }, 250);
-        }
-      });
-
-      container.appendChild(el);
-
-      // Auto-dismiss after 3.5s
-      setTimeout(function () {
-        if (el.parentNode) {
-          el.classList.remove('toast-enter');
-          el.classList.add('toast-exit');
-          setTimeout(function () { el.remove(); }, 250);
-        }
-      }, 3500);
-    }
-  </script>
-</body>
-
+    </script>
+  </body>
 </html>

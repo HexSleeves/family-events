@@ -1,22 +1,33 @@
-{% extends "base.html" %}
-{% block title %}Page Not Found{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Page Not Found{% endblock %} {% block
+content %}
 
 <div class="max-w-2xl mx-auto mt-10">
-  <div class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] p-8 text-center animate-scale-in">
-    <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--color-accent-light)] mb-4">
+  <div
+    class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] p-8 text-center animate-scale-in"
+  >
+    <div
+      class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--color-accent-light)] mb-4"
+    >
       <span class="text-5xl" aria-hidden="true">🧭</span>
     </div>
-    <h1 class="text-2xl font-bold text-[var(--color-heading)]">Page not found</h1>
-    <p class="text-[var(--color-muted)] mt-2">We couldn’t find that page. It may have moved or never existed.</p>
+    <h1 class="text-2xl font-bold text-[var(--color-heading)]">
+      Page not found
+    </h1>
+    <p class="text-[var(--color-muted)] mt-2">
+      We couldn’t find that page. It may have moved or never existed.
+    </p>
 
     <div class="mt-6 flex flex-wrap justify-center gap-3">
-      <a href="/"
-        class="px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors touch-target">
+      <a
+        href="/"
+        class="px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors touch-target"
+      >
         Go to Discover
       </a>
-      <a href="/events"
-        class="px-4 py-2.5 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] font-medium text-sm hover:bg-[var(--color-accent-light)] transition-colors touch-target">
+      <a
+        href="/events"
+        class="px-4 py-2.5 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] font-medium text-sm hover:bg-[var(--color-accent-light)] transition-colors touch-target"
+      >
         Browse Events
       </a>
     </div>

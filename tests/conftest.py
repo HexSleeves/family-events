@@ -21,6 +21,7 @@ from src.web.auth import hash_password
 def client(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     test_db = Database(str(tmp_path / "test.db"))
     monkeypatch.setattr(appmod, "db", test_db)
+    appmod.app.state.db = test_db
     appmod._rate_limit_store.clear()
     appmod._bulk_unattend_undo_store.clear()
     appmod.settings.app_base_url = "https://testserver"
