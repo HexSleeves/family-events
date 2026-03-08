@@ -1,8 +1,8 @@
 {# Events results: card grid + pagination #}
 
 {% if total == 0 %}
-<section class="rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-10 text-center shadow-[var(--shadow-xs)] animate-fade-in-up">
-  <div class="text-4xl mb-3">🔍</div>
+<section class="glass rounded-xl p-10 text-center animate-fade-in-up">
+  <div class="text-4xl mb-3" aria-hidden="true">🔍</div>
   <h2 class="text-lg font-semibold text-[var(--color-heading)]">No events found</h2>
   <p class="mt-1 text-sm text-[var(--color-muted)]">Try broadening your filters or resetting search.</p>
 </section>
@@ -13,15 +13,15 @@
 
 {% if attended == 'yes' %}
 <form id="bulk-unattend-form" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-xs)]">
-  <label class="inline-flex items-center gap-2 text-sm text-[var(--color-body)]">
+  <div class="inline-flex items-center gap-2">
     <input id="select-all-attended" type="checkbox" class="rounded border-[var(--color-edge)]" />
-    Select all on page
-  </label>
+    <label for="select-all-attended" class="text-sm text-[var(--color-body)]">Select all on page</label>
+  </div>
   <button
     type="button"
     onclick="bulkUnattend()"
-    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
-    ↩ Unattend selected
+    class="touch-target inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
+    <span aria-hidden="true">↩</span> Unattend selected
   </button>
 </form>
 {% endif %}
@@ -36,37 +36,39 @@
                   else "score-top" if score is not none
                   else "" %}
 
-  <article class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}">
-    <a href="/event/{{ event.id }}" class="block">
+  <article class="group block bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5 transition-all duration-200 overflow-hidden animate-fade-in-up stagger-{{ [loop.index0 % 8, 9] | min }}" aria-labelledby="card-title-{{ event.id }}">
+    <a href="/event/{{ event.id }}" class="block" aria-label="{{ event.title }}">
       <div class="relative aspect-[16/10] overflow-hidden">
         {% if attended == 'yes' %}
         <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm" onclick="event.stopPropagation();">
-          <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" />
+          <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" aria-label="Select {{ event.title }}" />
           Select
         </label>
         {% endif %}
 
         {% if event.image_url %}
-        <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+        <img src="{{ event.image_url }}" alt="{{ event.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" loading="lazy" />
         {% else %}
-        <div class="img-placeholder w-full h-full text-2xl">
-          {% if event.tags and event.tags.categories %}{{ {'play': '🎪', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
+        <div class="w-full h-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-brand)] flex items-center justify-center" role="img" aria-label="{{ event.title }} placeholder">
+          <span class="text-2xl text-white/90" aria-hidden="true">
+            {% if event.tags and event.tags.categories %}{{ {'play': '🎪', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
+          </span>
         </div>
         {% endif %}
 
         {% if score is not none %}
         <div class="absolute top-2.5 left-2.5">
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-sm font-semibold bg-white/90 backdrop-blur-sm shadow-xs {{ score_class }}">
-            {% if score >= 9 %}⭐{% endif %}{{ score }}
+          <span class="badge {{ 'badge-accent' if score >= 7 else 'badge-brand' if score >= 4 else 'badge-warning' }} shadow-xs backdrop-blur-sm" aria-label="Score {{ score }} out of 10">
+            {% if score >= 9 %}<span aria-hidden="true">⭐</span>{% endif %}{{ score }}
           </span>
         </div>
         {% endif %}
 
         {% if event.is_free %}
-        <span class="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-success)] text-white shadow-xs">Free</span>
+        <span class="badge badge-success absolute bottom-2.5 left-2.5 shadow-xs">Free</span>
         {% endif %}
         {% if event.attended %}
-        <span class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--color-info-light)] text-[var(--color-info)] shadow-xs">Attended</span>
+        <span class="badge badge-accent absolute bottom-2.5 right-2.5 shadow-xs">Attended</span>
         {% endif %}
       </div>
     </a>
@@ -74,19 +76,19 @@
     <div class="p-3.5">
       <div class="flex items-center gap-2 text-xs text-[var(--color-faint)] mb-1.5">
         <span>{{ event.start_time.strftime('%a %b %d') }}</span>
-        <span>·</span>
+        <span aria-hidden="true">·</span>
         <span class="capitalize">{{ event.source }}</span>
       </div>
-      <h3 class="font-semibold text-[var(--color-heading)] text-sm leading-snug line-clamp-2 group-hover:text-[var(--color-brand)] transition-colors mb-1.5">
+      <h3 id="card-title-{{ event.id }}" class="font-semibold text-[var(--color-heading)] text-sm leading-snug line-clamp-2 group-hover:text-[var(--color-brand)] transition-colors mb-1.5">
         <a href="/event/{{ event.id }}">{{ event.title }}</a>
       </h3>
       <p class="text-xs text-[var(--color-muted)] truncate">
-        📍 {{ event.location_name or event.location_city }}, {{ event.location_city }}
+        <span aria-hidden="true">📍</span> {{ event.location_name or event.location_city }}, {{ event.location_city }}
       </p>
       {% if event.tags and event.tags.categories %}
       <div class="flex flex-wrap gap-1 mt-2">
         {% for cat in event.tags.categories[:2] %}
-        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-surface-tertiary)] text-[var(--color-muted)]">{{ cat }}</span>
+        <span class="badge badge-muted">{{ cat }}</span>
         {% endfor %}
       </div>
       {% endif %}
@@ -130,30 +132,33 @@
   {% if page > 1 %}
   <button hx-get="/events?page={{ page - 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
-          class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
-    ←
+          aria-label="Previous page"
+          class="touch-target min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+    <span aria-hidden="true">←</span>
   </button>
   {% endif %}
 
   {% for p in range(1, total_pages + 1) %}
     {% if p == page %}
-    <span class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg bg-[var(--color-brand)] text-white text-sm font-semibold">{{ p }}</span>
+    <span class="touch-target min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg bg-[var(--color-accent)] text-white text-sm font-semibold" aria-current="page" aria-label="Page {{ p }}, current page">{{ p }}</span>
     {% elif p == 1 or p == total_pages or (p >= page - 1 and p <= page + 1) %}
     <button hx-get="/events?page={{ p }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
             hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
-            class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+            aria-label="Page {{ p }}"
+            class="touch-target min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
       {{ p }}
     </button>
     {% elif p == 2 or p == total_pages - 1 %}
-    <span class="text-[var(--color-faint)] px-1">…</span>
+    <span class="text-[var(--color-faint)] px-1" aria-hidden="true">…</span>
     {% endif %}
   {% endfor %}
 
   {% if page < total_pages %}
   <button hx-get="/events?page={{ page + 1 }}&q={{ q }}&city={{ city }}&source={{ source }}&tagged={{ tagged }}&attended={{ attended }}&score_min={{ score_min or '' }}&sort={{ sort }}"
           hx-target="#events-results" hx-swap="innerHTML" hx-push-url="true"
-          class="min-w-[40px] min-h-[40px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
-    →
+          aria-label="Next page"
+          class="touch-target min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+    <span aria-hidden="true">→</span>
   </button>
   {% endif %}
 </nav>

@@ -12,8 +12,8 @@
 
 <div class="max-w-4xl mx-auto animate-fade-in">
   {# Back link #}
-  <a href="/events" class="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] mb-4 transition-colors">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+  <a href="/events" class="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] mb-4 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     Back to events
   </a>
 
@@ -24,34 +24,36 @@
   </div>
   {% endif %}
 
-  {# Main info card #}
-  <div class="bg-[var(--color-surface)] rounded-xl p-6 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] mb-4 animate-fade-in-up">
+  {# Main info card — glass #}
+  <div class="glass rounded-xl p-6 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] mb-4 animate-fade-in-up">
     <div class="flex items-start justify-between gap-4">
       <div class="flex-1 min-w-0">
         <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-3">{{ event.title }}</h1>
         <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-[var(--color-muted)]">
-          <span>📍 {{ event.location_name }}, {{ event.location_city }}</span>
-          <span>📅 {{ event.start_time.strftime('%A, %B %d at %I:%M %p') }}</span>
+          <span><span aria-hidden="true">📍</span> {{ event.location_name }}, {{ event.location_city }}</span>
+          <span><span aria-hidden="true">📅</span> {{ event.start_time.strftime('%A, %B %d at %I:%M %p') }}</span>
           {% if event.end_time %}
           <span>→ {{ event.end_time.strftime('%I:%M %p') }}</span>
           {% endif %}
           {% if event.is_free %}
-          <span class="text-[var(--color-success)] font-medium">🆓 Free</span>
+          <span class="text-[var(--color-success)] font-medium"><span aria-hidden="true">🆓</span> Free</span>
           {% elif event.price_min %}
-          <span>💵 ${{ '%.0f' % event.price_min }}</span>
+          <span><span aria-hidden="true">💵</span> ${{ '%.0f' % event.price_min }}</span>
           {% endif %}
-          <span class="capitalize">📡 {{ event.source }}</span>
+          <span class="capitalize"><span aria-hidden="true">📡</span> {{ event.source }}</span>
         </div>
       </div>
 
       {# Score badge (large) #}
       {% if event.tags %}
       {% set score = event.tags.toddler_score %}
+      {% set score_label = "poor" if score <= 3 else "fair" if score <= 6 else "good" if score <= 8 else "excellent" %}
       {% set score_class = "score-low" if score <= 3 else "score-mid" if score <= 6 else "score-high" if score <= 8 else "score-top" %}
       {% set score_bg = "score-bg-low" if score <= 3 else "score-bg-mid" if score <= 6 else "score-bg-high" if score <= 8 else "score-bg-top" %}
-      <div class="shrink-0 w-16 h-16 rounded-2xl {{ score_bg }} flex flex-col items-center justify-center">
-        <span class="text-2xl font-bold {{ score_class }}">{{ score }}</span>
-        <span class="text-[10px] {{ score_class }}">/ 10</span>
+      <div class="shrink-0 w-16 h-16 rounded-2xl {{ score_bg }} flex flex-col items-center justify-center {% if score > 8 %}ring-2 ring-[var(--color-accent)]/30{% endif %}"
+           role="img" aria-label="Toddler score {{ score }} out of 10, {{ score_label }}">
+        <span class="text-2xl font-bold {{ score_class }}" aria-hidden="true">{{ score }}</span>
+        <span class="text-[10px] {{ score_class }}" aria-hidden="true">/ 10</span>
       </div>
       {% endif %}
     </div>
@@ -65,31 +67,36 @@
     <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)] flex flex-wrap items-center gap-3">
       {% if event.source_url %}
       <a href="{{ event.source_url }}" target="_blank" rel="noopener"
-         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors">
+         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors touch-target">
         View Original →
       </a>
       {% endif %}
       {% if maps_url %}
       <a href="{{ maps_url }}" target="_blank" rel="noopener"
-         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors">
-        🗺️ Open in Maps
+         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium hover:bg-[var(--color-accent-light)] transition-colors touch-target">
+        <span aria-hidden="true">🗺️</span> Open in Maps
       </a>
       {% endif %}
       <button
         onclick="navigator.clipboard.writeText(window.location.href); showToast('Link copied', 'success')"
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors">
-        🔗 Share
+        aria-label="Copy link to clipboard"
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target">
+        <span aria-hidden="true">🔗</span> Share
       </button>
       <span id="attend-btn" class="inline-flex items-center gap-2">
         {% if event.attended %}
-        <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-success-light)] text-[var(--color-success)] text-sm font-medium">✅ Attended</span>
+        <span class="badge badge-success">
+          <span aria-hidden="true">✅</span> Attended
+        </span>
         <button hx-post="/api/unattend/{{ event.id }}" hx-swap="none"
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+                aria-label="Remove attended mark for {{ event.title }}"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
           Undo
         </button>
         {% else %}
         <button hx-post="/api/attend/{{ event.id }}" hx-swap="none"
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+                aria-label="Mark {{ event.title }} as attended"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors touch-target">
           Mark Attended
         </button>
         {% endif %}
@@ -98,7 +105,7 @@
   </div>
 
   {% if score_breakdown %}
-  <div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
+  <div class="glass rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
     <h3 class="font-semibold text-[var(--color-heading)] mb-3">Why this score?</h3>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Toddler fit</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.toddler) }}</p></div>
@@ -108,7 +115,7 @@
       <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Timing</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.timing) }}</p></div>
       <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Logistics</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.logistics) }}</p></div>
       <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Novelty</p><p class="font-semibold text-[var(--color-heading)]">{{ '%.1f'|format(score_breakdown.novelty) }}</p></div>
-      <div class="rounded-lg bg-[var(--color-brand-light)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Total</p><p class="font-bold text-[var(--color-brand)]">{{ '%.1f'|format(score_breakdown.toddler + score_breakdown.interest + score_breakdown.weather + score_breakdown.city + score_breakdown.timing + score_breakdown.logistics + score_breakdown.novelty) }}</p></div>
+      <div class="rounded-lg bg-[var(--color-accent-light)] px-3 py-2"><p class="text-xs text-[var(--color-faint)]">Total</p><p class="font-bold text-[var(--color-accent)]">{{ '%.1f'|format(score_breakdown.toddler + score_breakdown.interest + score_breakdown.weather + score_breakdown.city + score_breakdown.timing + score_breakdown.logistics + score_breakdown.novelty) }}</p></div>
     </div>
   </div>
   {% endif %}
@@ -120,14 +127,14 @@
   {% endif %}
 
   {% if related_events %}
-  <div class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-2">
+  <div class="glass rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-2">
     <h3 class="font-semibold text-[var(--color-heading)] mb-3">Related events</h3>
     <div class="grid gap-3 sm:grid-cols-2">
       {% for rel_event, rel_score in related_events %}
-      <a href="/event/{{ rel_event.id }}" class="rounded-lg border border-[var(--color-edge-subtle)] p-3 hover:bg-[var(--color-surface-secondary)] transition-colors">
+      <a href="/event/{{ rel_event.id }}" class="rounded-lg border border-[var(--color-edge-subtle)] p-3 hover:border-[var(--color-accent)] hover:bg-[var(--color-surface-secondary)] transition-colors">
         <p class="font-medium text-[var(--color-heading)] line-clamp-1">{{ rel_event.title }}</p>
         <p class="text-xs text-[var(--color-muted)] mt-1">{{ rel_event.start_time.strftime('%a, %b %d · %I:%M%p') }} · {{ rel_event.location_city }}</p>
-        <p class="text-xs text-[var(--color-brand)] mt-1">Toddler score {{ '%.0f'|format(rel_score) }}/10</p>
+        <p class="text-xs text-[var(--color-accent)] mt-1">Toddler score {{ '%.0f'|format(rel_score) }}/10</p>
       </a>
       {% endfor %}
     </div>
@@ -135,7 +142,7 @@
   {% endif %}
 
   {# Raw data #}
-  <details class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-3">
+  <details id="raw-data-panel" class="glass rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-3">
     <summary class="font-semibold text-[var(--color-heading)] cursor-pointer">Raw Data</summary>
     <pre class="mt-3 bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ raw_data }}</pre>
   </details>

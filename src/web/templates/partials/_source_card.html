@@ -1,20 +1,28 @@
 {# Source card for custom sources #}
-{% set status_colors = {
-  'active': ('bg-[var(--color-success-light)]', 'text-[var(--color-success)]'),
-  'analyzing': ('bg-[var(--color-info-light)]', 'text-[var(--color-info)]'),
-  'failed': ('bg-[var(--color-danger-light)]', 'text-[var(--color-danger)]'),
-  'stale': ('bg-[var(--color-warning-light)]', 'text-[var(--color-warning)]'),
-  'disabled': ('bg-[var(--color-surface-tertiary)]', 'text-[var(--color-faint)]'),
-  'pending': ('bg-[var(--color-surface-tertiary)]', 'text-[var(--color-muted)]')
+{% set status_badge = {
+  'active': 'badge-success',
+  'analyzing': 'badge-info',
+  'failed': 'badge-danger',
+  'stale': 'badge-warning',
+  'disabled': 'badge-muted',
+  'pending': 'badge-muted'
 } %}
-{% set bg_cls, text_cls = status_colors.get(source.status, status_colors['pending']) %}
+{% set status_text = {
+  'active': 'Active',
+  'analyzing': 'Analyzing',
+  'failed': 'Failed',
+  'stale': 'Stale',
+  'disabled': 'Disabled',
+  'pending': 'Pending'
+} %}
+{% set badge_cls = status_badge.get(source.status, 'badge-muted') %}
 
 <div class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-card)] transition-all duration-200 animate-fade-in-up">
-  <div class="flex items-start justify-between">
+  <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">
       <div class="flex items-center gap-2 mb-1">
         <a href="/source/{{ source.id }}" class="font-semibold text-[var(--color-heading)] hover:text-[var(--color-brand)] transition-colors">{{ source.name }}</a>
-        <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ bg_cls }} {{ text_cls }}">{{ source.status }}</span>
+        <span class="badge {{ badge_cls }}">{{ status_text.get(source.status, source.status) }}</span>
       </div>
       <p class="text-xs text-[var(--color-muted)] truncate">{{ source.url }}</p>
       {% if source.last_event_count %}
@@ -27,15 +35,18 @@
 
     <div class="flex items-center gap-2 shrink-0">
       <button hx-post="/api/sources/{{ source.id }}/test" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-          class="px-3 py-1.5 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+          aria-label="Test source {{ source.name }}"
+          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         Test
       </button>
       <button hx-post="/api/sources/{{ source.id }}/toggle" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
-          class="px-3 py-1.5 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
+          aria-label="{{ 'Disable' if source.enabled else 'Enable' }} source {{ source.name }}"
+          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         {{ 'Disable' if source.enabled else 'Enable' }}
       </button>
       <button hx-delete="/api/sources/{{ source.id }}" hx-target="#test-{{ source.id }}" hx-confirm="Delete this source?"
-          class="px-3 py-1.5 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+          aria-label="Delete source {{ source.name }}"
+          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
         Delete
       </button>
     </div>

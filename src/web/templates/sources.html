@@ -3,24 +3,26 @@
 {% block content %}
 
 <div class="animate-fade-in">
-  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6">📡 Event Sources</h1>
+  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6"><span aria-hidden="true">📡</span> Event Sources</h1>
 
   {# ═══ ADD SOURCE ═══ #}
   {% if current_user %}
   <form hx-post="/api/sources" hx-swap="none" hx-indicator="#add-spinner"
-      class="bg-[var(--color-surface)] rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 animate-fade-in-up stagger-1">
+      class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 animate-fade-in-up stagger-1">
     <h3 class="font-semibold text-[var(--color-heading)] mb-3">Add Custom Source</h3>
     <div class="flex flex-col sm:flex-row gap-3">
       <div class="flex-1">
-        <input type="url" name="url" required placeholder="https://example.com/events"
-            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+        <label for="source-url" class="sr-only">Source URL</label>
+        <input type="url" name="url" id="source-url" required placeholder="https://example.com/events"
+            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
       <div class="w-full sm:w-48">
-        <input type="text" name="name" placeholder="Name (optional)"
-            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+        <label for="source-name" class="sr-only">Source name (optional)</label>
+        <input type="text" name="name" id="source-name" placeholder="Name (optional)"
+            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
       <button type="submit"
-          class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all flex items-center gap-2">
+          class="px-5 py-2.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 touch-target">
         Add Source
         <span id="add-spinner" class="htmx-indicator spinner"></span>
       </button>
@@ -30,7 +32,7 @@
 
   {# ═══ BUILT-IN SOURCES ═══ #}
   <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3 animate-fade-in-up stagger-2">Built-in Sources</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+  <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8" role="list">
     {% set builtins = [
       ('BREC Parks', 'brec.org', 'Baton Rouge parks & recreation', '🏞️'),
       ('Eventbrite', 'eventbrite.com', 'Both cities', '🎫'),
@@ -39,18 +41,18 @@
       ('Libraries', 'LibCal', 'Lafayette & BR libraries', '📚')
     ] %}
     {% for name, domain, desc, icon in builtins %}
-    <div class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-{{ loop.index + 2 }}">
+    <li class="bg-[var(--color-surface)] rounded-xl p-4 border-l-4 border-l-[var(--color-accent)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-{{ loop.index + 2 }}">
       <div class="flex items-center gap-3">
-        <span class="text-2xl">{{ icon }}</span>
+        <span class="text-2xl" aria-hidden="true">{{ icon }}</span>
         <div>
           <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ name }}</h3>
           <p class="text-xs text-[var(--color-muted)]">{{ desc }}</p>
         </div>
-        <span class="ml-auto px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success-light)] text-[var(--color-success)]">Active</span>
+        <span class="ml-auto badge badge-success">Active</span>
       </div>
-    </div>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
 
   {# ═══ CUSTOM SOURCES ═══ #}
   {% if sources %}

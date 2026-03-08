@@ -2,7 +2,7 @@
 {% if tags %}
 <div
   class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
-  <h3 class="font-semibold text-[var(--color-heading)] mb-4">🤖 AI Analysis</h3>
+  <h3 class="font-semibold text-[var(--color-accent)] mb-4"><span aria-hidden="true">🤖</span> AI Analysis</h3>
 
   <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
     {% set items = [
@@ -15,21 +15,28 @@
     ('😤', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk
     == 'medium' else 'high'),
     ('👀', 'Attention', tags.parent_attention_required, ''),
-    ('🛍️', 'Stroller', '✅' if tags.stroller_friendly else '❌', ''),
-    ('🅿️', 'Parking', '✅' if tags.parking_available else '❌', ''),
-    ('🚻', 'Bathrooms', '✅' if tags.bathroom_accessible else '❌', ''),
-    ('🌧️', 'Weather Dep.', '✅' if tags.weather_dependent else '❌', ''),
-    ('😴', 'Nap Compatible', '✅' if tags.nap_compatible else '❌', ''),
-    ('🍔', 'Food Available', '✅' if tags.food_available else '❌', '')
+    ('🛍️', 'Stroller', tags.stroller_friendly, 'bool'),
+    ('🅿️', 'Parking', tags.parking_available, 'bool'),
+    ('🚻', 'Bathrooms', tags.bathroom_accessible, 'bool'),
+    ('🌧️', 'Weather Dep.', tags.weather_dependent, 'bool'),
+    ('😴', 'Nap Compatible', tags.nap_compatible, 'bool'),
+    ('🍔', 'Food Available', tags.food_available, 'bool')
     ] %}
     {% for icon, label, value, variant in items %}
-    <div class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--color-surface-secondary)]">
-      <span class="text-base">{{ icon }}</span>
+    <div class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--color-surface-secondary)] hover:bg-[var(--color-surface-tertiary)] transition-colors duration-150">
+      <span class="text-base" aria-hidden="true">{{ icon }}</span>
       <div>
         <p class="text-xs text-[var(--color-faint)]">{{ label }}</p>
+        {% if variant == 'bool' %}
+        <p class="text-sm font-medium {% if value %}text-[var(--color-success)]{% else %}text-[var(--color-danger)]{% endif %}">
+          <span aria-hidden="true">{% if value %}✅{% else %}❌{% endif %}</span>
+          <span class="sr-only">{% if value %}Yes{% else %}No{% endif %}</span>
+        </p>
+        {% else %}
         <p class="text-sm font-medium text-[var(--color-heading)] capitalize
           {% if variant == 'low' %} text-[var(--color-success)]{% elif variant == 'high' %} text-[var(--color-danger)]{% endif %}
         ">{{ value }}</p>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -40,9 +47,7 @@
     <p class="text-xs text-[var(--color-faint)] mb-2">Categories</p>
     <div class="flex flex-wrap gap-1.5">
       {% for cat in tags.categories %}
-      <span
-        class="px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-light)] text-[var(--color-info)]">{{
-        cat }}</span>
+      <span class="badge badge-info">{{ cat }}</span>
       {% endfor %}
     </div>
   </div>

@@ -10,146 +10,161 @@
 
   <div class="space-y-6">
     {# ═══ APPEARANCE ═══ #}
-    <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-1">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4">🎨 Appearance</h2>
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-1">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+        <span aria-hidden="true">🎨</span> Appearance
+      </h2>
       <form hx-post="/api/profile/theme" hx-swap="none">
-        <div class="flex items-center gap-6">
-          {% for value, label, icon in [('light', 'Light', '☀️'), ('dark', 'Dark', '🌙'), ('auto', 'System', '💻')] %}
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="theme" value="{{ value }}" {{ 'checked' if current_user.theme == value }}
-                class="accent-[var(--color-brand)]" />
-            <span class="text-sm text-[var(--color-body)]">{{ icon }} {{ label }}</span>
-          </label>
-          {% endfor %}
-          <button type="submit" id="theme-save-btn"
-              class="ml-auto px-4 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-            Save
-          </button>
-        </div>
+        <fieldset>
+          <legend class="sr-only">Theme preference</legend>
+          <div class="flex items-center gap-2">
+            {% for value, label, icon in [('light', 'Light', '☀️'), ('dark', 'Dark', '🌙'), ('auto', 'System', '💻')] %}
+            <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border {% if current_user.theme == value %}border-[var(--color-accent)] bg-[var(--color-accent-light)] text-[var(--color-accent)]{% else %}border-[var(--color-edge)] text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-all">
+              <input type="radio" name="theme" id="theme-{{ value }}" value="{{ value }}" {{ 'checked' if current_user.theme == value }}
+                  class="sr-only" />
+              <span aria-hidden="true">{{ icon }}</span>
+              <span class="text-sm font-medium">{{ label }}</span>
+            </label>
+            {% endfor %}
+            <button type="submit" id="theme-save-btn"
+                aria-label="Save theme preference"
+                class="ml-auto px-4 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed touch-target" disabled>
+              Save
+            </button>
+          </div>
+        </fieldset>
       </form>
     </section>
 
     {# ═══ LOCATION ═══ #}
-    <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-2">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4">📍 Location</h2>
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-2">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+        <span aria-hidden="true">📍</span> Location
+      </h2>
       <form hx-post="/api/profile/location" hx-swap="none" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Home City</label>
-            <input type="text" name="home_city" value="{{ current_user.home_city }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="profile-home-city" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Home City</label>
+            <input type="text" name="home_city" id="profile-home-city" value="{{ current_user.home_city }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Preferred Cities (comma-separated)</label>
-            <input type="text" name="preferred_cities" value="{{ current_user.preferred_cities | join(', ') }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="profile-preferred-cities" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Preferred Cities (comma-separated)</label>
+            <input type="text" name="preferred_cities" id="profile-preferred-cities" value="{{ current_user.preferred_cities | join(', ') }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all">Save Location</button>
+        <button type="submit" aria-label="Save location settings" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all touch-target">Save Location</button>
       </form>
     </section>
 
     {# ═══ CHILD PREFERENCES ═══ #}
-    <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-3">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4">🧩 Child Preferences</h2>
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-3">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+        <span aria-hidden="true">🧩</span> Child Preferences
+      </h2>
       <form hx-post="/api/profile/preferences" hx-swap="none" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">❤️ Loves</label>
-            <input type="text" name="loves" value="{{ current_user.interest_profile.loves | join(', ') }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-loves" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">❤️</span> Loves</label>
+            <input type="text" name="loves" id="pref-loves" value="{{ current_user.interest_profile.loves | join(', ') }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">👍 Likes</label>
-            <input type="text" name="likes" value="{{ current_user.interest_profile.likes | join(', ') }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-likes" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">👍</span> Likes</label>
+            <input type="text" name="likes" id="pref-likes" value="{{ current_user.interest_profile.likes | join(', ') }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">👎 Dislikes</label>
-            <input type="text" name="dislikes" value="{{ current_user.interest_profile.dislikes | join(', ') }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-dislikes" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">👎</span> Dislikes</label>
+            <input type="text" name="dislikes" id="pref-dislikes" value="{{ current_user.interest_profile.dislikes | join(', ') }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">💤 Nap Time</label>
-            <input type="text" name="nap_time" value="{{ current_user.interest_profile.constraints.nap_time }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-nap-time" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">💤</span> Nap Time</label>
+            <input type="text" name="nap_time" id="pref-nap-time" value="{{ current_user.interest_profile.constraints.nap_time }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">🌙 Bedtime</label>
-            <input type="text" name="bedtime" value="{{ current_user.interest_profile.constraints.bedtime }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-bedtime" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">🌙</span> Bedtime</label>
+            <input type="text" name="bedtime" id="pref-bedtime" value="{{ current_user.interest_profile.constraints.bedtime }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">💰 Budget ($)</label>
-            <input type="number" name="budget" value="{{ current_user.interest_profile.constraints.budget_per_event }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-budget" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">💰</span> Budget ($)</label>
+            <input type="number" name="budget" id="pref-budget" value="{{ current_user.interest_profile.constraints.budget_per_event }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">🚗 Max Drive (min)</label>
-            <input type="number" name="max_drive" value="{{ current_user.interest_profile.constraints.max_drive_time_minutes }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pref-max-drive" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">🚗</span> Max Drive (min)</label>
+            <input type="number" name="max_drive" id="pref-max-drive" value="{{ current_user.interest_profile.constraints.max_drive_time_minutes }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all">Save Preferences</button>
+        <button type="submit" aria-label="Save child preferences" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all touch-target">Save Preferences</button>
       </form>
     </section>
 
     {# ═══ NOTIFICATIONS ═══ #}
-    <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-4">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4">🔔 Notifications</h2>
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-4">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+        <span aria-hidden="true">🔔</span> Notifications
+      </h2>
       <form hx-post="/api/profile/notifications" hx-swap="none" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child’s Name</label>
-            <input type="text" name="child_name" value="{{ current_user.child_name }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="notif-child-name" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child’s Name</label>
+            <input type="text" name="child_name" id="notif-child-name" value="{{ current_user.child_name }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Notification Email</label>
-            <input type="email" name="email_to" value="{{ current_user.email_to }}"
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="notif-email-to" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Notification Email</label>
+            <input type="email" name="email_to" id="notif-email-to" value="{{ current_user.email_to }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
-        <div>
-          <p class="text-xs font-medium text-[var(--color-muted)] mb-2">Channels</p>
+        <fieldset>
+          <legend class="text-xs font-medium text-[var(--color-muted)] mb-2">Channels</legend>
           <div class="flex flex-wrap gap-4">
             {% for ch in ['console', 'email', 'sms', 'telegram'] %}
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="channels" value="{{ ch }}" {{ 'checked' if ch in current_user.notification_channels }}
+            <label for="notif-ch-{{ ch }}" class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="channels" id="notif-ch-{{ ch }}" value="{{ ch }}" {{ 'checked' if ch in current_user.notification_channels }}
                   class="accent-[var(--color-brand)] rounded-sm" />
               <span class="text-sm text-[var(--color-body)] capitalize">{{ ch }}</span>
             </label>
             {% endfor %}
           </div>
-        </div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all">Save Notifications</button>
+        </fieldset>
+        <button type="submit" aria-label="Save notification settings" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all touch-target">Save Notifications</button>
       </form>
     </section>
 
     {# ═══ PASSWORD ═══ #}
-    <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-5">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4">🔒 Change Password</h2>
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 animate-fade-in-up stagger-5">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+        <span aria-hidden="true">🔒</span> Change Password
+      </h2>
       <form hx-post="/api/profile/password" hx-swap="none" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Current Password</label>
-            <input type="password" name="current_password" required
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pw-current" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Current Password</label>
+            <input type="password" name="current_password" id="pw-current" required
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">New Password</label>
-            <input type="password" name="new_password" required
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pw-new" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">New Password</label>
+            <input type="password" name="new_password" id="pw-new" required
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Confirm Password</label>
-            <input type="password" name="confirm_password" required
-                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:outline-hidden focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+            <label for="pw-confirm" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Confirm Password</label>
+            <input type="password" name="confirm_password" id="pw-confirm" required
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">Change Password</button>
+        <button type="submit" aria-label="Change password" class="px-5 py-2.5 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">Change Password</button>
       </form>
     </section>
   </div>
@@ -160,10 +175,26 @@
   (function() {
     var radios = document.querySelectorAll('input[name="theme"]');
     var btn = document.getElementById('theme-save-btn');
+    var labels = document.querySelectorAll('input[name="theme"]');
     var saved = '{{ current_user.theme }}';
+
+    function updatePillStyles() {
+      radios.forEach(function(r) {
+        var label = r.closest('label');
+        if (r.checked) {
+          label.classList.add('border-[var(--color-accent)]', 'bg-[var(--color-accent-light)]', 'text-[var(--color-accent)]');
+          label.classList.remove('border-[var(--color-edge)]', 'text-[var(--color-muted)]');
+        } else {
+          label.classList.remove('border-[var(--color-accent)]', 'bg-[var(--color-accent-light)]', 'text-[var(--color-accent)]');
+          label.classList.add('border-[var(--color-edge)]', 'text-[var(--color-muted)]');
+        }
+      });
+    }
+
     radios.forEach(function(r) {
       r.addEventListener('change', function() {
         btn.disabled = (r.value === saved);
+        updatePillStyles();
       });
     });
     document.body.addEventListener('htmx:afterRequest', function(evt) {
