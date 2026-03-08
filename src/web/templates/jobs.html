@@ -19,7 +19,7 @@
       <label for="job-state" class="block text-xs font-medium text-[var(--color-muted)] mb-1">State</label>
       <select id="job-state" name="state" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
         <option value="">All states</option>
-        {% for value in ['running', 'succeeded', 'failed'] %}
+        {% for value in ['running', 'succeeded', 'failed', 'cancelled'] %}
         <option value="{{ value }}" {% if selected_state == value %}selected{% endif %}>{{ value }}</option>
         {% endfor %}
       </select>

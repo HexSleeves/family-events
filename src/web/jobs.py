@@ -169,7 +169,7 @@ class JobRegistry:
 
                 await db.update_job(
                     job_id,
-                    state="failed",
+                    state="cancelled",
                     detail="Cancelled",
                     error="Cancelled by user",
                     finished_at=datetime.now(tz=UTC),

@@ -11,7 +11,7 @@
       <p class="text-[var(--color-muted)]">{{ message }}</p>
     </div>
     <div class="flex items-center gap-2">
-      <span class="badge {% if job.state == 'running' %}badge-info{% elif job.state == 'failed' %}badge-danger{% else %}badge-success{% endif %}">
+      <span class="badge {% if job.state == 'running' %}badge-info{% elif job.state == 'failed' %}badge-danger{% elif job.state == 'cancelled' %}badge-warning{% else %}badge-success{% endif %}">
         {{ job.state }}
       </span>
       {% if job.state == 'running' %}

@@ -70,6 +70,8 @@ def job_status_message(job: Job) -> str:
     if job.state == "running":
         summary = job_result_summary(job)
         return f"{job.label} is running… {summary}" if summary else f"{job.label} is running…"
+    if job.state == "cancelled":
+        return f"{job.label} was cancelled"
     if job.state == "failed":
         return f"{job.label} failed: {job.error or 'Unknown error'}"
     summary = job_result_summary(job)

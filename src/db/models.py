@@ -156,7 +156,7 @@ class Job(BaseModel):
     label: str
     owner_user_id: str
     source_id: str | None = None
-    state: Literal["running", "succeeded", "failed"] = "running"
+    state: Literal["running", "succeeded", "failed", "cancelled"] = "running"
     detail: str = "Queued"
     result_json: str = ""
     error: str = ""

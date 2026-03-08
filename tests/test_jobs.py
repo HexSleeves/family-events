@@ -89,7 +89,7 @@ def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
 
         updated = await job_registry.cancel(job_id=job.id, owner_user_id="user-1")
         assert updated is not None
-        assert updated.state == "failed"
+        assert updated.state == "cancelled"
         assert updated.detail == "Cancelled"
         assert updated.error == "Cancelled by user"
         assert updated.finished_at is not None
