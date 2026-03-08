@@ -50,6 +50,7 @@ _MAX_CLEAN_CHARS = 24_000  # ~6K tokens
 class UnsafeFetchTargetError(ValueError):
     """Raised when a fetch target resolves to a non-public address."""
 
+
 RECIPE_SCHEMA = """
 {
   "strategy": "css",
