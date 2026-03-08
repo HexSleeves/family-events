@@ -21,6 +21,22 @@
     {% endif %}
   </div>
 
+  {% if job.state == 'running' and progress is mapping and progress.total %}
+  <div class="mt-3">
+    <div class="mb-1 flex items-center justify-between text-xs text-[var(--color-muted)]">
+      <span>{{ progress.processed or 0 }}/{{ progress.total }}</span>
+      <span>{{ ((progress.processed or 0) / progress.total * 100) | round(0) }}%</span>
+    </div>
+    <div class="h-2 overflow-hidden rounded-full bg-[var(--color-surface-secondary)]">
+      <div class="h-full bg-[var(--color-accent)] transition-all duration-300" style="width: {{ ((progress.processed or 0) / progress.total * 100) | round(0) }}%"></div>
+    </div>
+    <div class="mt-2 text-xs text-[var(--color-faint)]">
+      Tagged: {{ progress.succeeded or 0 }}
+      {% if progress.failed %}· Failed: {{ progress.failed }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if job.state == 'succeeded' and result is mapping %}
     {% if job.kind == 'source-analyze' %}
     <div class="mt-3 rounded-lg bg-[var(--color-surface-secondary)] p-3 text-xs text-[var(--color-body)]">

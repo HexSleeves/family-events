@@ -869,7 +869,7 @@ async def api_scrape(request: Request):
 
     db_path = db.db_path
 
-    async def runner() -> int:
+    async def runner(_job) -> int:
         async with Database(db_path) as job_db:
             return await run_scrape(job_db)
 
@@ -897,9 +897,10 @@ async def api_tag(request: Request):
 
     db_path = db.db_path
 
-    async def runner() -> int:
+    async def runner(job) -> int:
         async with Database(db_path) as job_db:
-            return await run_tag(job_db)
+            await job.update(detail="Preparing tag batches…", result={"processed": 0, "total": 0, "succeeded": 0, "failed": 0})
+            return await run_tag(job_db, progress_callback=lambda progress: job.update(detail=progress.get("summary", "Running…"), result=progress))
 
     return await start_background_job(
         request,
@@ -923,7 +924,7 @@ async def api_dedupe(request: Request):
 
     db_path = db.db_path
 
-    async def runner() -> int:
+    async def runner(_job) -> int:
         async with Database(db_path) as job_db:
             result = await job_db.dedupe_existing_events()
             return int(result["merged"])
@@ -952,7 +953,7 @@ async def api_notify(request: Request):
 
     db_path = db.db_path
 
-    async def runner() -> str:
+    async def runner(_job) -> str:
         async with Database(db_path) as job_db:
             return await run_notify(job_db, user=user)
 

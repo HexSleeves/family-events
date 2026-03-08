@@ -126,7 +126,7 @@ async def api_add_source(request: Request):
 
     db_path = db.db_path
 
-    async def runner() -> dict[str, Any]:
+    async def runner(_job) -> dict[str, Any]:
         async with Database(db_path) as job_db:
             try:
                 recipe = await PageAnalyzer().analyze(url)
@@ -177,7 +177,7 @@ async def api_reanalyze(request: Request, source_id: str):
 
     db_path = db.db_path
 
-    async def runner() -> dict[str, Any]:
+    async def runner(_job) -> dict[str, Any]:
         async with Database(db_path) as job_db:
             source_for_job = await job_db.get_source(source_id)
             if not source_for_job:
@@ -230,7 +230,7 @@ async def api_test_source(request: Request, source_id: str):
 
     db_path = db.db_path
 
-    async def runner() -> dict[str, Any]:
+    async def runner(_job) -> dict[str, Any]:
         from src.scrapers.generic import GenericScraper
 
         async with Database(db_path) as job_db:

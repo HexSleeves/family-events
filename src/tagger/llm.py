@@ -218,3 +218,20 @@ class EventTagger:
         tasks = [self._tag_event_safe(semaphore, event) for event in events]
         tagged = await asyncio.gather(*tasks)
         return [result for result in tagged if result is not None]
+
+    async def tag_events_in_batches(
+        self,
+        events: list[Event],
+        *,
+        batch_size: int,
+        on_batch_complete=None,
+    ) -> list[tuple[Event, EventTags]]:
+        """Tag events in batches so progress can be checkpointed between writes."""
+        results: list[tuple[Event, EventTags]] = []
+        for start in range(0, len(events), batch_size):
+            batch = events[start : start + batch_size]
+            tagged = await self.tag_events(batch)
+            results.extend(tagged)
+            if on_batch_complete is not None:
+                await on_batch_complete(start, batch, tagged, results)
+        return results

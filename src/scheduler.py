@@ -84,7 +84,11 @@ async def run_scrape(db: Database | None = None) -> int:
     return total
 
 
-async def run_tag(db: Database | None = None) -> int:
+async def run_tag(
+    db: Database | None = None,
+    *,
+    progress_callback=None,
+) -> int:
     """Tag all untagged events with the LLM. Returns count tagged."""
     own_db = db is None
     if own_db:
@@ -94,23 +98,50 @@ async def run_tag(db: Database | None = None) -> int:
     untagged = await db.get_untagged_events()
     if not untagged:
         print("No untagged events found.")
+        if progress_callback is not None:
+            await progress_callback({"processed": 0, "total": 0, "succeeded": 0, "failed": 0})
         if own_db:
             await db.close()
         return 0
 
-    print(f"Tagging {len(untagged)} events...")
+    total = len(untagged)
+    print(f"Tagging {total} events...")
     tagger = EventTagger()
     if tagger.model != "heuristic":
         print(
             f"Using OpenAI model={tagger.model} timeout={settings.openai_timeout_seconds}s "
-            f"concurrency={settings.tagger_concurrency}"
+            f"concurrency={settings.tagger_concurrency} batch_size={settings.tagger_batch_size}"
         )
     else:
         print("Using heuristic tagger (no OpenAI API key configured)")
-    tagged = await tagger.tag_events(untagged)
 
-    for event, tags in tagged:
-        await db.update_event_tags(event.id, tags)
+    processed = 0
+    succeeded = 0
+
+    async def on_batch_complete(start_idx, batch, tagged_batch, _all_results):
+        nonlocal processed, succeeded
+        for event, tags in tagged_batch:
+            await db.update_event_tags(event.id, tags)
+        processed = min(total, start_idx + len(batch))
+        succeeded += len(tagged_batch)
+        failed = processed - succeeded
+        print(f"Progress: {processed}/{total} processed, {succeeded} tagged, {failed} failed")
+        if progress_callback is not None:
+            await progress_callback(
+                {
+                    "processed": processed,
+                    "total": total,
+                    "succeeded": succeeded,
+                    "failed": failed,
+                    "summary": f"{processed}/{total} processed · {succeeded} tagged · {failed} failed",
+                }
+            )
+
+    tagged = await tagger.tag_events_in_batches(
+        untagged,
+        batch_size=max(1, settings.tagger_batch_size),
+        on_batch_complete=on_batch_complete,
+    )
 
     if own_db:
         await db.close()

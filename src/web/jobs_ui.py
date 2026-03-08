@@ -32,6 +32,11 @@ def job_result_value(job: Job) -> Any:
 def job_result_summary(job: Job) -> str | None:
     """Return a concise success summary for structured job results."""
     result = job_result_value(job)
+    if job.state == "running" and isinstance(result, dict):
+        summary = result.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return summary
+
     if isinstance(result, int):
         noun = {
             "scrape": "events scraped",
@@ -63,7 +68,8 @@ def job_result_summary(job: Job) -> str | None:
 def job_status_message(job: Job) -> str:
     """Return a human-readable job status string."""
     if job.state == "running":
-        return f"{job.label} is running…"
+        summary = job_result_summary(job)
+        return f"{job.label} is running… {summary}" if summary else f"{job.label} is running…"
     if job.state == "failed":
         return f"{job.label} failed: {job.error or 'Unknown error'}"
     summary = job_result_summary(job)
@@ -80,13 +86,16 @@ def job_template_context(
     auto_refresh_history: bool = False,
 ) -> dict[str, Any]:
     """Build template context for a rendered job card."""
+    result = job_result_value(job)
+    progress = result if isinstance(result, dict) else None
     return {
         "job": job,
         "target_id": target_id,
         "message": job_status_message(job),
         "started_at": fmt_job_time(job.started_at or job.created_at),
         "finished_at": fmt_job_time(job.finished_at),
-        "result": job_result_value(job),
+        "result": result,
+        "progress": progress,
         "result_summary": job_result_summary(job),
         "refresh_path": refresh_path,
         "refresh_select": refresh_select,

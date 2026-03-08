@@ -16,6 +16,24 @@ from src.db.models import Job
 
 
 @dataclass(slots=True)
+class BackgroundJobContext:
+    """Helper passed to background runners for progress updates."""
+
+    job_id: str
+
+    async def update(self, *, detail: str | None = None, result: Any | None = None) -> None:
+        fields: dict[str, Any] = {}
+        if detail is not None:
+            fields["detail"] = detail
+        if result is not None:
+            fields["result_json"] = json.dumps(result)
+        if not fields:
+            return
+        async with Database() as db:
+            await db.update_job(self.job_id, **fields)
+
+
+@dataclass(slots=True)
 class ActiveJob:
     id: str
     job_key: str
@@ -40,7 +58,7 @@ class JobRegistry:
         label: str,
         owner_user_id: str,
         source_id: str | None,
-        runner: Callable[[], Awaitable[Any]],
+        runner: Callable[[BackgroundJobContext], Awaitable[Any]],
     ) -> tuple[Job, bool]:
         async with self._lock:
             active_id = self._active_ids_by_key.get(job_key)
@@ -75,13 +93,19 @@ class JobRegistry:
             self._trim_locked()
             return job, True
 
-    async def _run(self, job_id: str, job_key: str, runner: Callable[[], Awaitable[Any]]) -> None:
+    async def _run(
+        self,
+        job_id: str,
+        job_key: str,
+        runner: Callable[[BackgroundJobContext], Awaitable[Any]],
+    ) -> None:
         started_at = datetime.now(tz=UTC)
+        context = BackgroundJobContext(job_id=job_id)
         async with Database() as db:
             await db.update_job(job_id, detail="Running…", started_at=started_at)
         try:
             result = await asyncio.wait_for(
-                runner(),
+                runner(context),
                 timeout=settings.background_job_timeout_seconds,
             )
             async with Database() as db:

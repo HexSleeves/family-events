@@ -48,3 +48,24 @@ def test_tag_events_respects_concurrency():
 
     assert len(results) == 6
     assert tagger.peak <= 2
+
+
+def test_tag_events_in_batches_calls_callback():
+    tagger = _FakeTagger()
+    events = [_event(i) for i in range(5)]
+    callbacks: list[tuple[int, int, int]] = []
+
+    async def scenario() -> None:
+        async def on_batch_complete(start_idx, batch, tagged_batch, _all_results):
+            callbacks.append((start_idx, len(batch), len(tagged_batch)))
+
+        results = await tagger.tag_events_in_batches(
+            events,
+            batch_size=2,
+            on_batch_complete=on_batch_complete,
+        )
+        assert len(results) == 5
+
+    asyncio.run(scenario())
+
+    assert callbacks == [(0, 2, 2), (2, 2, 2), (4, 1, 1)]

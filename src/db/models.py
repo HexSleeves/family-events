@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime, time
 from typing import Any, Literal
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field
 
 
 class EventTags(BaseModel):
+    tagging_version: str = "v2"
     age_min_recommended: int = 0
     age_max_recommended: int = 12
     toddler_score: int = Field(default=5, ge=0, le=10)
@@ -33,6 +35,13 @@ class EventTags(BaseModel):
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
     parent_attention_required: Literal["full", "partial", "minimal"] = "full"
     meltdown_risk: Literal["low", "medium", "high"] = "medium"
+    audience: Literal["toddler_focused", "family_mixed", "general_public", "adult_skewed"] = (
+        "general_public"
+    )
+    positive_signals: list[str] = Field(default_factory=list)
+    caution_signals: list[str] = Field(default_factory=list)
+    exclusion_signals: list[str] = Field(default_factory=list)
+    raw_rule_score: int = Field(default=50, ge=0, le=100)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +163,16 @@ class Job(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+    @property
+    def progress(self) -> dict[str, Any] | None:
+        if not self.result_json:
+            return None
+        try:
+            data = json.loads(self.result_json)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
 
 
 # ---------------------------------------------------------------------------

@@ -47,3 +47,19 @@ def test_fail_stale_jobs_marks_old_running_jobs_failed(tmp_path):
     import asyncio
 
     asyncio.run(scenario())
+
+
+def test_job_progress_property_parses_result_json():
+    job = Job(
+        kind="tag",
+        job_key="pipeline:tag",
+        label="Tag job",
+        owner_user_id="user-1",
+        result_json='{"processed": 10, "total": 25, "summary": "10/25 processed"}',
+    )
+
+    assert job.progress == {
+        "processed": 10,
+        "total": 25,
+        "summary": "10/25 processed",
+    }
