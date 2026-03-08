@@ -124,3 +124,55 @@ def test_rule_based_tagger_rewards_toddler_event_high_score():
     assert tags.toddler_score >= 8
     assert tags.raw_rule_score >= 75
     assert "learning" in tags.categories
+
+
+def test_get_untagged_events_includes_stale_tagging_versions(tmp_path):
+    async def scenario() -> None:
+        from src.db.database import Database
+        from src.db.models import Event, EventTags
+        from src.tagger.taxonomy import TAGGING_VERSION
+
+        db = Database(str(tmp_path / "tagging-version.db"))
+        await db.connect()
+        try:
+            stale = Event(
+                title="Old tagged event",
+                description="Fun",
+                start_time=datetime(2026, 3, 8, 10, 0),
+                end_time=None,
+                source="test",
+                source_url="https://example.com/stale",
+                source_id="stale",
+                location_name="Park",
+                location_address="123 Main St",
+                location_city="Lafayette",
+                is_free=True,
+                tags=EventTags(tagging_version="v1"),
+                raw_data={},
+            )
+            fresh = Event(
+                title="Fresh tagged event",
+                description="Fun",
+                start_time=datetime(2026, 3, 8, 11, 0),
+                end_time=None,
+                source="test",
+                source_url="https://example.com/fresh",
+                source_id="fresh",
+                location_name="Park",
+                location_address="123 Main St",
+                location_city="Lafayette",
+                is_free=True,
+                tags=EventTags(tagging_version=TAGGING_VERSION),
+                raw_data={},
+            )
+            await db.upsert_event(stale)
+            await db.upsert_event(fresh)
+
+            events = await db.get_untagged_events(tagging_version=TAGGING_VERSION)
+            ids = {event.source_id for event in events}
+            assert "stale" in ids
+            assert "fresh" not in ids
+        finally:
+            await db.close()
+
+    asyncio.run(scenario())

@@ -96,7 +96,10 @@
           <p class="text-xs text-[var(--color-muted)]">{{ event.start_time.strftime('%b %d, %I:%M%p') }} · {{ event.location_city }}</p>
         </div>
         {% if event.tags %}
-        <span class="text-sm font-bold text-[var(--color-accent)]">{{ event.tags.toddler_score }}/10</span>
+        <div class="text-right">
+          <div class="text-sm font-bold text-[var(--color-accent)]">{{ event.tags.toddler_score }}/10</div>
+          <div class="text-[11px] text-[var(--color-faint)]">{{ event.tags.audience.replace('_', ' ') }}</div>
+        </div>
         {% endif %}
       </a>
       {% endfor %}

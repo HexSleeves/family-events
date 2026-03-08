@@ -60,9 +60,12 @@
       <span class="badge badge-muted">${{ '%.0f' % event.price_min }}</span>
       {% endif %}
       {% if event.tags %}
+      <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
       <span class="badge badge-muted">{{ event.tags.indoor_outdoor }}</span>
       {% if event.tags.meltdown_risk == 'low' %}
       <span class="badge badge-success">calm</span>
+      {% elif event.tags.meltdown_risk == 'high' %}
+      <span class="badge badge-warning">high risk</span>
       {% endif %}
       {% for cat in (event.tags.categories or [])[:2] %}
       <span class="badge badge-info">{{ cat }}</span>

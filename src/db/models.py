@@ -72,6 +72,7 @@ class Event(BaseModel):
     scraped_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     raw_data: dict[str, Any] = Field(default_factory=dict)
     tags: EventTags | None = None
+    score_breakdown: dict[str, float] | None = None
     attended: bool = False
 
 

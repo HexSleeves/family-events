@@ -91,6 +91,9 @@
       {# Tags row #}
       {% if event.tags %}
         <div class="mt-2 flex flex-wrap gap-1">
+          {% if event.tags.audience %}
+            <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
+          {% endif %}
           {% if event.tags.indoor_outdoor %}
             <span class="badge badge-info">{{ event.tags.indoor_outdoor }}</span>
           {% endif %}

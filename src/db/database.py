@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS events (
     scraped_at      TEXT NOT NULL,
     raw_data        TEXT NOT NULL DEFAULT '{}',
     tags            TEXT,
+    score_breakdown TEXT,
     attended        INTEGER NOT NULL DEFAULT 0,
     UNIQUE(source, source_id)
 );
@@ -126,6 +127,9 @@ def _row_to_event(row: aiosqlite.Row) -> Event:
     # JSON fields
     d["raw_data"] = json.loads(str(d["raw_data"])) if d["raw_data"] else {}
     d["tags"] = EventTags.model_validate(json.loads(str(d["tags"]))) if d["tags"] else None
+    d["score_breakdown"] = (
+        json.loads(str(d["score_breakdown"])) if d.get("score_breakdown") else None
+    )
     # Datetimes stored as ISO strings
     d["start_time"] = datetime.fromisoformat(str(d["start_time"]))
     d["end_time"] = datetime.fromisoformat(str(d["end_time"])) if d["end_time"] else None
@@ -223,6 +227,7 @@ def _event_to_params(event: Event) -> dict[str, Any]:
         "scraped_at": event.scraped_at.isoformat(),
         "raw_data": json.dumps(event.raw_data),
         "tags": (json.dumps(event.tags.model_dump()) if event.tags else None),
+        "score_breakdown": json.dumps(event.score_breakdown) if event.score_breakdown else None,
         "attended": int(event.attended),
     }
 
@@ -251,6 +256,7 @@ class Database:
             "ALTER TABLE users ADD COLUMN sms_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN child_name TEXT NOT NULL DEFAULT 'Your Little One'",
             "ALTER TABLE events ADD COLUMN tagged_at TEXT",
+            "ALTER TABLE events ADD COLUMN score_breakdown TEXT",
         ]:
             with contextlib.suppress(Exception):
                 await self._db.execute(migration)
@@ -319,6 +325,7 @@ class Database:
                             ELSE scraped_at
                         END,
                         tags = COALESCE(tags, :tags),
+                        score_breakdown = COALESCE(score_breakdown, :score_breakdown),
                         attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
                     WHERE id = :canonical_id
                     """,
@@ -346,14 +353,14 @@ class Database:
                 latitude, longitude, start_time, end_time,
                 is_recurring, recurrence_rule, is_free,
                 price_min, price_max, image_url,
-                scraped_at, raw_data, tags, attended
+                scraped_at, raw_data, tags, score_breakdown, attended
             ) VALUES (
                 :id, :source, :source_url, :source_id, :title, :description,
                 :location_name, :location_address, :location_city,
                 :latitude, :longitude, :start_time, :end_time,
                 :is_recurring, :recurrence_rule, :is_free,
                 :price_min, :price_max, :image_url,
-                :scraped_at, :raw_data, :tags, :attended
+                :scraped_at, :raw_data, :tags, :score_breakdown, :attended
             )
             ON CONFLICT(source, source_id) DO UPDATE SET
                 source_url      = excluded.source_url,
@@ -453,20 +460,40 @@ class Database:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
 
-    async def get_untagged_events(self) -> list[Event]:
-        """Return events that have no AI-generated tags yet."""
-        async with self.db.execute(
-            "SELECT * FROM events WHERE tags IS NULL ORDER BY start_time"
-        ) as cursor:
+    async def get_untagged_events(self, *, tagging_version: str | None = None) -> list[Event]:
+        """Return events that have no tags, or stale tags when a version is requested."""
+        if tagging_version is None:
+            query = "SELECT * FROM events WHERE tags IS NULL ORDER BY start_time"
+            params: dict[str, Any] = {}
+        else:
+            query = (
+                "SELECT * FROM events "
+                "WHERE tags IS NULL "
+                "OR COALESCE(json_extract(tags, '$.tagging_version'), '') != :tagging_version "
+                "ORDER BY start_time"
+            )
+            params = {"tagging_version": tagging_version}
+        async with self.db.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
 
-    async def update_event_tags(self, event_id: str, tags: EventTags) -> None:
+    async def update_event_tags(
+        self,
+        event_id: str,
+        tags: EventTags,
+        *,
+        score_breakdown: dict[str, float] | None = None,
+    ) -> None:
         """Set the tags JSON for a specific event."""
         now = datetime.now(tz=UTC).isoformat()
         await self.db.execute(
-            "UPDATE events SET tags = :tags, tagged_at = :tagged_at WHERE id = :id",
-            {"tags": json.dumps(tags.model_dump()), "tagged_at": now, "id": event_id},
+            "UPDATE events SET tags = :tags, score_breakdown = :score_breakdown, tagged_at = :tagged_at WHERE id = :id",
+            {
+                "tags": json.dumps(tags.model_dump()),
+                "score_breakdown": json.dumps(score_breakdown) if score_breakdown else None,
+                "tagged_at": now,
+                "id": event_id,
+            },
         )
         await self.db.commit()
 
@@ -1129,6 +1156,7 @@ class Database:
                             ELSE scraped_at
                         END,
                         tags = COALESCE(tags, :tags),
+                        score_breakdown = COALESCE(score_breakdown, :score_breakdown),
                         attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
                     WHERE id = :canonical_id
                     """,

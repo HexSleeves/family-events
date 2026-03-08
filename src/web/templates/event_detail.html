@@ -182,55 +182,31 @@ block content %}
       Why this score?
     </h3>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {% set items = [
+        ('Toddler fit', score_breakdown.toddler_fit or 0),
+        ('Intrinsic fit', score_breakdown.intrinsic or 0),
+        ('Interests', score_breakdown.interest or 0),
+        ('Weather', score_breakdown.weather or 0),
+        ('City', score_breakdown.city or 0),
+        ('Timing', score_breakdown.timing or 0),
+        ('Logistics', score_breakdown.logistics or 0),
+        ('Novelty', score_breakdown.novelty or 0),
+        ('Confidence', score_breakdown.confidence or 0),
+        ('Rule penalty', -(score_breakdown.rule_penalty or 0)),
+        ('Budget penalty', -(score_breakdown.budget_penalty or 0))
+      ] %}
+      {% for label, value in items %}
       <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Toddler fit</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.toddler) }}
+        <p class="text-xs text-[var(--color-faint)]">{{ label }}</p>
+        <p class="font-semibold {% if value < 0 %}text-[var(--color-danger)]{% else %}text-[var(--color-heading)]{% endif %}">
+          {{ '%+.1f'|format(value) }}
         </p>
       </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Interests</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.interest) }}
-        </p>
-      </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Weather</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.weather) }}
-        </p>
-      </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">City</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.city) }}
-        </p>
-      </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Timing</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.timing) }}
-        </p>
-      </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Logistics</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.logistics) }}
-        </p>
-      </div>
-      <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2">
-        <p class="text-xs text-[var(--color-faint)]">Novelty</p>
-        <p class="font-semibold text-[var(--color-heading)]">
-          {{ '%.1f'|format(score_breakdown.novelty) }}
-        </p>
-      </div>
+      {% endfor %}
       <div class="rounded-lg bg-[var(--color-accent-light)] px-3 py-2">
         <p class="text-xs text-[var(--color-faint)]">Total</p>
         <p class="font-bold text-[var(--color-accent)]">
-          {{ '%.1f'|format(score_breakdown.toddler + score_breakdown.interest +
-          score_breakdown.weather + score_breakdown.city +
-          score_breakdown.timing + score_breakdown.logistics +
-          score_breakdown.novelty) }}
+          {{ '%.1f'|format(score_breakdown.final or 0) }}
         </p>
       </div>
     </div>

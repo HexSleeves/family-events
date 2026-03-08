@@ -9,7 +9,7 @@ from src.db.database import Database
 from src.db.models import InterestProfile, User
 from src.notifications.dispatcher import NotificationDispatcher
 from src.notifications.formatter import format_console_message
-from src.ranker.scoring import rank_events
+from src.ranker.scoring import rank_events, score_event_breakdown
 from src.ranker.weather import WeatherService
 from src.scrapers.allevents import AllEventsScraper
 from src.scrapers.brec import BrecScraper
@@ -19,6 +19,7 @@ from src.scrapers.lafayette import LafayetteScraper
 from src.scrapers.library import LibraryScraper
 from src.scrapers.recipe import ScrapeRecipe
 from src.tagger.llm import EventTagger
+from src.tagger.taxonomy import TAGGING_VERSION
 
 ALL_SCRAPERS = [
     LafayetteScraper(),  # Lafayette-first: Moncus Park, Acadiana Arts, Science Museum
@@ -95,7 +96,7 @@ async def run_tag(
         db = Database()
         await db.connect()
 
-    untagged = await db.get_untagged_events()
+    untagged = await db.get_untagged_events(tagging_version=TAGGING_VERSION)
     if not untagged:
         print("No untagged events found.")
         if progress_callback is not None:
@@ -120,8 +121,25 @@ async def run_tag(
 
     async def on_batch_complete(start_idx, batch, tagged_batch, _all_results):
         nonlocal processed, succeeded
+        weather_stub = await WeatherService().get_weekend_forecast(date.today(), date.today())
         for event, tags in tagged_batch:
-            await db.update_event_tags(event.id, tags)
+            event.tags = tags
+            breakdown = score_event_breakdown(event, InterestProfile(), weather_stub)
+            score_breakdown = {
+                "final": breakdown.final,
+                "toddler_fit": breakdown.toddler_fit,
+                "intrinsic": breakdown.intrinsic,
+                "interest": breakdown.interest,
+                "weather": breakdown.weather,
+                "timing": breakdown.timing,
+                "logistics": breakdown.logistics,
+                "novelty": breakdown.novelty,
+                "city": breakdown.city,
+                "confidence": breakdown.confidence,
+                "rule_penalty": breakdown.rule_penalty,
+                "budget_penalty": breakdown.budget_penalty,
+            }
+            await db.update_event_tags(event.id, tags, score_breakdown=score_breakdown)
         processed = min(total, start_idx + len(batch))
         succeeded += len(tagged_batch)
         failed = processed - succeeded

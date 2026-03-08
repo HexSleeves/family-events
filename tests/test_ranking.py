@@ -110,3 +110,21 @@ def test_score_breakdown_applies_budget_penalty_instead_of_zeroing():
 
     assert breakdown.final > 0
     assert breakdown.budget_penalty > 0
+
+
+def test_score_breakdown_can_be_persisted_on_event_model():
+    event = _event(
+        "Persisted breakdown",
+        city="Lafayette",
+        tags=EventTags(
+            toddler_score=8,
+            raw_rule_score=80,
+            audience="family_mixed",
+            categories=["play"],
+            confidence_score=0.6,
+        ),
+    )
+    breakdown = score_event_breakdown(event, InterestProfile(), _weather())
+    event.score_breakdown = {"final": breakdown.final, "intrinsic": breakdown.intrinsic}
+
+    assert event.score_breakdown == {"final": breakdown.final, "intrinsic": breakdown.intrinsic}

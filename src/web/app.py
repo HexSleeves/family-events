@@ -491,7 +491,7 @@ async def events_page(
         sources=filters["sources"],
     )
 
-    if request.headers.get("HX-Request"):
+    if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "events-results":
         return templates.TemplateResponse("partials/_events_table.html", page_ctx)
     return templates.TemplateResponse("events.html", page_ctx)
 
@@ -533,20 +533,24 @@ async def event_detail(request: Request, event_id: str):
 
         start = event.start_time.date()
         weather = await WeatherService().get_weekend_forecast(start, start)
-        breakdown = score_event_breakdown(event, profile, weather)
-        score_breakdown = {
-            "toddler": breakdown.toddler_fit,
-            "intrinsic": breakdown.intrinsic,
-            "interest": breakdown.interest,
-            "weather": breakdown.weather,
-            "city": breakdown.city,
-            "timing": breakdown.timing,
-            "logistics": breakdown.logistics,
-            "novelty": breakdown.novelty,
-            "confidence": breakdown.confidence,
-            "rule_penalty": -breakdown.rule_penalty,
-            "budget_penalty": -breakdown.budget_penalty,
-        }
+        if event.score_breakdown:
+            score_breakdown = event.score_breakdown
+        else:
+            breakdown = score_event_breakdown(event, profile, weather)
+            score_breakdown = {
+                "final": breakdown.final,
+                "toddler_fit": breakdown.toddler_fit,
+                "intrinsic": breakdown.intrinsic,
+                "interest": breakdown.interest,
+                "weather": breakdown.weather,
+                "city": breakdown.city,
+                "timing": breakdown.timing,
+                "logistics": breakdown.logistics,
+                "novelty": breakdown.novelty,
+                "confidence": breakdown.confidence,
+                "rule_penalty": breakdown.rule_penalty,
+                "budget_penalty": breakdown.budget_penalty,
+            }
 
         candidates = await db.get_recent_events(days=30)
         related = [

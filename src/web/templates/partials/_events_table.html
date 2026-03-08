@@ -86,9 +86,10 @@
       <p class="text-xs text-[var(--color-muted)] truncate">
         <span aria-hidden="true">📍</span> {{ event.location_name or event.location_city }}, {{ event.location_city }}
       </p>
-      {% if event.tags and event.tags.categories %}
+      {% if event.tags %}
       <div class="flex flex-wrap gap-1 mt-2">
-        {% for cat in event.tags.categories[:2] %}
+        <span class="badge badge-info">{{ event.tags.audience.replace('_', ' ') }}</span>
+        {% for cat in (event.tags.categories or [])[:2] %}
         <span class="badge badge-muted">{{ cat }}</span>
         {% endfor %}
       </div>
