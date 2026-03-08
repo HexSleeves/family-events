@@ -2,6 +2,10 @@
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import time
+from typing import Literal
 
 from openai import AsyncOpenAI
 
@@ -26,6 +30,7 @@ LOUISIANA CONTEXT:
 
 Return ONLY a JSON object with these exact fields:
 {
+  "tagging_version": "v2",
   "age_min_recommended": int,
   "age_max_recommended": int,
   "toddler_score": int (0-10, be conservative, 8+ only if truly exceptional),
@@ -44,8 +49,119 @@ Return ONLY a JSON object with these exact fields:
   "good_for_heat": boolean,
   "confidence_score": float (0-1, your confidence in this assessment),
   "parent_attention_required": "full" | "partial" | "minimal",
-  "meltdown_risk": "low" | "medium" | "high"
+  "meltdown_risk": "low" | "medium" | "high",
+  "audience": "toddler_focused" | "family_mixed" | "general_public" | "adult_skewed",
+  "positive_signals": [string],
+  "caution_signals": [string],
+  "exclusion_signals": [string],
+  "raw_rule_score": int (0-100, estimate the event's intrinsic toddler fit before personalization)
 }"""
+
+CATEGORY_RULES: dict[str, tuple[str, ...]] = {
+    "animals": ("zoo", "animal", "petting", "farm", "wildlife", "aquarium"),
+    "arts": ("art", "craft", "paint", "ceramic", "creative", "sensory", "messy"),
+    "music": ("music", "concert", "sing", "band", "jazz", "dance-along"),
+    "nature": ("nature", "swamp", "trail", "garden", "hike", "park", "outdoors"),
+    "learning": ("story", "book", "read", "library", "learn", "museum", "science"),
+    "play": (
+        "play",
+        "playground",
+        "bounce",
+        "jump",
+        "kid",
+        "toddler",
+        "child",
+        "youth",
+    ),
+    "sports": ("sport", "soccer", "baseball", "basketball", "fit", "gymnastics"),
+    "water": ("splash", "swim", "pool", "water", "aqua", "sprinkler", "foam"),
+}
+
+POSITIVE_RULES: tuple[tuple[str, int, str], ...] = (
+    ("toddler", 18, "explicitly for toddlers"),
+    ("preschool", 16, "targets preschoolers"),
+    ("story time", 14, "short child-friendly format"),
+    ("storytime", 14, "short child-friendly format"),
+    ("sensory", 14, "sensory-friendly play"),
+    ("playgroup", 14, "peer toddler play"),
+    ("petting zoo", 16, "hands-on animal experience"),
+    ("splash", 14, "cooling water play"),
+    ("playground", 14, "free play opportunity"),
+    ("family", 8, "family-oriented framing"),
+    ("kids", 10, "kid-oriented framing"),
+    ("children", 10, "child-oriented framing"),
+    ("music", 8, "music tends to engage toddlers"),
+    ("craft", 8, "hands-on creative activity"),
+    ("art", 6, "creative exploration"),
+    ("free", 5, "low commitment"),
+)
+
+CAUTION_RULES: tuple[tuple[str, int, str], ...] = (
+    ("festival", -6, "festival scale can be tiring"),
+    ("fair", -5, "can be stimulating/crowded"),
+    ("market", -5, "often not kid-centered"),
+    ("vendor", -4, "adult browsing event"),
+    ("lecture", -18, "sit-still expectation"),
+    ("workshop", -8, "may skew older/structured"),
+    ("evening", -8, "late start for toddlers"),
+    ("night", -10, "late timing"),
+    ("loud", -10, "noise overload risk"),
+    ("crowd", -8, "crowd stress risk"),
+    ("downtown", -3, "parking/logistics risk"),
+)
+
+EXCLUSION_RULES: tuple[tuple[str, int, str], ...] = (
+    ("wine", -35, "adult drinking focus"),
+    ("beer", -35, "adult drinking focus"),
+    ("cocktail", -35, "adult drinking focus"),
+    ("bar", -30, "bar setting"),
+    ("brewery", -30, "brewery setting"),
+    ("adults only", -45, "explicitly excludes kids"),
+    ("21+", -45, "age-gated"),
+    ("trivia", -28, "adult attention-focused"),
+    ("networking", -28, "adult professional event"),
+    ("5k", -24, "not toddler paced"),
+    ("marathon", -28, "not toddler paced"),
+)
+
+INDOOR_TERMS = ("indoor", "library", "museum", "studio", "classroom", "gym")
+OUTDOOR_TERMS = ("outdoor", "park", "trail", "garden", "splash", "farm")
+LOUD_TERMS = ("concert", "pep rally", "dj", "loud", "festival")
+QUIET_TERMS = ("story", "library", "sensory", "museum", "read")
+LARGE_CROWD_TERMS = ("festival", "fair", "parade", "concert", "expo")
+SMALL_CROWD_TERMS = ("story time", "storytime", "class", "playgroup", "sensory")
+FOOD_TERMS = ("food", "snack", "lunch", "breakfast", "picnic", "vendors")
+PARKING_TERMS = ("parking", "lot", "garage")
+STAIRS_TERMS = ("stairs", "upstairs", "historic")
+BATHROOM_TERMS = ("restroom", "bathroom", "facility", "visitor center", "library")
+WATER_TERMS = CATEGORY_RULES["water"]
+
+
+@dataclass(slots=True)
+class RuleEvaluation:
+    raw_score: int
+    categories: list[str]
+    audience: Literal["toddler_focused", "family_mixed", "general_public", "adult_skewed"]
+    positive_signals: list[str]
+    caution_signals: list[str]
+    exclusion_signals: list[str]
+    indoor_outdoor: Literal["indoor", "outdoor", "both"]
+    noise_level: Literal["quiet", "moderate", "loud"]
+    crowd_level: Literal["small", "medium", "large"]
+    stroller_friendly: bool
+    parking_available: bool
+    bathroom_accessible: bool
+    food_available: bool
+    nap_compatible: bool
+    energy_level: Literal["calm", "moderate", "active"]
+    weather_dependent: bool
+    good_for_rain: bool
+    good_for_heat: bool
+    parent_attention_required: Literal["full", "partial", "minimal"]
+    meltdown_risk: Literal["low", "medium", "high"]
+    age_min_recommended: int
+    age_max_recommended: int
+    confidence_score: float
 
 
 class EventTagger:
@@ -68,117 +184,248 @@ class EventTagger:
             return self._heuristic_tag(event)
         return await self._llm_tag(event)
 
+    def _event_text(self, event: Event) -> str:
+        return " ".join(
+            part
+            for part in [
+                event.title,
+                event.description,
+                event.location_name,
+                event.location_address,
+                event.location_city,
+            ]
+            if part
+        ).lower()
+
+    def _contains_any(self, haystack: str, needles: tuple[str, ...]) -> bool:
+        return any(needle in haystack for needle in needles)
+
+    def _derive_categories(self, text: str) -> list[str]:
+        categories: list[str] = []
+        for category, terms in CATEGORY_RULES.items():
+            if self._contains_any(text, terms):
+                categories.append(category)
+        if not categories:
+            categories.append("play")
+        return categories[:4]
+
+    def _rule_based_assessment(self, event: Event) -> RuleEvaluation:
+        text = self._event_text(event)
+        categories = self._derive_categories(text)
+
+        score = 50
+        positive_signals: list[str] = []
+        caution_signals: list[str] = []
+        exclusion_signals: list[str] = []
+
+        for term, delta, reason in POSITIVE_RULES:
+            if term in text:
+                score += delta
+                positive_signals.append(reason)
+
+        for term, delta, reason in CAUTION_RULES:
+            if term in text:
+                score += delta
+                caution_signals.append(reason)
+
+        for term, delta, reason in EXCLUSION_RULES:
+            if term in text:
+                score += delta
+                exclusion_signals.append(reason)
+
+        if "water" in categories:
+            score += 8
+            positive_signals.append("water play helps with Louisiana heat")
+        if "animals" in categories:
+            score += 8
+            positive_signals.append("animal encounters are toddler-friendly")
+        if "play" in categories:
+            score += 10
+            positive_signals.append("open-ended play is toddler-friendly")
+        if event.is_free:
+            score += 4
+        if event.start_time.time() >= time(19, 0):
+            score -= 18
+            caution_signals.append("late start time")
+        elif 13 <= event.start_time.hour <= 15:
+            score -= 10
+            caution_signals.append("starts during nap window")
+        elif 9 <= event.start_time.hour <= 11:
+            score += 10
+            positive_signals.append("morning timing fits toddler routines")
+
+        indoor = self._contains_any(text, INDOOR_TERMS)
+        outdoor = self._contains_any(text, OUTDOOR_TERMS)
+        if indoor and outdoor:
+            indoor_outdoor: Literal["indoor", "outdoor", "both"] = "both"
+        elif indoor:
+            indoor_outdoor = "indoor"
+        elif outdoor:
+            indoor_outdoor = "outdoor"
+        else:
+            indoor_outdoor = "both"
+
+        if self._contains_any(text, LOUD_TERMS):
+            noise_level: Literal["quiet", "moderate", "loud"] = "loud"
+        elif self._contains_any(text, QUIET_TERMS):
+            noise_level = "quiet"
+        else:
+            noise_level = "moderate"
+
+        if self._contains_any(text, LARGE_CROWD_TERMS):
+            crowd_level: Literal["small", "medium", "large"] = "large"
+        elif self._contains_any(text, SMALL_CROWD_TERMS):
+            crowd_level = "small"
+        else:
+            crowd_level = "medium"
+
+        stroller_friendly = not self._contains_any(text, STAIRS_TERMS)
+        parking_available = self._contains_any(text, PARKING_TERMS) or event.location_city in {
+            "Lafayette",
+            "Baton Rouge",
+        }
+        bathroom_accessible = self._contains_any(text, BATHROOM_TERMS) or indoor_outdoor != "outdoor"
+        food_available = self._contains_any(text, FOOD_TERMS)
+        nap_compatible = not (13 <= event.start_time.hour <= 15)
+        weather_dependent = indoor_outdoor == "outdoor"
+        good_for_rain = indoor_outdoor in {"indoor", "both"}
+        good_for_heat = indoor_outdoor == "indoor" or self._contains_any(text, WATER_TERMS)
+
+        energy_level: Literal["calm", "moderate", "active"]
+        if "sports" in categories or "water" in categories or "play" in categories:
+            energy_level = "active"
+        elif "learning" in categories and noise_level == "quiet":
+            energy_level = "calm"
+        else:
+            energy_level = "moderate"
+
+        if exclusion_signals:
+            audience: Literal["toddler_focused", "family_mixed", "general_public", "adult_skewed"]
+            audience = "adult_skewed"
+        elif any(term in text for term in ("toddler", "preschool", "story time", "playgroup")):
+            audience = "toddler_focused"
+        elif any(term in text for term in ("family", "kids", "children")):
+            audience = "family_mixed"
+        else:
+            audience = "general_public"
+
+        parent_attention_required: Literal["full", "partial", "minimal"] = "partial"
+        if crowd_level == "large" or noise_level == "loud":
+            parent_attention_required = "full"
+        elif audience == "toddler_focused" and noise_level == "quiet":
+            parent_attention_required = "minimal"
+
+        risk_points = 0
+        if noise_level == "loud":
+            risk_points += 2
+        if crowd_level == "large":
+            risk_points += 2
+        if not nap_compatible:
+            risk_points += 1
+        if event.start_time.time() >= time(19, 0):
+            risk_points += 2
+        if audience == "adult_skewed":
+            risk_points += 3
+
+        meltdown_risk: Literal["low", "medium", "high"]
+        if risk_points >= 5:
+            meltdown_risk = "high"
+        elif risk_points >= 2:
+            meltdown_risk = "medium"
+        else:
+            meltdown_risk = "low"
+
+        if audience == "adult_skewed":
+            age_min = 8
+        elif audience == "toddler_focused":
+            age_min = 1
+        else:
+            age_min = 3
+        age_max = 12 if audience != "adult_skewed" else 99
+
+        confidence = 0.55
+        if len(positive_signals) + len(caution_signals) + len(exclusion_signals) >= 4:
+            confidence = 0.72
+        if event.description:
+            confidence += 0.08
+        confidence = min(confidence, 0.9)
+
+        score = max(0, min(100, score))
+        return RuleEvaluation(
+            raw_score=score,
+            categories=categories,
+            audience=audience,
+            positive_signals=positive_signals[:5],
+            caution_signals=caution_signals[:5],
+            exclusion_signals=exclusion_signals[:5],
+            indoor_outdoor=indoor_outdoor,
+            noise_level=noise_level,
+            crowd_level=crowd_level,
+            stroller_friendly=stroller_friendly,
+            parking_available=parking_available,
+            bathroom_accessible=bathroom_accessible,
+            food_available=food_available,
+            nap_compatible=nap_compatible,
+            energy_level=energy_level,
+            weather_dependent=weather_dependent,
+            good_for_rain=good_for_rain,
+            good_for_heat=good_for_heat,
+            parent_attention_required=parent_attention_required,
+            meltdown_risk=meltdown_risk,
+            age_min_recommended=age_min,
+            age_max_recommended=age_max,
+            confidence_score=confidence,
+        )
+
     def _heuristic_tag(self, event: Event) -> EventTags:
         """Rule-based fallback tagger when no LLM API key is configured."""
-        title = (event.title + " " + event.description).lower()
-        cats: list[str] = []
-        toddler_score = 5  # default
-
-        # Category detection
-        if any(w in title for w in ["zoo", "animal", "petting", "farm", "wildlife"]):
-            cats.append("animals")
-            toddler_score += 2
-        if any(w in title for w in ["art", "craft", "paint", "ceramic", "creative"]):
-            cats.append("arts")
-            toddler_score += 1
-        if any(w in title for w in ["music", "concert", "sing", "band", "jazz"]):
-            cats.append("music")
-        if any(w in title for w in ["nature", "swamp", "trail", "garden", "hike", "park"]):
-            cats.append("nature")
-        if any(w in title for w in ["story", "book", "read", "library", "learn"]):
-            cats.append("learning")
-            toddler_score += 1
-        if any(
-            w in title
-            for w in ["play", "playground", "bounce", "jump", "kid", "toddler", "child", "youth"]
-        ):
-            cats.append("play")
-            toddler_score += 2
-        if any(w in title for w in ["sport", "soccer", "baseball", "basketball", "fit"]):
-            cats.append("sports")
-        if any(w in title for w in ["splash", "swim", "pool", "water", "aqua"]):
-            cats.append("water")
-            toddler_score += 2
-
-        # Detect indoor/outdoor
-        indoor_outdoor = "both"
-        if any(w in title for w in ["indoor", "library", "museum", "studio", "classroom"]):
-            indoor_outdoor = "indoor"
-        elif any(w in title for w in ["outdoor", "park", "trail", "garden", "splash"]):
-            indoor_outdoor = "outdoor"
-
-        # Family/kid oriented boost
-        if any(
-            w in title
-            for w in [
-                "family",
-                "kid",
-                "toddler",
-                "preschool",
-                "baby",
-                "child",
-                "youth",
-                "beginnings",
-            ]
-        ):
-            toddler_score += 1
-
-        # Adult-oriented penalty
-        if any(
-            w in title
-            for w in [
-                "bar",
-                "wine",
-                "beer",
-                "cocktail",
-                "adults only",
-                "senior",
-                "5k",
-                "marathon",
-                "trivia",
-            ]
-        ):
-            toddler_score = max(1, toddler_score - 4)
-
-        # Time-based nap compatibility
-        nap_compat = True
-        if event.start_time.hour >= 13 and event.start_time.hour <= 15:
-            nap_compat = False
-
-        # Clamp score
-        toddler_score = max(1, min(10, toddler_score))
-        if not cats:
-            cats = ["play"]
+        rule_eval = self._rule_based_assessment(event)
+        toddler_score = round(rule_eval.raw_score / 10)
+        toddler_score = max(0, min(10, toddler_score))
 
         return EventTags(
-            age_min_recommended=0 if toddler_score >= 6 else 5,
-            age_max_recommended=99,
+            tagging_version="v2",
+            age_min_recommended=rule_eval.age_min_recommended,
+            age_max_recommended=rule_eval.age_max_recommended,
             toddler_score=toddler_score,
-            indoor_outdoor=indoor_outdoor,
-            noise_level="moderate",
-            crowd_level="medium",
-            stroller_friendly=True,
-            parking_available=True,
-            bathroom_accessible=True,
-            food_available=False,
-            nap_compatible=nap_compat,
-            categories=cats[:3],
-            energy_level="moderate",
-            weather_dependent=indoor_outdoor == "outdoor",
-            good_for_rain=indoor_outdoor == "indoor",
-            good_for_heat=indoor_outdoor == "indoor" or "water" in cats,
-            confidence_score=0.5,
-            parent_attention_required="partial",
-            meltdown_risk="medium",
+            indoor_outdoor=rule_eval.indoor_outdoor,
+            noise_level=rule_eval.noise_level,
+            crowd_level=rule_eval.crowd_level,
+            stroller_friendly=rule_eval.stroller_friendly,
+            parking_available=rule_eval.parking_available,
+            bathroom_accessible=rule_eval.bathroom_accessible,
+            food_available=rule_eval.food_available,
+            nap_compatible=rule_eval.nap_compatible,
+            categories=rule_eval.categories,
+            energy_level=rule_eval.energy_level,
+            weather_dependent=rule_eval.weather_dependent,
+            good_for_rain=rule_eval.good_for_rain,
+            good_for_heat=rule_eval.good_for_heat,
+            confidence_score=rule_eval.confidence_score,
+            parent_attention_required=rule_eval.parent_attention_required,
+            meltdown_risk=rule_eval.meltdown_risk,
+            audience=rule_eval.audience,
+            positive_signals=rule_eval.positive_signals,
+            caution_signals=rule_eval.caution_signals,
+            exclusion_signals=rule_eval.exclusion_signals,
+            raw_rule_score=rule_eval.raw_score,
         )
 
     async def _llm_tag(self, event: Event) -> EventTags:
         """Tag a single event using the LLM."""
+        rule_eval = self._rule_based_assessment(event)
         user_prompt = (
             f"Event: {event.title}\n"
             f"Description: {(event.description or 'No description')[:1500]}\n"
             f"Location: {event.location_name}, {event.location_city}\n"
             f"Date/Time: {event.start_time.strftime('%A %B %d, %Y at %I:%M %p')}\n"
+            f"Rule baseline score: {rule_eval.raw_score}/100\n"
+            f"Rule audience: {rule_eval.audience}\n"
+            f"Rule categories: {', '.join(rule_eval.categories)}\n"
+            f"Positive signals: {', '.join(rule_eval.positive_signals) or 'none'}\n"
+            f"Caution signals: {', '.join(rule_eval.caution_signals) or 'none'}\n"
+            f"Exclusion signals: {', '.join(rule_eval.exclusion_signals) or 'none'}\n"
+            "Use the rule baseline as a starting point, but correct it if the event details justify it.\n"
         )
         if event.end_time:
             user_prompt += f"Ends: {event.end_time.strftime('%I:%M %p')}\n"
@@ -193,11 +440,17 @@ class EventTagger:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.3,
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
 
         raw = json.loads(response.choices[0].message.content or "{}")
+        raw.setdefault("tagging_version", "v2")
+        raw.setdefault("raw_rule_score", rule_eval.raw_score)
+        raw.setdefault("positive_signals", rule_eval.positive_signals)
+        raw.setdefault("caution_signals", rule_eval.caution_signals)
+        raw.setdefault("exclusion_signals", rule_eval.exclusion_signals)
+        raw.setdefault("audience", rule_eval.audience)
         return EventTags.model_validate(raw)
 
     async def _tag_event_safe(
@@ -206,7 +459,10 @@ class EventTagger:
         async with semaphore:
             try:
                 tags = await self.tag_event(event)
-                print(f"  Tagged: {event.title} \u2192 toddler_score={tags.toddler_score}")
+                print(
+                    f"  Tagged: {event.title} → toddler_score={tags.toddler_score} "
+                    f"rule_score={tags.raw_rule_score} audience={tags.audience}"
+                )
                 return event, tags
             except Exception as e:
                 print(f"  Failed to tag '{event.title}': {e}")
@@ -224,14 +480,21 @@ class EventTagger:
         events: list[Event],
         *,
         batch_size: int,
-        on_batch_complete=None,
+        on_batch_complete: Callable[
+            [int, list[Event], list[tuple[Event, EventTags]], list[tuple[Event, EventTags]]],
+            Awaitable[None],
+        ]
+        | None = None,
     ) -> list[tuple[Event, EventTags]]:
-        """Tag events in batches so progress can be checkpointed between writes."""
-        results: list[tuple[Event, EventTags]] = []
-        for start in range(0, len(events), batch_size):
-            batch = events[start : start + batch_size]
-            tagged = await self.tag_events(batch)
-            results.extend(tagged)
+        """Tag events in batches, optionally reporting progress after each batch."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be > 0")
+
+        all_results: list[tuple[Event, EventTags]] = []
+        for start_idx in range(0, len(events), batch_size):
+            batch = events[start_idx : start_idx + batch_size]
+            tagged_batch = await self.tag_events(batch)
+            all_results.extend(tagged_batch)
             if on_batch_complete is not None:
-                await on_batch_complete(start, batch, tagged, results)
-        return results
+                await on_batch_complete(start_idx, batch, tagged_batch, all_results)
+        return all_results

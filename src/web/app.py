@@ -30,9 +30,11 @@ from src.ranker.scoring import (
     _timing_score,
     _weather_score,
     rank_events,
+    score_event_breakdown,
 )
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
 from src.web.auth import (
+    ensure_csrf_token,
     get_current_user,
     hash_password,
     login_session,
@@ -51,6 +53,7 @@ from src.web.common import (
     require_login_and_csrf,
     toast,
 )
+from src.web.jobs import job_registry
 from src.web.jobs_ui import job_template_context, render_job_cards, start_background_job
 from src.web.middleware import RequestLoggingMiddleware
 from src.web.routes.auth import router as auth_router
@@ -539,14 +542,19 @@ async def event_detail(request: Request, event_id: str):
         start = event.start_time.date()
         weather = await WeatherService().get_weekend_forecast(start, start)
         tags = event.tags
+        breakdown = score_event_breakdown(event, profile, weather)
         score_breakdown = {
-            "toddler": tags.toddler_score * 3.0,
-            "interest": _interest_score(tags.categories, profile) * 2.5,
-            "weather": _weather_score(event, tags, weather) * 2.0,
-            "city": _city_score(event, profile) * 2.0,
-            "timing": _timing_score(event, profile) * 1.5,
-            "logistics": _logistics_score(tags) * 1.0,
-            "novelty": (5.0 if not event.attended else 0.0) * 0.5,
+            "toddler": breakdown.toddler_fit,
+            "intrinsic": breakdown.intrinsic,
+            "interest": breakdown.interest,
+            "weather": breakdown.weather,
+            "city": breakdown.city,
+            "timing": breakdown.timing,
+            "logistics": breakdown.logistics,
+            "novelty": breakdown.novelty,
+            "confidence": breakdown.confidence,
+            "rule_penalty": -breakdown.rule_penalty,
+            "budget_penalty": -breakdown.budget_penalty,
         }
 
         candidates = await db.get_recent_events(days=30)
@@ -799,8 +807,35 @@ async def api_job_status(request: Request, job_id: str, target_id: str = "job-st
 
     return templates.TemplateResponse(
         "partials/_job_status.html",
-        {"request": request, **job_template_context(job, target_id=target_id)},
+        {
+            "request": request,
+            "csrf_token": ensure_csrf_token(request),
+            **job_template_context(job, target_id=target_id),
+        },
     )
+
+
+@app.post("/api/jobs/{job_id}/cancel", response_class=HTMLResponse)
+async def api_cancel_job(request: Request, job_id: str, target_id: str = "job-status"):
+    user, _form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None
+    if throttled := check_rate_limit(request, "api_cancel_job"):
+        return throttled
+
+    job = await job_registry.cancel(job_id=job_id, owner_user_id=user.id)
+    if not job:
+        return toast("Job not found", "error", status_code=404)
+
+    body = templates.get_template("partials/_job_status.html").render(
+        request=request,
+        csrf_token=ensure_csrf_token(request),
+        **job_template_context(job, target_id=target_id),
+    )
+    if job.state == "running":
+        return toast("Job is still running", "warning", body=body)
+    return toast("Job cancelled", "success", body=body)
 
 
 @app.get("/jobs", response_class=HTMLResponse)

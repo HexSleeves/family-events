@@ -69,3 +69,58 @@ def test_tag_events_in_batches_calls_callback():
     asyncio.run(scenario())
 
     assert callbacks == [(0, 2, 2), (2, 2, 2), (4, 1, 1)]
+
+
+def test_rule_based_tagger_flags_adult_event_low_score():
+    event = Event(
+        title="Brewery Trivia Night",
+        description="Adults only trivia with beer specials",
+        start_time=datetime(2026, 3, 8, 20, 0),
+        end_time=None,
+        source="test",
+        source_url="https://example.com/adult",
+        source_id="test-source",
+        location_name="Taproom",
+        location_address="123 Main St",
+        location_city="Lafayette",
+        is_free=True,
+        price_min=None,
+        price_max=None,
+        tags=None,
+        raw_data={},
+    )
+
+    tags = EventTagger()._heuristic_tag(event)
+
+    assert tags.audience == "adult_skewed"
+    assert tags.toddler_score <= 3
+    assert tags.raw_rule_score <= 30
+    assert tags.exclusion_signals
+
+
+
+def test_rule_based_tagger_rewards_toddler_event_high_score():
+    event = Event(
+        title="Toddler Story Time and Sensory Play",
+        description="Library storytime for toddlers with songs and sensory bins.",
+        start_time=datetime(2026, 3, 8, 10, 0),
+        end_time=None,
+        source="test",
+        source_url="https://example.com/toddler",
+        source_id="test-source",
+        location_name="Library",
+        location_address="123 Main St",
+        location_city="Lafayette",
+        is_free=True,
+        price_min=None,
+        price_max=None,
+        tags=None,
+        raw_data={},
+    )
+
+    tags = EventTagger()._heuristic_tag(event)
+
+    assert tags.audience == "toddler_focused"
+    assert tags.toddler_score >= 8
+    assert tags.raw_rule_score >= 75
+    assert "learning" in tags.categories

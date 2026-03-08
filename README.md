@@ -18,8 +18,8 @@ for things to do this weekend.
 ```
 
 1. **Scrape** — Pulls events from 5 sources (BREC parks, Eventbrite, AllEvents, Lafayette venues, libraries)
-2. **Tag** — AI scores each event for toddler-friendliness (0-10), noise, crowds, stroller access, meltdown risk
-3. **Rank** — Weighted scoring based on your child's interests, weather forecast, timing, and logistics
+2. **Tag** — Hybrid rule + AI tagging assigns structured family-fit metadata, signal lists, and a toddler score
+3. **Rank** — Weighted scoring blends intrinsic toddler fit, personalized interests, weather, timing, logistics, and penalties
 4. **Notify** — Sends top weekend picks via console, SMS, Telegram, or email
 
 The web dashboard lets you browse, search, filter, and manually trigger any step.
@@ -83,17 +83,31 @@ Lafayette venues include Moncus Park, Acadiana Center for the Arts, and Lafayett
 
 ## Event Scoring
 
-Each event gets a weighted score combining AI analysis with personal preferences:
+Each event gets a weighted score combining intrinsic family-fit rules with personal preferences:
 
 ```
-Final Score = toddler_score    × 3.0   (AI: how good for a 3yo, 0-10)
-            + interest_match   × 2.5   (matches daughter's loves/likes)
-            + weather_compat   × 2.0   (rain→indoor, heat→shade/water)
-            + city_proximity   × 2.0   (Lafayette +10, Baton Rouge +2)
-            + timing_score     × 1.5   (morning bonus, nap/bedtime penalty)
-            + logistics        × 1.0   (stroller, parking, bathrooms)
-            + novelty          × 0.5   (haven't attended recently)
+Final Score = toddler_fit      × 2.2   (normalized 0-10 toddler score)
+            + intrinsic_fit    × 0.35  (rule-system raw score, normalized from 0-100)
+            + interest_match   × 1.4   (matches child's loves/likes)
+            + weather_compat   × 1.0   (rain→indoor, heat→shade/water)
+            + timing_score     × 1.0   (morning bonus, nap/bedtime penalty)
+            + logistics        × 0.9   (stroller, parking, bathrooms, food)
+            + city_proximity   × 0.8   (preferred cities favored)
+            + novelty          × 0.4   (haven't attended recently)
+            + confidence       × 0.5   (better-described events rank more reliably)
+            - rule_penalty           (adult-skewed/high-risk/exclusion signals)
+            - budget_penalty         (over-budget events are penalized, not auto-zeroed)
 ```
+
+### Tagging Rules (per event)
+
+Every event starts at a neutral `raw_rule_score` of **50/100**.
+
+- **Positive signals** add points: toddler/preschool wording, story time, sensory play, playgrounds, animals, water play, family framing, morning timing.
+- **Caution signals** subtract points: festival/fair scale, lectures, late evening starts, loud/crowded framing, downtown logistics.
+- **Exclusion signals** subtract heavily: bars, breweries, wine/beer, trivia, networking, adults-only, 21+, marathon/5k.
+- A derived **audience** is assigned: `toddler_focused`, `family_mixed`, `general_public`, or `adult_skewed`.
+- Reasons are preserved on the tag object as `positive_signals`, `caution_signals`, and `exclusion_signals`.
 
 ### AI Tags (per event)
 
@@ -111,6 +125,11 @@ Final Score = toddler_score    × 3.0   (AI: how good for a 3yo, 0-10)
 | `nap_compatible` | ✅ / ❌ |
 | `weather_dependent` | ✅ / ❌ |
 | `categories` | e.g., ["animals", "nature", "arts"] |
+| `audience` | toddler_focused / family_mixed / general_public / adult_skewed |
+| `raw_rule_score` | 0-100 |
+| `positive_signals` | reasons the event looks good for toddlers |
+| `caution_signals` | softer concerns that reduce the score |
+| `exclusion_signals` | strong reasons to avoid recommending it |
 
 ### Child Interest Profile
 
