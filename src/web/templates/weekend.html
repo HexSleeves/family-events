@@ -3,34 +3,24 @@ content %}
 
 <div class="animate-fade-in">
   {# ═══ PAGE TITLE — left accent border ═══ #}
-  <h1
-    id="weekend-heading"
-    class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)] border-l-[3px] border-[var(--color-accent)] pl-3 mb-6"
-  >
+  <h1 id="weekend-heading"
+    class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)] border-l-[3px] border-[var(--color-accent)] pl-3 mb-6">
     <span aria-hidden="true">🎉</span> Weekend Plan: {{ saturday.strftime('%b
     %d') }} – {{ sunday.strftime('%b %d') }}
   </h1>
 
   {# ═══ WEATHER BANNER — glass card ═══ #}
-  <section
-    aria-labelledby="weather-heading"
-    class="glass rounded-2xl p-5 sm:p-6 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] mb-8 animate-fade-in-up stagger-1"
-  >
+  <section aria-labelledby="weather-heading"
+    class="glass rounded-2xl p-5 sm:p-6 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] mb-8 animate-fade-in-up stagger-1">
     <h2 id="weather-heading" class="sr-only">Weekend Weather</h2>
 
-    <div
-      class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-    >
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       {# Day forecasts #}
       <div class="flex items-center gap-6 sm:gap-8">
         {# Saturday #}
         <div class="flex items-center gap-3">
-          <div
-            class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)] flex items-center justify-center"
-          >
-            <span class="text-2xl" aria-hidden="true"
-              >{{ weather.saturday.icon }}</span
-            >
+          <div class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)] flex items-center justify-center">
+            <span class="text-2xl" aria-hidden="true">{{ weather.saturday.icon }}</span>
           </div>
           <div>
             <p class="text-sm font-bold text-[var(--color-heading)]">
@@ -43,19 +33,12 @@ content %}
         </div>
 
         {# Divider #}
-        <div
-          class="hidden sm:block w-px h-10 bg-[var(--color-edge)]"
-          aria-hidden="true"
-        ></div>
+        <div class="hidden sm:block w-px h-10 bg-[var(--color-edge)]" aria-hidden="true"></div>
 
         {# Sunday #}
         <div class="flex items-center gap-3">
-          <div
-            class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)] flex items-center justify-center"
-          >
-            <span class="text-2xl" aria-hidden="true"
-              >{{ weather.sunday.icon }}</span
-            >
+          <div class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)] flex items-center justify-center">
+            <span class="text-2xl" aria-hidden="true">{{ weather.sunday.icon }}</span>
           </div>
           <div>
             <p class="text-sm font-bold text-[var(--color-heading)]">Sunday</p>
@@ -68,27 +51,21 @@ content %}
 
       {# Weather summary with tone icon — ADA: not color-only #} {% if
       weather_tone == 'success' %}
-      <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent-light)]"
-      >
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent-light)]">
         <span aria-hidden="true">☀️</span>
         <p class="text-sm font-medium text-[var(--color-accent)]">
           {{ weather_summary }}
         </p>
       </div>
       {% elif weather_tone == 'warning' %}
-      <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-light)]"
-      >
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-light)]">
         <span aria-hidden="true">⚠️</span>
         <p class="text-sm font-medium text-[var(--color-brand)]">
           {{ weather_summary }}
         </p>
       </div>
       {% else %}
-      <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-surface-tertiary)]"
-      >
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-surface-tertiary)]">
         <span aria-hidden="true">🌤️</span>
         <p class="text-sm font-medium text-[var(--color-muted)]">
           {{ weather_summary }}
@@ -99,27 +76,14 @@ content %}
   </section>
 
   {# ═══ WEATHER TIPS — bordered info card ═══ #} {% if weather_tips %}
-  <section
-    aria-labelledby="tips-heading"
-    class="mb-8 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-4 sm:p-5 animate-fade-in-up stagger-2"
-  >
+  <section aria-labelledby="tips-heading"
+    class="mb-8 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-4 sm:p-5 animate-fade-in-up stagger-2">
     <div class="flex items-center gap-2 mb-3">
-      <div
-        class="w-8 h-8 rounded-lg bg-[var(--color-info-light)] flex items-center justify-center shrink-0"
-      >
-        <svg
-          class="w-4 h-4 text-[var(--color-info)]"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
+      <div class="w-8 h-8 rounded-lg bg-[var(--color-info-light)] flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4 text-[var(--color-info)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
       <h3 id="tips-heading" class="font-semibold text-[var(--color-heading)]">
@@ -129,9 +93,7 @@ content %}
     <ul class="space-y-1.5 text-sm text-[var(--color-muted)] pl-10">
       {% for tip in weather_tips %}
       <li class="flex items-start gap-2">
-        <span class="text-[var(--color-accent)] mt-0.5" aria-hidden="true"
-          >•</span
-        >
+        <span class="text-[var(--color-accent)] mt-0.5" aria-hidden="true">•</span>
         <span>{{ tip }}</span>
       </li>
       {% endfor %}
@@ -139,10 +101,8 @@ content %}
   </section>
   {% endif %} {# ═══ RANKED EVENTS ═══ #} {% if ranked %}
   <section aria-labelledby="picks-heading">
-    <h2
-      id="picks-heading"
-      class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3 mb-5 animate-fade-in-up stagger-2"
-    >
+    <h2 id="picks-heading"
+      class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3 mb-5 animate-fade-in-up stagger-2">
       <span aria-hidden="true">⭐</span> Top {{ ranked|length }} Picks for Your
       Weekend
     </h2>
@@ -155,12 +115,8 @@ content %}
     </div>
   </section>
   {% else %} {# ═══ EMPTY STATE ═══ #}
-  <div
-    class="flex flex-col items-center justify-center py-16 text-center animate-fade-in-up stagger-2"
-  >
-    <div
-      class="w-20 h-20 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center mb-5"
-    >
+  <div class="flex flex-col items-center justify-center py-16 text-center animate-fade-in-up stagger-2">
+    <div class="w-20 h-20 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center mb-5">
       <span class="text-4xl" aria-hidden="true">📅</span>
     </div>
     <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-2">

@@ -9,41 +9,48 @@
     </div>
   </div>
 
-  <form method="get" action="/jobs" class="glass rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+  <form method="get" action="/jobs"
+    class="glass rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
     <div>
       <label for="job-q" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Search</label>
       <input id="job-q" type="search" name="q" value="{{ q }}" placeholder="Label, detail, error..."
-             class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)]" />
+        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)]" />
     </div>
     <div>
       <label for="job-state" class="block text-xs font-medium text-[var(--color-muted)] mb-1">State</label>
-      <select id="job-state" name="state" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
+      <select id="job-state" name="state"
+        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
         <option value="">All states</option>
         {% for value in ['running', 'succeeded', 'failed', 'cancelled'] %}
-        <option value="{{ value }}" {% if selected_state == value %}selected{% endif %}>{{ value }}</option>
+        <option value="{{ value }}" {% if selected_state==value %}selected{% endif %}>{{ value }}</option>
         {% endfor %}
       </select>
     </div>
     <div>
       <label for="job-kind" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Kind</label>
-      <select id="job-kind" name="kind" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
+      <select id="job-kind" name="kind"
+        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
         <option value="">All kinds</option>
         {% for value in job_kinds %}
-        <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ value }}</option>
+        <option value="{{ value }}" {% if selected_kind==value %}selected{% endif %}>{{ value }}</option>
         {% endfor %}
       </select>
     </div>
     <div>
       <label for="job-source" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Source</label>
-      <select id="job-source" name="source_id" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
+      <select id="job-source" name="source_id"
+        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
         <option value="">All sources</option>
         {% for source in sources %}
-        <option value="{{ source.id }}" {% if selected_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
+        <option value="{{ source.id }}" {% if selected_source_id==source.id %}selected{% endif %}>{{ source.name }}
+        </option>
         {% endfor %}
       </select>
     </div>
     <div class="md:col-span-4 flex items-center gap-3">
-      <button type="submit" class="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90">Apply filters</button>
+      <button type="submit"
+        class="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90">Apply
+        filters</button>
       <a href="/jobs" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)]">Reset</a>
     </div>
   </form>
@@ -56,23 +63,24 @@
     {% if job_cards %}
     <div class="space-y-3">
       {% for card in job_cards %}
-        {% set job = card.job %}
-        {% set target_id = card.target_id %}
-        {% set message = card.message %}
-        {% set started_at = card.started_at %}
-        {% set finished_at = card.finished_at %}
-        {% set result = card.result %}
-        {% set progress = card.progress %}
-        {% set result_summary = card.result_summary %}
-        {% set refresh_path = card.refresh_path %}
-        {% set refresh_select = card.refresh_select %}
-        {% set refresh_target_id = card.refresh_target_id %}
-        {% set auto_refresh_history = card.auto_refresh_history %}
-        {% include "partials/_job_status.html" %}
+      {% set job = card.job %}
+      {% set target_id = card.target_id %}
+      {% set message = card.message %}
+      {% set started_at = card.started_at %}
+      {% set finished_at = card.finished_at %}
+      {% set result = card.result %}
+      {% set progress = card.progress %}
+      {% set result_summary = card.result_summary %}
+      {% set refresh_path = card.refresh_path %}
+      {% set refresh_select = card.refresh_select %}
+      {% set refresh_target_id = card.refresh_target_id %}
+      {% set auto_refresh_history = card.auto_refresh_history %}
+      {% include "partials/_job_status.html" %}
       {% endfor %}
     </div>
     {% else %}
-    <div class="glass rounded-xl p-6 border border-[var(--color-edge-subtle)] text-sm text-[var(--color-muted)]">No jobs match these filters yet.</div>
+    <div class="glass rounded-xl p-6 border border-[var(--color-edge-subtle)] text-sm text-[var(--color-muted)]">No jobs
+      match these filters yet.</div>
     {% endif %}
   </section>
 </div>

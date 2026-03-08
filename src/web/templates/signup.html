@@ -3,12 +3,9 @@ content %}
 
 <div class="max-w-md mx-auto mt-8">
   <div
-    class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] p-8 animate-scale-in"
-  >
+    class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] p-8 animate-scale-in">
     <div class="text-center mb-6">
-      <div
-        class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--color-accent-light)] mb-3"
-      >
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--color-accent-light)] mb-3">
         <span class="text-3xl" aria-hidden="true">🎈</span>
       </div>
       <h2 class="text-xl font-bold text-[var(--color-heading)] mt-2">
@@ -20,10 +17,8 @@ content %}
     </div>
 
     {% if errors %}
-    <div
-      role="alert"
-      class="bg-[var(--color-danger-light)] text-[var(--color-danger)] px-4 py-3 rounded-lg text-sm mb-4"
-    >
+    <div role="alert"
+      class="bg-[var(--color-danger-light)] text-[var(--color-danger)] px-4 py-3 rounded-lg text-sm mb-4">
       <ul class="list-disc list-inside space-y-1">
         {% for err in errors %}
         <li>{{ err }}</li>
@@ -35,79 +30,37 @@ content %}
     <form method="POST" action="/signup" class="space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div>
-        <label
-          for="signup-display-name"
-          class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"
-          >Display Name</label
-        >
-        <input
-          type="text"
-          name="display_name"
-          id="signup-display-name"
-          value="{{ display_name|default('') }}"
-          required
+        <label for="signup-display-name" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Display
+          Name</label>
+        <input type="text" name="display_name" id="signup-display-name" value="{{ display_name|default('') }}" required
           autofocus
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-        />
+          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
       <div>
-        <label
-          for="signup-email"
-          class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"
-          >Email</label
-        >
-        <input
-          type="email"
-          name="email"
-          id="signup-email"
-          value="{{ email|default('') }}"
-          required
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-        />
+        <label for="signup-email" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Email</label>
+        <input type="email" name="email" id="signup-email" value="{{ email|default('') }}" required
+          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
       <div>
-        <label
-          for="signup-password"
-          class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"
-          >Password</label
-        >
-        <input
-          type="password"
-          name="password"
-          id="signup-password"
-          required
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-        />
+        <label for="signup-password" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Password</label>
+        <input type="password" name="password" id="signup-password" required
+          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
       <div>
-        <label
-          for="signup-confirm-password"
-          class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"
-          >Confirm Password</label
-        >
-        <input
-          type="password"
-          name="confirm_password"
-          id="signup-confirm-password"
-          required
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-        />
+        <label for="signup-confirm-password" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Confirm
+          Password</label>
+        <input type="password" name="confirm_password" id="signup-confirm-password" required
+          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
       </div>
-      <button
-        type="submit"
-        class="w-full px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-semibold text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all touch-target"
-      >
+      <button type="submit"
+        class="w-full px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-semibold text-sm hover:bg-[var(--color-brand-hover)] active:scale-[0.98] transition-all touch-target">
         Create Account
       </button>
     </form>
 
     <p class="text-center text-sm text-[var(--color-muted)] mt-6">
       Already have an account?
-      <a
-        href="/login"
-        class="text-[var(--color-accent)] font-medium hover:underline"
-        >Log in</a
-      >
+      <a href="/login" class="text-[var(--color-accent)] font-medium hover:underline">Log in</a>
     </p>
   </div>
 </div>
