@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from src.config import settings
 from src.db.database import Database
 from src.db.models import InterestProfile, User
 from src.notifications.dispatcher import NotificationDispatcher
@@ -99,6 +100,13 @@ async def run_tag(db: Database | None = None) -> int:
 
     print(f"Tagging {len(untagged)} events...")
     tagger = EventTagger()
+    if tagger.model != "heuristic":
+        print(
+            f"Using OpenAI model={tagger.model} timeout={settings.openai_timeout_seconds}s "
+            f"concurrency={settings.tagger_concurrency}"
+        )
+    else:
+        print("Using heuristic tagger (no OpenAI API key configured)")
     tagged = await tagger.tag_events(untagged)
 
     for event, tags in tagged:

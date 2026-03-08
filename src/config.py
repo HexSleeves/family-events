@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: float = 20.0
+    openai_max_retries: int = 1
+    tagger_concurrency: int = 8
 
     # Weather
     weather_api_key: str = ""  # OpenWeatherMap

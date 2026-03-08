@@ -145,8 +145,12 @@ async def start_background_job(
         message = f"{label} is already running"
         variant = "warning"
 
-    body = get_templates(request).get_template("partials/_job_status.html").render(
-        request=request,
-        **job_template_context(job, target_id=target_id),
+    body = (
+        get_templates(request)
+        .get_template("partials/_job_status.html")
+        .render(
+            request=request,
+            **job_template_context(job, target_id=target_id),
+        )
     )
     return toast(message, variant, body=body)

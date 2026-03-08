@@ -515,7 +515,11 @@ async def event_detail(request: Request, event_id: str):
     raw_data = json.dumps(event.raw_data, indent=2, default=str)[:3000]
 
     map_query = ", ".join(
-        [value for value in [event.location_name, event.location_address, event.location_city] if value]
+        [
+            value
+            for value in [event.location_name, event.location_address, event.location_city]
+            if value
+        ]
     )
     maps_url = (
         f"https://www.google.com/maps/search/?api=1&query={quote_plus(map_query)}"
@@ -697,10 +701,7 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
 
     def esc(value: str) -> str:
         return (
-            value.replace("\\", "\\\\")
-            .replace(";", "\\;")
-            .replace(",", "\\,")
-            .replace("\n", "\\n")
+            value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
         )
 
     out = StringIO()
@@ -721,7 +722,11 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
         out.write(f"DTEND:{end}\r\n")
         out.write(f"SUMMARY:{esc(event.title)}\r\n")
         location = ", ".join(
-            [value for value in [event.location_name, event.location_address, event.location_city] if value]
+            [
+                value
+                for value in [event.location_name, event.location_address, event.location_city]
+                if value
+            ]
         )
         if location:
             out.write(f"LOCATION:{esc(location)}\r\n")

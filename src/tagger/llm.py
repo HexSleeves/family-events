@@ -1,5 +1,6 @@
 """LLM-based event tagger using OpenAI."""
 
+import asyncio
 import json
 
 from openai import AsyncOpenAI
@@ -50,8 +51,13 @@ Return ONLY a JSON object with these exact fields:
 class EventTagger:
     def __init__(self) -> None:
         self._use_llm = bool(settings.openai_api_key)
+        self._concurrency = max(1, settings.tagger_concurrency)
         if self._use_llm:
-            self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+            self.client = AsyncOpenAI(
+                api_key=settings.openai_api_key,
+                timeout=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+            )
             self.model = settings.openai_model
         else:
             self.client = None
@@ -194,14 +200,21 @@ class EventTagger:
         raw = json.loads(response.choices[0].message.content or "{}")
         return EventTags.model_validate(raw)
 
-    async def tag_events(self, events: list[Event]) -> list[tuple[Event, EventTags]]:
-        """Tag multiple events. Returns list of (event, tags) pairs."""
-        results: list[tuple[Event, EventTags]] = []
-        for event in events:
+    async def _tag_event_safe(
+        self, semaphore: asyncio.Semaphore, event: Event
+    ) -> tuple[Event, EventTags] | None:
+        async with semaphore:
             try:
                 tags = await self.tag_event(event)
-                results.append((event, tags))
                 print(f"  Tagged: {event.title} \u2192 toddler_score={tags.toddler_score}")
+                return event, tags
             except Exception as e:
                 print(f"  Failed to tag '{event.title}': {e}")
-        return results
+                return None
+
+    async def tag_events(self, events: list[Event]) -> list[tuple[Event, EventTags]]:
+        """Tag multiple events. Returns list of (event, tags) pairs."""
+        semaphore = asyncio.Semaphore(self._concurrency)
+        tasks = [self._tag_event_safe(semaphore, event) for event in events]
+        tagged = await asyncio.gather(*tasks)
+        return [result for result in tagged if result is not None]

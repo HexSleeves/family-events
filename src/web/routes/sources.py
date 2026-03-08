@@ -69,7 +69,9 @@ async def source_detail(request: Request, source_id: str):
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
 
-    events_from_source, _ = await db.search_events(days=90, source=f"custom:{source_id}", per_page=10)
+    events_from_source, _ = await db.search_events(
+        days=90, source=f"custom:{source_id}", per_page=10
+    )
     recipe = ScrapeRecipe.model_validate_json(source.recipe_json) if source.recipe_json else None
     recent_jobs = await db.list_jobs(owner_user_id=user.id, source_id=source.id, limit=10)
     recent_job_cards = render_job_cards(

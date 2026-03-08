@@ -33,7 +33,9 @@ async def login_page(request: Request):
     user = await get_current_user(request, get_db(request))
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return get_templates(request).TemplateResponse("login.html", await ctx(request, active_page="auth"))
+    return get_templates(request).TemplateResponse(
+        "login.html", await ctx(request, active_page="auth")
+    )
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -72,7 +74,9 @@ async def signup_page(request: Request):
     user = await get_current_user(request, get_db(request))
     if user:
         return RedirectResponse("/profile", status_code=302)
-    return get_templates(request).TemplateResponse("signup.html", await ctx(request, active_page="auth"))
+    return get_templates(request).TemplateResponse(
+        "signup.html", await ctx(request, active_page="auth")
+    )
 
 
 @router.post("/signup", response_class=HTMLResponse)
