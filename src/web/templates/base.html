@@ -84,10 +84,10 @@
           </a>
 
           {% if current_user %}
-          <button id="theme-toggle"
+          <button id="theme-toggle" type="button"
             class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
             aria-label="Toggle theme" aria-pressed="{{ 'true' if current_user.theme == 'dark' else 'false' }}"
-            onclick="quickToggleTheme()">
+            data-theme-toggle>
             <svg class="w-5 h-5 text-[var(--color-muted)] dark:hidden" fill="none" stroke="currentColor"
               viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -391,33 +391,6 @@
       });
     })();
 
-    function quickToggleTheme() {
-      var html = document.documentElement;
-      var isDark = html.classList.contains('dark');
-      var newTheme = isDark ? 'light' : 'dark';
-
-      if (isDark) {
-        html.classList.remove('dark');
-        html.setAttribute('data-theme', 'light');
-      } else {
-        html.classList.add('dark');
-        html.setAttribute('data-theme', 'dark');
-      }
-
-      var btn = document.getElementById('theme-toggle');
-      if (btn) btn.setAttribute('aria-pressed', String(!isDark));
-
-      var status = document.getElementById('theme-status');
-      if (status) status.textContent = 'Theme changed to ' + newTheme + ' mode';
-
-      var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-      fetch('/api/profile/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
-        body: 'theme=' + encodeURIComponent(newTheme) + '&csrf_token=' + encodeURIComponent(csrfToken)
-      });
-    }
-
     function changeTheme(theme) {
       var html = document.documentElement;
       html.setAttribute('data-theme', theme);
@@ -443,6 +416,37 @@
         } else {
           document.documentElement.classList.remove('dark');
         }
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      var themeToggle = event.target.closest('[data-theme-toggle]');
+      if (themeToggle) {
+        var html = document.documentElement;
+        var isDark = html.classList.contains('dark');
+        var newTheme = isDark ? 'light' : 'dark';
+        var status = document.getElementById('theme-status');
+        if (status) status.textContent = 'Theme changed to ' + newTheme + ' mode';
+        if (window.htmx) {
+          window.htmx.ajax('POST', '/api/profile/theme', {
+            source: themeToggle,
+            values: {
+              theme: newTheme,
+              csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            target: '#profile-status',
+            swap: 'innerHTML'
+          });
+        }
+        return;
+      }
+
+      var copyButton = event.target.closest('[data-copy-url]');
+      if (copyButton) {
+        navigator.clipboard.writeText(copyButton.getAttribute('data-copy-url') || '').then(function () {
+          showToast('Link copied', 'success');
+        });
+        return;
       }
     });
 
@@ -483,23 +487,14 @@
         undoBtn.textContent = (undo.label || 'Undo');
         undoBtn.onclick = function (e) {
           e.stopPropagation();
-          var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-          fetch(undo.path, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
-            body: 'csrf_token=' + encodeURIComponent(csrfToken)
-          }).then(function (response) {
-            var trigger = response.headers.get('HX-Trigger');
-            if (!trigger) return;
-            try {
-              var data = JSON.parse(trigger);
-              if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
-            } catch (e) {}
-            var eventsForm = document.getElementById('events-form');
-            if (eventsForm && window.htmx) {
-              window.htmx.trigger(eventsForm, 'submit');
-            }
-          });
+          if (window.htmx) {
+            window.htmx.ajax('POST', undo.path, {
+              values: {
+                csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
+              },
+              swap: 'none'
+            });
+          }
         };
         el.appendChild(undoBtn);
       }
@@ -530,10 +525,6 @@
       }, 3500);
     }
   </script>
-</body>
-
-</html>
-
 <script>
   (function () {
     function syncGlobalSearchInputs() {
@@ -542,20 +533,6 @@
         if (document.activeElement !== input) input.value = value;
       });
     }
-
-    function submitGlobalSearch(event) {
-      if (event.key !== 'Enter') return;
-      event.preventDefault();
-      var value = event.currentTarget.value || '';
-      window.location.href = '/events?q=' + encodeURIComponent(value);
-    }
-
-    document.addEventListener('keydown', function (event) {
-      var target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      if (!target.matches('[data-global-event-search]')) return;
-      submitGlobalSearch(event);
-    });
 
     document.addEventListener('DOMContentLoaded', syncGlobalSearchInputs);
     document.body.addEventListener('htmx:afterSwap', function () {
@@ -567,3 +544,55 @@
     window.addEventListener('popstate', syncGlobalSearchInputs);
   })();
 </script>
+
+<script>
+  (function () {
+    function applyAttendedSelectionState(scope) {
+      var root = scope || document;
+      root.querySelectorAll('#bulk-unattend-form').forEach(function (form) {
+        var selectAll = form.querySelector('#select-all-attended');
+        if (!selectAll || selectAll.dataset.bound === 'true') return;
+        selectAll.dataset.bound = 'true';
+        selectAll.addEventListener('change', function () {
+          form.querySelectorAll('.attended-select').forEach(function (el) {
+            el.checked = selectAll.checked;
+          });
+        });
+      });
+    }
+
+    document.body.addEventListener('htmx:configRequest', function (evt) {
+      var target = evt.detail.elt;
+      if (target && target.id === 'bulk-unattend-form') {
+        var ids = Array.from(target.querySelectorAll('.attended-select:checked')).map(function (el) { return el.value; });
+        if (!ids.length) {
+          evt.preventDefault();
+          showToast('Select at least one event', 'warning');
+          return;
+        }
+        evt.detail.parameters.event_ids = ids;
+      }
+    });
+
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
+      var target = evt.detail.elt;
+      if (target && target.id === 'bulk-unattend-form') {
+        var eventsForm = document.getElementById('events-form');
+        if (eventsForm && window.htmx) {
+          window.htmx.trigger(eventsForm, 'submit');
+        }
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      applyAttendedSelectionState(document);
+    });
+    document.body.addEventListener('htmx:afterSwap', function (event) {
+      applyAttendedSelectionState(event.target);
+    });
+  })();
+</script>
+
+</body>
+
+</html>

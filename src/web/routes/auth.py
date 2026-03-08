@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from src.config import settings
 from src.db.models import User
@@ -27,9 +27,11 @@ from src.web.common import (
     check_rate_limit,
     ctx,
     get_db,
-    get_templates,
+    htmx_redirect_or_redirect,
+    is_htmx_request,
     require_csrf,
     require_login_and_csrf,
+    template_response,
 )
 
 router = APIRouter()
@@ -39,10 +41,8 @@ router = APIRouter()
 async def login_page(request: Request):
     user = await get_current_user(request, get_db(request))
     if user:
-        return RedirectResponse("/profile", status_code=302)
-    return get_templates(request).TemplateResponse(
-        "login.html", await ctx(request, active_page="auth")
-    )
+        return htmx_redirect_or_redirect(request, "/profile")
+    return template_response(request, "login.html", await ctx(request, active_page="auth"))
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -66,24 +66,25 @@ async def login_submit(request: Request):
 
     user = await db.get_user_by_email(email)
     if not user or not verify_password(password, user.password_hash):
-        return get_templates(request).TemplateResponse(
+        status_code = 422 if is_htmx_request(request) else 200
+        return template_response(
+            request,
             "login.html",
-            {**await ctx(request, active_page="auth"), "error": "Invalid email or password."},
+            {**await ctx(request, active_page="auth"), "error": "Invalid email or password.", "email": email},
+            status_code=status_code,
         )
 
     login_session(request, user)
     rotate_csrf_token(request)
-    return RedirectResponse("/profile", status_code=302)
+    return htmx_redirect_or_redirect(request, "/profile")
 
 
 @router.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
     user = await get_current_user(request, get_db(request))
     if user:
-        return RedirectResponse("/profile", status_code=302)
-    return get_templates(request).TemplateResponse(
-        "signup.html", await ctx(request, active_page="auth")
-    )
+        return htmx_redirect_or_redirect(request, "/profile")
+    return template_response(request, "signup.html", await ctx(request, active_page="auth"))
 
 
 @router.post("/signup", response_class=HTMLResponse)
@@ -126,7 +127,9 @@ async def signup_submit(request: Request):
         errors.append("An account with this email already exists.")
 
     if errors:
-        return get_templates(request).TemplateResponse(
+        status_code = 422 if is_htmx_request(request) else 200
+        return template_response(
+            request,
             "signup.html",
             {
                 **await ctx(request, active_page="auth"),
@@ -138,6 +141,7 @@ async def signup_submit(request: Request):
                 "child_name": child_name,
                 "temperament": str(form.get("temperament", "")).strip(),
             },
+            status_code=status_code,
         )
 
     interest_profile = build_interest_profile_from_form(
@@ -163,7 +167,7 @@ async def signup_submit(request: Request):
     )
     login_session(request, user)
     rotate_csrf_token(request)
-    return RedirectResponse("/profile", status_code=302)
+    return htmx_redirect_or_redirect(request, "/profile")
 
 
 @router.post("/logout")
@@ -172,4 +176,4 @@ async def logout(request: Request):
     if denied:
         return denied
     logout_session(request)
-    return RedirectResponse("/", status_code=302)
+    return htmx_redirect_or_redirect(request, "/")

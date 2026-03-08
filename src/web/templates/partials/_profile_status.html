@@ -1,0 +1,3 @@
+<div class="rounded-xl border px-4 py-3 text-sm {% if variant == 'error' %}border-[var(--color-danger)]/20 bg-[var(--color-danger-light)] text-[var(--color-danger)]{% elif variant == 'info' %}border-[var(--color-info)]/20 bg-[var(--color-info)]/10 text-[var(--color-body)]{% else %}border-[var(--color-success)]/20 bg-[var(--color-success-light)] text-[var(--color-success)]{% endif %}">
+  {{ message }}
+</div>

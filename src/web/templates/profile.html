@@ -45,7 +45,7 @@
 
     <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🎨</span> Appearance</h2>
-      <form hx-post="/api/profile/theme" hx-target="#profile-status" hx-swap="none">
+      <form hx-post="/api/profile/theme" hx-target="#profile-status" hx-swap="innerHTML">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="flex items-center gap-2">
           {% for value, label in [('light', 'Light'), ('dark', 'Dark'), ('auto', 'System')] %}

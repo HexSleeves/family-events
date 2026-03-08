@@ -14,7 +14,7 @@ from urllib.parse import quote_plus
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -27,7 +27,17 @@ from src.ranker.scoring import rank_events, score_event_breakdown
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
 from src.tagger.taxonomy import TAGGING_VERSION
 from src.web.auth import ensure_csrf_token, get_current_user
-from src.web.common import check_rate_limit, ctx, format_ts, require_login_and_csrf, toast
+from src.web.common import (
+    check_rate_limit,
+    ctx,
+    format_ts,
+    htmx_redirect_or_redirect,
+    hx_target,
+    is_htmx_request,
+    require_login_and_csrf,
+    template_response,
+    toast,
+)
 from src.web.jobs import job_registry
 from src.web.jobs_ui import job_template_context, render_job_cards, start_background_job
 from src.web.middleware import RequestLoggingMiddleware
@@ -169,7 +179,8 @@ async def dashboard(request: Request):
         reverse=True,
     )[:8]
 
-    return templates.TemplateResponse(
+    return template_response(
+        request,
         "dashboard.html",
         await ctx(
             request,
@@ -242,9 +253,9 @@ async def events_page(
         sources=filters["sources"],
     )
 
-    if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "events-results":
-        return templates.TemplateResponse("partials/_events_table.html", page_ctx)
-    return templates.TemplateResponse("events.html", page_ctx)
+    if is_htmx_request(request) and hx_target(request) == "events-results":
+        return template_response(request, "partials/_events_table.html", page_ctx)
+    return template_response(request, "events.html", page_ctx)
 
 
 @app.get("/event/{event_id}", response_class=HTMLResponse)
@@ -321,7 +332,8 @@ async def event_detail(request: Request, event_id: str):
             for candidate in related[:4]
         ]
 
-    return templates.TemplateResponse(
+    return template_response(
+        request,
         "event_detail.html",
         await ctx(
             request,
@@ -428,9 +440,9 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
         today=today,
     )
 
-    if request.headers.get("HX-Request"):
-        return templates.TemplateResponse("partials/_calendar_grid.html", page_ctx)
-    return templates.TemplateResponse("calendar.html", page_ctx)
+    if is_htmx_request(request):
+        return template_response(request, "partials/_calendar_shell.html", page_ctx)
+    return template_response(request, "calendar.html", page_ctx)
 
 
 @app.get("/calendar.ics")
@@ -520,7 +532,8 @@ async def weekend_page(request: Request):
     message = format_console_message(ranked, weather, child_name) if ranked else ""
     weather_summary, weather_tone, weather_tips = summarize_weekend_recommendation(weather)
 
-    return templates.TemplateResponse(
+    return template_response(
+        request,
         "weekend.html",
         await ctx(
             request,
@@ -595,7 +608,7 @@ async def jobs_page(
 ):
     user = await get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return htmx_redirect_or_redirect(request, "/login")
 
     selected_source_id = source_id.strip() or None
     selected_state = state.strip() or None
@@ -621,7 +634,8 @@ async def jobs_page(
     sources = await db.get_user_sources(user.id)
     job_kinds = await db.list_job_kinds(owner_user_id=user.id)
 
-    return templates.TemplateResponse(
+    return template_response(
+        request,
         "jobs.html",
         await ctx(
             request,
@@ -811,7 +825,7 @@ async def api_unattend_bulk(request: Request):
 
     event_ids = [str(event_id) for event_id in form.getlist("event_ids") if str(event_id).strip()]
     if not event_ids:
-        return toast("Select at least one event", "warning")
+        return toast("Select at least one event", "warning", status_code=422)
 
     await db.db.executemany(
         "UPDATE events SET attended = 0 WHERE id = ?",
@@ -873,13 +887,13 @@ async def api_events():
 @app.exception_handler(404)
 async def not_found_handler(request: Request, _exc: Exception) -> HTMLResponse:
     """Render friendly 404 page for missing routes."""
-    return templates.TemplateResponse("404.html", await ctx(request), status_code=404)
+    return template_response(request, "404.html", await ctx(request), status_code=404)
 
 
 @app.exception_handler(500)
 async def server_error_handler(request: Request, _exc: Exception) -> HTMLResponse:
     """Render friendly 500 page for unhandled server errors."""
-    return templates.TemplateResponse("500.html", await ctx(request), status_code=500)
+    return template_response(request, "500.html", await ctx(request), status_code=500)
 
 
 @app.post("/api/tag/stale", response_class=HTMLResponse)

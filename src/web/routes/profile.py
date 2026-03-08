@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from src.onboarding import (
     build_interest_profile_from_form,
@@ -15,9 +15,9 @@ from src.web.common import (
     change_theme,
     ctx,
     get_db,
-    get_templates,
-    null_response,
+    htmx_redirect_or_redirect,
     require_login_and_csrf,
+    template_response,
     toast,
 )
 
@@ -29,9 +29,10 @@ async def profile_page(request: Request):
     db = get_db(request)
     user = await get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return htmx_redirect_or_redirect(request, "/login")
     sources = await db.get_user_sources(user.id)
-    return get_templates(request).TemplateResponse(
+    return template_response(
+        request,
         "profile.html",
         {**await ctx(request, active_page="profile"), "sources": sources},
     )
@@ -47,7 +48,7 @@ async def api_update_onboarding(request: Request):
 
     errors = validate_onboarding_form(form)
     if errors:
-        return toast(errors[0], "error")
+        return toast(errors[0], "error", body=_profile_status(request, errors[0], "error"))
 
     home_city = str(form.get("home_city", "")).strip()
     preferred_cities = normalize_city_list(
@@ -68,7 +69,10 @@ async def api_update_onboarding(request: Request):
         interest_profile=profile,
         onboarding_complete=True,
     )
-    return toast("Child profile updated")
+    return toast(
+        "Child profile updated",
+        body=_profile_status(request, "Child profile updated"),
+    )
 
 
 @router.post("/api/profile/theme", response_class=HTMLResponse)
@@ -80,12 +84,16 @@ async def api_update_theme(request: Request):
     assert user is not None and form is not None
     user_theme = user.theme
     theme = str(form.get("theme", user_theme)).strip()
-    if theme == user_theme:
-        return null_response()
     if theme not in ("light", "dark", "auto"):
-        theme = "auto"
+        raise ValueError("Invalid theme")
+    if theme == user_theme:
+        return toast(
+            "Theme already up to date",
+            "info",
+            body=_profile_status(request, "Theme already up to date", "info"),
+        )
     await db.update_user(user.id, theme=theme)
-    return change_theme(theme)
+    return change_theme(theme, body=_profile_status(request, f"Theme set to {theme.title() if theme != 'auto' else 'System'}"))
 
 
 @router.post("/api/profile/notifications", response_class=HTMLResponse)
@@ -102,9 +110,17 @@ async def api_update_notifications(request: Request):
     sms_to = str(form.get("sms_to", "")).strip()
     child_name = str(form.get("child_name", "")).strip() or "Your Little One"
     if "email" in channels and not email_to:
-        return toast("Add a notification email to enable email delivery", "error")
+        return toast(
+            "Add a notification email to enable email delivery",
+            "error",
+            body=_profile_status(request, "Add a notification email to enable email delivery", "error"),
+        )
     if "sms" in channels and not sms_to:
-        return toast("Add a phone number to enable SMS delivery", "error")
+        return toast(
+            "Add a phone number to enable SMS delivery",
+            "error",
+            body=_profile_status(request, "Add a phone number to enable SMS delivery", "error"),
+        )
     await db.update_user(
         user.id,
         notification_channels=[str(channel) for channel in channels],
@@ -112,7 +128,10 @@ async def api_update_notifications(request: Request):
         sms_to=sms_to,
         child_name=child_name,
     )
-    return toast("Notification settings updated")
+    return toast(
+        "Notification settings updated",
+        body=_profile_status(request, "Notification settings updated"),
+    )
 
 
 @router.post("/api/profile/password", response_class=HTMLResponse)
@@ -126,11 +145,34 @@ async def api_update_password(request: Request):
     new_pw = str(form.get("new_password", ""))
     confirm = str(form.get("confirm_password", ""))
     if not verify_password(current, user.password_hash):
-        return toast("Current password is incorrect", "error")
+        return toast(
+            "Current password is incorrect",
+            "error",
+            body=_profile_status(request, "Current password is incorrect", "error"),
+        )
     password_errors = validate_password(new_pw)
     if password_errors:
-        return toast(password_errors[0], "error")
+        return toast(
+            password_errors[0],
+            "error",
+            body=_profile_status(request, password_errors[0], "error"),
+        )
     if new_pw != confirm:
-        return toast("Passwords don't match", "error")
+        return toast(
+            "Passwords don't match",
+            "error",
+            body=_profile_status(request, "Passwords don't match", "error"),
+        )
     await db.update_user(user.id, password_hash=hash_password(new_pw))
-    return toast("Password changed")
+    return toast(
+        "Password changed",
+        body=_profile_status(request, "Password changed"),
+    )
+
+
+def _profile_status(request: Request, message: str, variant: str = "success") -> str:
+    return template_response(
+        request,
+        "partials/_profile_status.html",
+        {"request": request, "message": message, "variant": variant},
+    ).body.decode()

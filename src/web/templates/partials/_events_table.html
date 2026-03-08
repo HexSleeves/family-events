@@ -12,15 +12,14 @@
 </p>
 
 {% if attended == 'yes' %}
-<form id="bulk-unattend-form" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-xs)]">
+<form id="bulk-unattend-form" hx-post="/api/unattend-bulk" hx-swap="none" hx-include="#bulk-unattend-form" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-xs)]">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
   <div class="inline-flex items-center gap-2">
     <input id="select-all-attended" type="checkbox" class="rounded border-[var(--color-edge)]" />
     <label for="select-all-attended" class="text-sm text-[var(--color-body)]">Select all on page</label>
   </div>
   <button
-    type="button"
-    onclick="bulkUnattend(this)"
+    type="submit"
     class="touch-target inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
     <span aria-hidden="true">↩</span> Unattend selected
   </button>
@@ -41,7 +40,7 @@
     <a href="/event/{{ event.id }}" class="block" aria-label="{{ event.title }}">
       <div class="relative aspect-[16/10] overflow-hidden">
         {% if attended == 'yes' %}
-        <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm" onclick="event.stopPropagation();">
+        <label class="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-xs font-medium text-[var(--color-body)] backdrop-blur-sm">
           <input type="checkbox" name="event_ids" value="{{ event.id }}" class="attended-select rounded border-[var(--color-edge)]" aria-label="Select {{ event.title }}" />
           Select
         </label>
@@ -98,50 +97,6 @@
   </article>
   {% endfor %}
 </div>
-
-{% if attended == 'yes' %}
-<script>
-  (function () {
-    var selectAll = document.getElementById('select-all-attended');
-    if (selectAll) {
-      selectAll.addEventListener('change', function () {
-        document.querySelectorAll('.attended-select').forEach(function (el) {
-          el.checked = selectAll.checked;
-        });
-      });
-    }
-  })();
-
-  function bulkUnattend(buttonEl) {
-    var ids = Array.from(document.querySelectorAll('.attended-select:checked')).map(function (el) { return el.value; });
-    if (!ids.length) {
-      showToast('Select at least one event', 'warning');
-      return;
-    }
-    var tokenEl = document.querySelector('#bulk-unattend-form input[name="csrf_token"]');
-    var body = ids.map(function (id) { return 'event_ids=' + encodeURIComponent(id); }).join('&');
-    if (tokenEl && tokenEl.value) {
-      body += '&csrf_token=' + encodeURIComponent(tokenEl.value);
-    }
-    fetch('/api/unattend-bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body
-    }).then(function (response) {
-      var trigger = response.headers.get('HX-Trigger');
-      if (trigger) {
-        try {
-          var data = JSON.parse(trigger);
-          if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
-        } catch (e) {}
-      }
-      if (buttonEl) {
-        buttonEl.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
-      }
-    });
-  }
-</script>
-{% endif %}
 
 {# ═══ PAGINATION ═══ #}
 {% if total_pages > 1 %}

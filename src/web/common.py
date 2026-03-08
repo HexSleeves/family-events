@@ -12,7 +12,7 @@ from typing import cast
 
 from fastapi import Request
 from fastapi.datastructures import FormData
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.config import settings
@@ -47,28 +47,75 @@ def get_bulk_unattend_undo_store(request: Request) -> BulkUndoStore:
     return cast(BulkUndoStore, request.app.state.bulk_unattend_undo_store)
 
 
+def _merge_hx_trigger(headers: dict[str, str] | None, payload: dict[str, object]) -> dict[str, str]:
+    merged = dict(headers or {})
+    existing = merged.get("HX-Trigger")
+    if existing:
+        current = json.loads(existing)
+        if not isinstance(current, dict):
+            raise ValueError("HX-Trigger header must be a JSON object")
+    else:
+        current = {}
+    current.update(payload)
+    merged["HX-Trigger"] = json.dumps(current)
+    return merged
+
+
+def is_htmx_request(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
+
+
+def hx_target(request: Request) -> str:
+    return request.headers.get("HX-Target", "")
+
+
+def htmx_redirect_or_redirect(request: Request, location: str, status_code: int = 302):
+    if is_htmx_request(request):
+        return HTMLResponse("", status_code=200, headers={"HX-Redirect": location})
+    return RedirectResponse(location, status_code=status_code)
+
+
+def template_response(
+    request: Request,
+    template_name: str,
+    context: dict[str, object],
+    *,
+    status_code: int = 200,
+    headers: dict[str, str] | None = None,
+) -> HTMLResponse:
+    response = get_templates(request).TemplateResponse(template_name, context, status_code=status_code)
+    for key, value in (headers or {}).items():
+        response.headers[key] = value
+    return response
+
+
 def toast(
     message: str,
     variant: str = "success",
     *,
     status_code: int = 200,
     body: str = "",
+    headers: dict[str, str] | None = None,
 ) -> HTMLResponse:
     """Return an HTML response that triggers a toast notification via HTMX."""
-    payload = json.dumps({"showToast": {"message": message, "variant": variant}})
-    return HTMLResponse(content=body, status_code=status_code, headers={"HX-Trigger": payload})
+    merged_headers = _merge_hx_trigger(
+        headers,
+        {"showToast": {"message": message, "variant": variant}},
+    )
+    return HTMLResponse(content=body, status_code=status_code, headers=merged_headers)
 
 
-def change_theme(theme: str) -> HTMLResponse:
+def change_theme(theme: str, *, body: str = "", headers: dict[str, str] | None = None) -> HTMLResponse:
     """Return an HTML response that triggers a theme change plus toast."""
     label = {"light": "Light", "dark": "Dark", "auto": "System"}.get(theme, theme)
-    payload = json.dumps(
+    merged_headers = _merge_hx_trigger(
+        headers,
         {
             "changeTheme": {"theme": theme},
             "showToast": {"message": f"Theme set to {label}", "variant": "success"},
-        }
+        },
     )
-    return HTMLResponse(content="", status_code=200, headers={"HX-Trigger": payload})
+    return HTMLResponse(content=body, status_code=200, headers=merged_headers)
 
 
 def null_response() -> HTMLResponse:

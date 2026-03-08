@@ -15,10 +15,10 @@ content %}
     </p>
 
     <div class="mt-6 flex flex-wrap justify-center gap-3">
-      <button type="button" onclick="location.reload()"
+      <a href="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}"
         class="px-4 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm hover:bg-[var(--color-brand-hover)] transition-colors touch-target">
         Try Again
-      </button>
+      </a>
       <a href="/"
         class="px-4 py-2.5 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] font-medium text-sm hover:bg-[var(--color-accent-light)] transition-colors touch-target">
         Go Home

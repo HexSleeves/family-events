@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from src.db.database import Database
 from src.db.models import Source
@@ -24,7 +24,9 @@ from src.web.common import (
     ctx,
     get_db,
     get_templates,
+    htmx_redirect_or_redirect,
     require_login_and_csrf,
+    template_response,
     toast,
     validate_source_url,
 )
@@ -50,7 +52,7 @@ async def sources_page(request: Request):
     db = get_db(request)
     user = await get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return htmx_redirect_or_redirect(request, "/login")
     sources = await db.get_user_sources(user.id)
     predefined_sources = list_predefined_sources(city=user.home_city)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=10)
@@ -61,7 +63,8 @@ async def sources_page(request: Request):
         refresh_select="#sources-jobs-panel",
         refresh_target_id="sources-jobs-panel",
     )
-    return get_templates(request).TemplateResponse(
+    return template_response(
+        request,
         "sources.html",
         await ctx(
             request,
@@ -79,7 +82,7 @@ async def source_detail(request: Request, source_id: str):
     db = get_db(request)
     user = await get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return htmx_redirect_or_redirect(request, "/login")
 
     source = await db.get_source(source_id)
     if not source:
@@ -99,7 +102,8 @@ async def source_detail(request: Request, source_id: str):
         refresh_select="#source-job-history-panel",
         refresh_target_id="source-job-history-panel",
     )
-    return get_templates(request).TemplateResponse(
+    return template_response(
+        request,
         "source_detail.html",
         await ctx(
             request,

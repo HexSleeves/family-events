@@ -73,10 +73,7 @@ block content %}
       <span aria-hidden="true">🗺️</span> Open in Maps
     </a>
     {% endif %}
-    <button onclick="
-          navigator.clipboard.writeText(window.location.href);
-          showToast('Link copied', 'success');
-        " aria-label="Copy link to clipboard"
+    <button type="button" data-copy-url="{{ request.url }}" aria-label="Copy link to clipboard"
       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target">
       <span aria-hidden="true">🔗</span> Share
     </button>
