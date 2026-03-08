@@ -210,9 +210,15 @@ class PageAnalyzer:
     async def _fetch(self, url: str) -> str:
         async with httpx.AsyncClient(
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=30.0,
+            timeout=httpx.Timeout(20.0, connect=5.0),
             follow_redirects=True,
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()
-            return resp.text
+            content_type = resp.headers.get("content-type", "")
+            if "html" not in content_type and "xml" not in content_type:
+                raise ValueError("URL did not return HTML content")
+            text = resp.text
+            if len(text) > 1_000_000:
+                raise ValueError("Source page is too large to analyze")
+            return text

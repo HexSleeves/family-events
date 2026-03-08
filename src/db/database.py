@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS users (
     theme                 TEXT NOT NULL DEFAULT 'auto',
     notification_channels TEXT NOT NULL DEFAULT '["console"]',
     email_to              TEXT NOT NULL DEFAULT '',
+    sms_to                TEXT NOT NULL DEFAULT '',
     child_name            TEXT NOT NULL DEFAULT 'Your Little One',
     interest_profile      TEXT NOT NULL DEFAULT '{}',
     created_at            TEXT NOT NULL,
@@ -116,6 +117,7 @@ def _row_to_user(row: aiosqlite.Row) -> User:
     d = dict(row)
     d["preferred_cities"] = json.loads(str(d["preferred_cities"]))
     d["notification_channels"] = json.loads(str(d["notification_channels"]))
+    d["sms_to"] = str(d.get("sms_to") or "")
     raw_profile = json.loads(str(d["interest_profile"])) if d["interest_profile"] else {}
     d["interest_profile"] = (
         InterestProfile.model_validate(raw_profile) if raw_profile else InterestProfile()
@@ -215,6 +217,7 @@ class Database:
         for migration in [
             "ALTER TABLE sources ADD COLUMN user_id TEXT",
             "ALTER TABLE users ADD COLUMN email_to TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN sms_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN child_name TEXT NOT NULL DEFAULT 'Your Little One'",
             "ALTER TABLE events ADD COLUMN tagged_at TEXT",
         ]:
@@ -782,12 +785,12 @@ class Database:
             INSERT INTO users (
                 id, email, display_name, password_hash,
                 home_city, preferred_cities, theme,
-                notification_channels, email_to, child_name,
+                notification_channels, email_to, sms_to, child_name,
                 interest_profile, created_at, updated_at
             ) VALUES (
                 :id, :email, :display_name, :password_hash,
                 :home_city, :preferred_cities, :theme,
-                :notification_channels, :email_to, :child_name,
+                :notification_channels, :email_to, :sms_to, :child_name,
                 :interest_profile, :created_at, :updated_at
             )
             """,
@@ -801,6 +804,7 @@ class Database:
                 "theme": user.theme,
                 "notification_channels": json.dumps(user.notification_channels),
                 "email_to": user.email_to,
+                "sms_to": user.sms_to,
                 "child_name": user.child_name,
                 "interest_profile": json.dumps(user.interest_profile.model_dump()),
                 "created_at": user.created_at.isoformat(),
@@ -833,6 +837,7 @@ class Database:
             "theme",
             "notification_channels",
             "email_to",
+            "sms_to",
             "child_name",
             "interest_profile",
             "password_hash",

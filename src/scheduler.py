@@ -132,6 +132,7 @@ async def run_notify(
     profile = user.interest_profile if user else InterestProfile()
     channels = user.notification_channels if user else ["console"]
     email_to = user.email_to if user else ""
+    sms_to = user.sms_to if user else ""
     name = user.child_name if user else child_name
 
     # Find next weekend
@@ -184,7 +185,12 @@ async def run_notify(
 
     # Dispatch to user's chosen channels
     dispatcher = NotificationDispatcher()
-    results = await dispatcher.dispatch(message, channels=channels, email_to=email_to)
+    results = await dispatcher.dispatch(
+        message,
+        channels=channels,
+        email_to=email_to,
+        sms_to=sms_to,
+    )
     print(f"Notification results: {results}")
 
     if own_db:

@@ -15,6 +15,7 @@
         <span aria-hidden="true">🎨</span> Appearance
       </h2>
       <form hx-post="/api/profile/theme" hx-swap="none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <fieldset>
           <legend class="sr-only">Theme preference</legend>
           <div class="flex items-center gap-2">
@@ -42,6 +43,7 @@
         <span aria-hidden="true">📍</span> Location
       </h2>
       <form hx-post="/api/profile/location" hx-swap="none" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="profile-home-city" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Home City</label>
@@ -64,6 +66,7 @@
         <span aria-hidden="true">🧩</span> Child Preferences
       </h2>
       <form hx-post="/api/profile/preferences" hx-swap="none" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label for="pref-loves" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5"><span aria-hidden="true">❤️</span> Loves</label>
@@ -113,6 +116,7 @@
         <span aria-hidden="true">🔔</span> Notifications
       </h2>
       <form hx-post="/api/profile/notifications" hx-swap="none" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="notif-child-name" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child’s Name</label>
@@ -122,6 +126,11 @@
           <div>
             <label for="notif-email-to" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Notification Email</label>
             <input type="email" name="email_to" id="notif-email-to" value="{{ current_user.email_to }}"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+          </div>
+          <div>
+            <label for="notif-sms-to" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">SMS Number</label>
+            <input type="tel" name="sms_to" id="notif-sms-to" value="{{ current_user.sms_to }}" placeholder="+13375551234"
                 class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
           </div>
         </div>
@@ -147,6 +156,7 @@
         <span aria-hidden="true">🔒</span> Change Password
       </h2>
       <form hx-post="/api/profile/password" hx-swap="none" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label for="pw-current" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Current Password</label>

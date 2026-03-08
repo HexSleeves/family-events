@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -11,10 +12,11 @@ from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.datastructures import FormData
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,10 +40,12 @@ from src.scrapers.analyzer import PageAnalyzer
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import extract_domain, is_builtin_domain
 from src.web.auth import (
+    ensure_csrf_token,
     get_current_user,
     hash_password,
     login_session,
     logout_session,
+    validate_password,
     verify_password,
 )
 
@@ -52,6 +56,9 @@ logger = logging.getLogger("uvicorn.error")
 
 _rate_limit_store: dict[str, deque[float]] = {}
 _bulk_unattend_undo_store: dict[str, list[str]] = {}
+_PRIVATE_HOST_RE = re.compile(
+    r"^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.|::1$)"
+)
 
 
 def _toast(
@@ -108,10 +115,17 @@ def _rate_limit_key(request: Request, route: str) -> str:
     return f"{ip}:{route}"
 
 
-def _check_rate_limit(request: Request, route: str) -> HTMLResponse | None:
+def _check_rate_limit(
+    request: Request,
+    route: str,
+    *,
+    limit: int | None = None,
+    window: int | None = None,
+    message: str = "Too many requests. Try again in a moment.",
+) -> HTMLResponse | None:
     """Simple sliding-window in-memory rate limiter."""
-    limit = max(1, settings.rate_limit_max_requests)
-    window = max(1, settings.rate_limit_window_seconds)
+    limit = max(1, limit or settings.rate_limit_max_requests)
+    window = max(1, window or settings.rate_limit_window_seconds)
 
     now = time.monotonic()
     key = _rate_limit_key(request, route)
@@ -122,7 +136,7 @@ def _check_rate_limit(request: Request, route: str) -> HTMLResponse | None:
         hits.popleft()
 
     if len(hits) >= limit:
-        return _toast("Too many requests. Try again in a moment.", "warning", status_code=429)
+        return _toast(message, "warning", status_code=429)
 
     hits.append(now)
     return None
@@ -133,6 +147,61 @@ def _format_ts(ts: datetime | None) -> str | None:
     if not ts:
         return None
     return ts.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _require_safe_origin(request: Request) -> HTMLResponse | None:
+    """Basic origin/referer check for unsafe methods."""
+    expected = str(request.base_url).rstrip("/")
+    for header in ("origin", "referer"):
+        value = request.headers.get(header)
+        if not value:
+            continue
+        if value.startswith(expected):
+            return None
+        return _toast("Request blocked by origin policy", "error", status_code=403)
+    return None
+
+
+async def _require_login_and_csrf(
+    request: Request,
+) -> tuple[User | None, FormData | None, HTMLResponse | None]:
+    """Return current user, parsed form, plus any auth/csrf denial response."""
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return user, None, denied
+    form = await request.form()
+    if denied := _require_safe_origin(request):
+        return user, form, denied
+    expected = request.session.get("csrf_token")
+    provided = (
+        request.headers.get("X-CSRF-Token", "").strip() or str(form.get("csrf_token", "")).strip()
+    )
+    if not expected or not provided or str(expected) != provided:
+        return (
+            user,
+            form,
+            _toast(
+                "Security check failed. Refresh the page and try again.",
+                "error",
+                status_code=403,
+            ),
+        )
+    return user, form, None
+
+
+def _validate_source_url(url: str) -> str | None:
+    """Return error message if source URL is unsafe or invalid."""
+    if len(url) > 2048:
+        return "URL is too long"
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return "URL must start with http:// or https://"
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        return "URL must include a hostname"
+    if _PRIVATE_HOST_RE.match(host):
+        return "Private or local network URLs are not allowed"
+    return None
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -178,9 +247,11 @@ app.add_middleware(
 async def _ctx(request: Request, **extra: object) -> dict:
     """Build base template context with current user."""
     user = await get_current_user(request, db)
+    csrf_token = ensure_csrf_token(request)
     return {
         "request": request,
         "current_user": user,
+        "csrf_token": csrf_token,
         "active_page": extra.pop("active_page", ""),
         **extra,
     }
@@ -199,6 +270,15 @@ async def login_page(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login_submit(request: Request):
+    if throttled := _check_rate_limit(
+        request,
+        "login_submit",
+        limit=settings.auth_rate_limit_max_requests,
+        window=settings.auth_rate_limit_window_seconds,
+        message="Too many login attempts. Try again later.",
+    ):
+        return throttled
+
     form = await request.form()
     email = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", ""))
@@ -224,6 +304,15 @@ async def signup_page(request: Request):
 
 @app.post("/signup", response_class=HTMLResponse)
 async def signup_submit(request: Request):
+    if throttled := _check_rate_limit(
+        request,
+        "signup_submit",
+        limit=settings.auth_rate_limit_max_requests,
+        window=settings.auth_rate_limit_window_seconds,
+        message="Too many signup attempts. Try again later.",
+    ):
+        return throttled
+
     form = await request.form()
     email = str(form.get("email", "")).strip().lower()
     display_name = str(form.get("display_name", "")).strip()
@@ -235,8 +324,7 @@ async def signup_submit(request: Request):
         errors.append("Valid email is required.")
     if not display_name:
         errors.append("Display name is required.")
-    if len(password) < 6:
-        errors.append("Password must be at least 6 characters.")
+    errors.extend(validate_password(password))
     if password != confirm:
         errors.append("Passwords don't match.")
     if not errors and await db.get_user_by_email(email):
@@ -263,8 +351,11 @@ async def signup_submit(request: Request):
     return RedirectResponse("/profile", status_code=302)
 
 
-@app.get("/logout")
+@app.post("/logout")
 async def logout(request: Request):
+    _user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
     logout_session(request)
     return RedirectResponse("/", status_code=302)
 
@@ -286,10 +377,10 @@ async def profile_page(request: Request):
 
 @app.post("/api/profile/location", response_class=HTMLResponse)
 async def api_update_location(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return HTMLResponse("Unauthorized", status_code=401)
-    form = await request.form()
+    user, form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
     home_city = str(form.get("home_city", "Lafayette")).strip()
     pref_raw = str(form.get("preferred_cities", "")).strip()
     preferred = [c.strip() for c in pref_raw.split(",") if c.strip()]
@@ -301,10 +392,10 @@ async def api_update_location(request: Request):
 
 @app.post("/api/profile/preferences", response_class=HTMLResponse)
 async def api_update_preferences(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return HTMLResponse("Unauthorized", status_code=401)
-    form = await request.form()
+    user, form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
     loves = [x.strip() for x in str(form.get("loves", "")).split(",") if x.strip()]
     likes = [x.strip() for x in str(form.get("likes", "")).split(",") if x.strip()]
     dislikes = [x.strip() for x in str(form.get("dislikes", "")).split(",") if x.strip()]
@@ -332,10 +423,10 @@ async def api_update_preferences(request: Request):
 
 @app.post("/api/profile/theme", response_class=HTMLResponse)
 async def api_update_theme(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return HTMLResponse("Unauthorized", status_code=401)
-    form = await request.form()
+    user, form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
     user_theme = user.theme
     theme = str(form.get("theme", user_theme)).strip()
     if theme == user_theme:
@@ -348,19 +439,25 @@ async def api_update_theme(request: Request):
 
 @app.post("/api/profile/notifications", response_class=HTMLResponse)
 async def api_update_notifications(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return HTMLResponse("Unauthorized", status_code=401)
-    form = await request.form()
+    user, form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
     channels = form.getlist("channels")
     if not channels:
         channels = ["console"]
     email_to = str(form.get("email_to", "")).strip()
+    sms_to = str(form.get("sms_to", "")).strip()
     child_name = str(form.get("child_name", "")).strip() or "Your Little One"
+    if "email" in channels and not email_to:
+        return _toast("Add a notification email to enable email delivery", "error")
+    if "sms" in channels and not sms_to:
+        return _toast("Add a phone number to enable SMS delivery", "error")
     await db.update_user(
         user.id,
         notification_channels=[str(c) for c in channels],
         email_to=email_to,
+        sms_to=sms_to,
         child_name=child_name,
     )
     return _toast("Notification settings updated")
@@ -368,17 +465,18 @@ async def api_update_notifications(request: Request):
 
 @app.post("/api/profile/password", response_class=HTMLResponse)
 async def api_update_password(request: Request):
-    user = await get_current_user(request, db)
-    if not user:
-        return HTMLResponse("Unauthorized", status_code=401)
-    form = await request.form()
+    user, form, denied = await _require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None and form is not None
     current = str(form.get("current_password", ""))
     new_pw = str(form.get("new_password", ""))
     confirm = str(form.get("confirm_password", ""))
     if not verify_password(current, user.password_hash):
         return _toast("Current password is incorrect", "error")
-    if len(new_pw) < 6:
-        return _toast("New password must be at least 6 characters", "error")
+    password_errors = validate_password(new_pw)
+    if password_errors:
+        return _toast(password_errors[0], "error")
     if new_pw != confirm:
         return _toast("Passwords don't match", "error")
     await db.update_user(user.id, password_hash=hash_password(new_pw))
@@ -702,10 +800,7 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
 
     def esc(value: str) -> str:
         return (
-            value.replace("\\", "\\\\")
-            .replace(";", "\\;")
-            .replace(",", "\\,")
-            .replace("\n", "\\n")
+            value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
         )
 
     out = StringIO()
@@ -831,9 +926,10 @@ async def source_detail(request: Request, source_id: str):
 
 @app.post("/api/scrape", response_class=HTMLResponse)
 async def api_scrape(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_scrape"):
         return throttled
 
@@ -845,9 +941,10 @@ async def api_scrape(request: Request):
 
 @app.post("/api/tag", response_class=HTMLResponse)
 async def api_tag(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_tag"):
         return throttled
 
@@ -859,9 +956,10 @@ async def api_tag(request: Request):
 
 @app.post("/api/dedupe", response_class=HTMLResponse)
 async def api_dedupe(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_dedupe"):
         return throttled
 
@@ -873,9 +971,10 @@ async def api_dedupe(request: Request):
 
 @app.post("/api/notify", response_class=HTMLResponse)
 async def api_notify(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_notify"):
         return throttled
 
@@ -887,9 +986,10 @@ async def api_notify(request: Request):
 
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
 async def api_attend(request: Request, event_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_attend"):
         return throttled
 
@@ -899,9 +999,10 @@ async def api_attend(request: Request, event_id: str):
 
 @app.post("/api/unattend/{event_id}", response_class=HTMLResponse)
 async def api_unattend(request: Request, event_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_unattend"):
         return throttled
 
@@ -912,14 +1013,16 @@ async def api_unattend(request: Request, event_id: str):
 
 @app.post("/api/unattend-bulk", response_class=HTMLResponse)
 async def api_unattend_bulk(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_unattend_bulk"):
         return throttled
 
-    form = await request.form()
-    event_ids = [str(eid) for eid in form.getlist("event_ids") if str(eid).strip()]
+    event_ids = [
+        str(eid) for eid in (_form.getlist("event_ids") if _form else []) if str(eid).strip()
+    ]
     if not event_ids:
         return _toast("Select at least one event", "warning")
 
@@ -945,9 +1048,10 @@ async def api_unattend_bulk(request: Request):
 
 @app.post("/api/unattend-bulk/undo/{undo_token}", response_class=HTMLResponse)
 async def api_unattend_bulk_undo(request: Request, undo_token: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_unattend_bulk_undo"):
         return throttled
 
@@ -985,17 +1089,20 @@ async def api_events():
 
 @app.post("/api/sources", response_class=HTMLResponse)
 async def api_add_source(request: Request):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_add_source"):
         return throttled
 
-    form = await request.form()
-    url = str(form.get("url", "")).strip()
-    name = str(form.get("name", "")).strip()
+    form = _form
+    url = str(form.get("url", "")).strip() if form else ""
+    name = str(form.get("name", "")).strip() if form else ""
     if not url:
         return _toast("Please enter a URL", "error")
+    if url_error := _validate_source_url(url):
+        return _toast(url_error, "error")
 
     # Check for built-in domain
     if is_builtin_domain(url):
@@ -1039,9 +1146,10 @@ async def api_add_source(request: Request):
 
 @app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
 async def api_reanalyze(request: Request, source_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_reanalyze_source"):
         return throttled
 
@@ -1070,9 +1178,10 @@ async def api_reanalyze(request: Request, source_id: str):
 
 @app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
 async def api_test_source(request: Request, source_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_test_source"):
         return throttled
 
@@ -1097,9 +1206,10 @@ async def api_test_source(request: Request, source_id: str):
 
 @app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)
 async def api_toggle_source(request: Request, source_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_toggle_source"):
         return throttled
 
@@ -1119,9 +1229,10 @@ async def api_toggle_source(request: Request, source_id: str):
 
 @app.delete("/api/sources/{source_id}", response_class=HTMLResponse)
 async def api_delete_source(request: Request, source_id: str):
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
+    user, _form, denied = await _require_login_and_csrf(request)
+    if denied:
         return denied
+    assert user is not None
     if throttled := _check_rate_limit(request, "api_delete_source"):
         return throttled
 

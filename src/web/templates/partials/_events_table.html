@@ -13,6 +13,7 @@
 
 {% if attended == 'yes' %}
 <form id="bulk-unattend-form" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-xs)]">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
   <div class="inline-flex items-center gap-2">
     <input id="select-all-attended" type="checkbox" class="rounded border-[var(--color-edge)]" />
     <label for="select-all-attended" class="text-sm text-[var(--color-body)]">Select all on page</label>
@@ -116,7 +117,11 @@
       showToast('Select at least one event', 'warning');
       return;
     }
+    var tokenEl = document.querySelector('#bulk-unattend-form input[name="csrf_token"]');
     var body = ids.map(function (id) { return 'event_ids=' + encodeURIComponent(id); }).join('&');
+    if (tokenEl && tokenEl.value) {
+      body += '&csrf_token=' + encodeURIComponent(tokenEl.value);
+    }
     fetch('/api/unattend-bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

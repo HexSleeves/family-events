@@ -134,10 +134,9 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Description |
 |----------|-------------|
 | `WEATHER_API_KEY` | OpenWeatherMap — for weekend forecasts (defaults to typical Louisiana weather) |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` / `TWILIO_TO` | SMS notifications |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | SMS sender configuration (recipient is set per user in profile) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot notifications |
-| `RESEND_API_KEY` / `RESEND_FROM` / `RESEND_TO` | Email notifications via Resend |
-| `NOTIFICATION_CHANNELS` | JSON array, e.g. `["console", "sms", "telegram"]` |
+| `RESEND_API_KEY` / `EMAIL_FROM` | Email sender configuration (recipient is set per user in profile) |
 
 ## Architecture
 

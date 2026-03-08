@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     weather_lat: float = 30.2241  # Lafayette, LA
     weather_lon: float = -92.0198
 
-    # Twilio SMS (secrets only — recipient is per-user)
+    # Twilio SMS (sender credentials; recipient is per-user)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # Basic API rate limiting (per-IP, per-route)
     rate_limit_window_seconds: int = 60
     rate_limit_max_requests: int = 20
+    auth_rate_limit_window_seconds: int = 300
+    auth_rate_limit_max_requests: int = 10
 
 
 settings = Settings()

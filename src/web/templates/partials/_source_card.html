@@ -34,17 +34,17 @@
     </div>
 
     <div class="flex items-center gap-2 shrink-0">
-      <button hx-post="/api/sources/{{ source.id }}/test" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
+      <button hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
           aria-label="Test source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         Test
       </button>
-      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
+      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
           aria-label="{{ 'Disable' if source.enabled else 'Enable' }} source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         {{ 'Disable' if source.enabled else 'Enable' }}
       </button>
-      <button hx-delete="/api/sources/{{ source.id }}" hx-target="#test-{{ source.id }}" hx-confirm="Delete this source?"
+      <button hx-delete="/api/sources/{{ source.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#test-{{ source.id }}" hx-confirm="Delete this source?"
           aria-label="Delete source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
         Delete

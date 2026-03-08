@@ -21,6 +21,7 @@ class NotificationDispatcher:
         *,
         channels: list[str] | None = None,
         email_to: str = "",
+        sms_to: str = "",
     ) -> dict[str, bool]:
         """Send message to the specified channels.
 
@@ -28,6 +29,7 @@ class NotificationDispatcher:
             message: The notification text.
             channels: Which channels to use. Defaults to ["console"].
             email_to: Recipient email for the email channel.
+            sms_to: Recipient phone number for the SMS channel.
         """
         if channels is None:
             channels = ["console"]
@@ -40,11 +42,12 @@ class NotificationDispatcher:
                 results[channel] = False
                 continue
 
-            if channel == "email" and email_to:
-                from .email import EmailNotifier
-
+            if channel == "email":
                 assert isinstance(notifier, EmailNotifier)
                 results[channel] = await notifier.send(message, to_email=email_to)
+            elif channel == "sms":
+                assert isinstance(notifier, SMSNotifier)
+                results[channel] = await notifier.send(message, to_number=sms_to)
             else:
                 results[channel] = await notifier.send(message)
         return results

@@ -21,6 +21,7 @@
     {% endif %}
 
     <form method="POST" action="/signup" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div>
         <label for="signup-display-name" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Display Name</label>
         <input type="text" name="display_name" id="signup-display-name" value="{{ display_name|default('') }}" required autofocus

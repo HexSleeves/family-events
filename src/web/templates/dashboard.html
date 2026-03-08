@@ -297,6 +297,7 @@
   <div class="flex flex-wrap gap-2">
     <button
       hx-post="/api/scrape"
+      hx-vals='{"csrf_token":"{{ csrf_token }}"}'
       hx-swap="none"
       hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
@@ -311,6 +312,7 @@
     </button>
     <button
       hx-post="/api/tag"
+      hx-vals='{"csrf_token":"{{ csrf_token }}"}'
       hx-swap="none"
       hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
@@ -325,6 +327,7 @@
     </button>
     <button
       hx-post="/api/notify"
+      hx-vals='{"csrf_token":"{{ csrf_token }}"}'
       hx-swap="none"
       hx-on:htmx:after-request="window.location.reload()"
       hx-indicator="this"
@@ -339,6 +342,7 @@
     </button>
     <button
       hx-post="/api/dedupe"
+      hx-vals='{"csrf_token":"{{ csrf_token }}"}'
       hx-confirm="Run dedupe on all events? This merges likely duplicates."
       hx-swap="none"
       hx-on:htmx:after-request="window.location.reload()"

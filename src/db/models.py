@@ -128,6 +128,7 @@ class User(BaseModel):
     theme: Literal["light", "dark", "auto"] = "auto"
     notification_channels: list[str] = Field(default_factory=lambda: ["console"])
     email_to: str = ""  # Notification recipient email
+    sms_to: str = ""  # Notification recipient phone number (E.164 preferred)
     child_name: str = "Your Little One"  # Name used in notification messages
     interest_profile: InterestProfile = Field(default_factory=InterestProfile)
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))

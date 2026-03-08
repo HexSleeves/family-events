@@ -4,16 +4,18 @@ from src.config import settings
 
 
 class SMSNotifier:
-    async def send(self, message: str) -> bool:
+    async def send(self, message: str, *, to_number: str = "") -> bool:
         if not all(
             [
                 settings.twilio_account_sid,
                 settings.twilio_auth_token,
                 settings.twilio_from_number,
-                settings.twilio_to_number,
             ]
         ):
             print("SMS: Missing Twilio credentials, skipping")
+            return False
+        if not to_number:
+            print("SMS: No recipient phone number, skipping")
             return False
 
         try:
@@ -23,7 +25,7 @@ class SMSNotifier:
                     auth=(settings.twilio_account_sid, settings.twilio_auth_token),
                     data={
                         "From": settings.twilio_from_number,
-                        "To": settings.twilio_to_number,
+                        "To": to_number,
                         "Body": message[:1600],
                     },
                 )

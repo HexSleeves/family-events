@@ -2,6 +2,7 @@
 <html lang="en" class="{% if current_user and current_user.theme == 'dark' %}dark{% endif %}">
 
 <head>
+  <meta name="csrf-token" content="{{ csrf_token }}" />
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Family Events — Discover toddler-friendly events in Lafayette & Baton Rouge, Louisiana. Browse, plan, and attend curated family activities." />
@@ -143,10 +144,13 @@
                 <span aria-hidden="true">📡</span> Sources
               </a>
               <hr class="my-1 border-[var(--color-edge-subtle)]" role="separator" />
-              <a href="/logout" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-                <span aria-hidden="true">↩</span> Log Out
-              </a>
+              <form method="POST" action="/logout">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                <button type="submit" role="menuitem" tabindex="-1"
+                  class="block w-full text-left px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+                  <span aria-hidden="true">↩</span> Log Out
+                </button>
+              </form>
             </div>
           </div>
           {% else %}
@@ -238,10 +242,13 @@
           class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
           <span aria-hidden="true">⚙️</span> Settings
         </a>
-        <a href="/logout"
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-          <span aria-hidden="true">↩</span> Log Out
-        </a>
+        <form method="POST" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <button type="submit"
+            class="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+            <span aria-hidden="true">↩</span> Log Out
+          </button>
+        </form>
         {% endif %}
       </div>
     </div>
@@ -424,10 +431,11 @@
       if (status) status.textContent = 'Theme changed to ' + newTheme + ' mode';
 
       // Persist via API if logged in
+      var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
       fetch('/api/profile/theme', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'theme=' + newTheme
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
+        body: 'theme=' + encodeURIComponent(newTheme) + '&csrf_token=' + encodeURIComponent(csrfToken)
       });
     }
 
@@ -501,7 +509,12 @@
         undoBtn.textContent = (undo.label || 'Undo');
         undoBtn.onclick = function (e) {
           e.stopPropagation();
-          fetch(undo.path, { method: 'POST' }).then(function () { window.location.reload(); });
+          var csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+          fetch(undo.path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
+            body: 'csrf_token=' + encodeURIComponent(csrfToken)
+          }).then(function () { window.location.reload(); });
         };
         el.appendChild(undoBtn);
       }
