@@ -4,24 +4,24 @@ A prioritized engineering plan based on the current codebase audit.
 
 ## P0 — Security and correctness
 
-- [ ] Add CSRF protection for all authenticated state-changing routes
-  - [ ] Generate per-session CSRF token
-  - [ ] Validate token on all POST/DELETE endpoints
-  - [ ] Include token in HTMX forms and requests
-  - [ ] Add origin/referer validation as a secondary safeguard
-- [ ] Harden authentication flows
-  - [ ] Add route-specific rate limiting for login and signup
-  - [ ] Change logout from `GET /logout` to `POST /logout`
-  - [ ] Improve password validation rules
-  - [ ] Review session cookie settings for secure deployment
-- [ ] Fix notification configuration inconsistencies
-  - [ ] Resolve Twilio recipient mismatch (`twilio_to_number` vs per-user model)
-  - [ ] Decide whether SMS recipient is global config or stored per user
-  - [ ] Make config, model, profile UI, and notifier behavior consistent
-- [ ] Tighten source URL handling
-  - [ ] Validate URLs before fetch/analyze
-  - [ ] Block localhost/private-network targets
-  - [ ] Add request size/time limits for user-submitted sources
+- [x] Add CSRF protection for all authenticated state-changing routes
+  - [x] Generate per-session CSRF token
+  - [x] Validate token on all POST/DELETE endpoints
+  - [x] Include token in HTMX forms and requests
+  - [x] Add origin/referer validation as a secondary safeguard
+- [x] Harden authentication flows
+  - [x] Add route-specific rate limiting for login and signup
+  - [x] Change logout from `GET /logout` to `POST /logout`
+  - [x] Improve password validation rules
+  - [x] Review session cookie settings for secure deployment
+- [x] Fix notification configuration inconsistencies
+  - [x] Resolve Twilio recipient mismatch (`twilio_to_number` vs per-user model)
+  - [x] Decide whether SMS recipient is global config or stored per user
+  - [x] Make config, model, profile UI, and notifier behavior consistent
+- [x] Tighten source URL handling
+  - [x] Validate URLs before fetch/analyze
+  - [x] Block localhost/private-network targets
+  - [x] Add request size/time limits for user-submitted sources
 
 ## P1 — Reliability and operations
 
@@ -81,7 +81,7 @@ A prioritized engineering plan based on the current codebase audit.
 
 ## P3 — Testing and quality gates
 
-- [ ] Add `pytest` and test tooling to dev dependencies
+- [x] Add `pytest` and test tooling to dev dependencies
 - [ ] Make `pytest` part of the standard quality checks
 - [ ] Add database tests
   - [ ] Event upsert tests
@@ -89,7 +89,7 @@ A prioritized engineering plan based on the current codebase audit.
   - [ ] Search/filter/pagination tests
   - [ ] User/source CRUD tests
 - [ ] Add route tests
-  - [ ] Login/signup/logout flows
+  - [x] Login/signup/logout flows
   - [ ] Profile update endpoints
   - [ ] Attend/unattend endpoints
   - [ ] Source management endpoints
@@ -100,9 +100,9 @@ A prioritized engineering plan based on the current codebase audit.
   - [ ] Weather summarization
   - [ ] Notification dispatch behavior
 - [ ] Add regression tests for security-sensitive flows
-  - [ ] CSRF rejection
+  - [x] CSRF rejection
   - [ ] Unauthorized access rejection
-  - [ ] Rate-limit behavior
+  - [x] Rate-limit behavior
 
 ## P4 — Performance and scaling
 
