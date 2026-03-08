@@ -63,3 +63,37 @@ def test_job_progress_property_parses_result_json():
         "total": 25,
         "summary": "10/25 processed",
     }
+
+
+def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        db_path = str(tmp_path / "jobs-cancel.db")
+        db = Database(db_path)
+        await db.connect()
+        try:
+            job = Job(
+                kind="tag",
+                job_key="pipeline:tag",
+                label="Tag job",
+                owner_user_id="user-1",
+                state="running",
+            )
+            await db.create_job(job)
+        finally:
+            await db.close()
+
+        import src.web.jobs as jobs_module
+        from src.web.jobs import job_registry
+
+        monkeypatch.setattr(jobs_module, "Database", lambda: Database(db_path))
+
+        updated = await job_registry.cancel(job_id=job.id, owner_user_id="user-1")
+        assert updated is not None
+        assert updated.state == "failed"
+        assert updated.detail == "Cancelled"
+        assert updated.error == "Cancelled by user"
+        assert updated.finished_at is not None
+
+    import asyncio
+
+    asyncio.run(scenario())

@@ -153,5 +153,33 @@ class JobRegistry:
             if self._active_ids_by_key.get(oldest.job_key) == oldest_id:
                 self._active_ids_by_key.pop(oldest.job_key, None)
 
+    async def cancel(self, *, job_id: str, owner_user_id: str) -> Job | None:
+        """Cancel an active job owned by the given user, if possible."""
+        async with self._lock:
+            async with Database() as db:
+                job = await db.get_job(job_id)
+                if not job or job.owner_user_id != owner_user_id:
+                    return None
+                if job.state != "running":
+                    return job
+
+                active = self._active_by_id.get(job_id)
+                if active and not active.task.done():
+                    active.task.cancel()
+
+                await db.update_job(
+                    job_id,
+                    state="failed",
+                    detail="Cancelled",
+                    error="Cancelled by user",
+                    finished_at=datetime.now(tz=UTC),
+                )
+                updated = await db.get_job(job_id)
+
+            self._active_by_id.pop(job_id, None)
+            if updated and self._active_ids_by_key.get(updated.job_key) == job_id:
+                self._active_ids_by_key.pop(updated.job_key, None)
+            return updated
+
 
 job_registry = JobRegistry()

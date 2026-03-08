@@ -5,14 +5,28 @@
      hx-trigger="load delay:800ms"
      hx-swap="outerHTML"
      {% endif %}>
-  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div>
       <p class="font-medium text-[var(--color-heading)]">{{ job.label }}</p>
       <p class="text-[var(--color-muted)]">{{ message }}</p>
     </div>
-    <span class="badge {% if job.state == 'running' %}badge-info{% elif job.state == 'failed' %}badge-danger{% else %}badge-success{% endif %}">
-      {{ job.state }}
-    </span>
+    <div class="flex items-center gap-2">
+      <span class="badge {% if job.state == 'running' %}badge-info{% elif job.state == 'failed' %}badge-danger{% else %}badge-success{% endif %}">
+        {{ job.state }}
+      </span>
+      {% if job.state == 'running' %}
+      <form hx-post="/api/jobs/{{ job.id }}/cancel?target_id={{ target_id | urlencode }}"
+            hx-target="#{{ target_id }}"
+            hx-swap="outerHTML"
+            class="inline-flex">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit"
+                class="rounded-lg border border-[var(--color-edge)] px-3 py-1.5 text-xs font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)]">
+          Cancel
+        </button>
+      </form>
+      {% endif %}
+    </div>
   </div>
   <div class="mt-2 text-xs text-[var(--color-faint)]">
     Started: {{ started_at }}

@@ -10,7 +10,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 
 from src.db.models import Job, User
-from src.web.common import get_templates, toast
+from src.web.common import ensure_csrf_token, get_templates, toast
 from src.web.jobs import job_registry
 
 
@@ -154,11 +154,13 @@ async def start_background_job(
         message = f"{label} is already running"
         variant = "warning"
 
+    ensure_csrf_token(request)
     body = (
         get_templates(request)
         .get_template("partials/_job_status.html")
         .render(
             request=request,
+            csrf_token=request.session.get("csrf_token", ""),
             **job_template_context(job, target_id=target_id),
         )
     )

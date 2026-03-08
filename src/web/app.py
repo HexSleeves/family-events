@@ -23,15 +23,7 @@ from src.config import settings
 from src.db.database import Database
 from src.db.models import Constraints, InterestProfile, User
 from src.notifications.formatter import format_console_message
-from src.ranker.scoring import (
-    _city_score,
-    _interest_score,
-    _logistics_score,
-    _timing_score,
-    _weather_score,
-    rank_events,
-    score_event_breakdown,
-)
+from src.ranker.scoring import rank_events, score_event_breakdown
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
 from src.web.auth import (
     ensure_csrf_token,
@@ -541,7 +533,6 @@ async def event_detail(request: Request, event_id: str):
 
         start = event.start_time.date()
         weather = await WeatherService().get_weekend_forecast(start, start)
-        tags = event.tags
         breakdown = score_event_breakdown(event, profile, weather)
         score_breakdown = {
             "toddler": breakdown.toddler_fit,
