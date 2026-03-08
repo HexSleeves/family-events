@@ -755,6 +755,15 @@ async def api_notify(request: Request):
     )
 
 
+def _render_event_attendance(request: Request, event, *, target_id: str) -> str:
+    return templates.get_template("partials/_event_attendance.html").render(
+        request=request,
+        event=event,
+        csrf_token=ensure_csrf_token(request),
+        target_id=target_id,
+    )
+
+
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
 async def api_attend(request: Request, event_id: str):
     user, _form, denied = await require_login_and_csrf(request)
@@ -765,7 +774,11 @@ async def api_attend(request: Request, event_id: str):
         return throttled
 
     await db.mark_attended(event_id)
-    return toast("Marked attended")
+    event = await db.get_event(event_id)
+    if event is None:
+        raise ValueError("Event disappeared after attend")
+    target_id = request.query_params.get("target_id", "event-attendance")
+    return toast("Marked attended", body=_render_event_attendance(request, event, target_id=target_id))
 
 
 @app.post("/api/unattend/{event_id}", response_class=HTMLResponse)
@@ -779,7 +792,11 @@ async def api_unattend(request: Request, event_id: str):
 
     await db.db.execute("UPDATE events SET attended = 0 WHERE id = :id", {"id": event_id})
     await db.db.commit()
-    return toast("Marked as not attended")
+    event = await db.get_event(event_id)
+    if event is None:
+        raise ValueError("Event disappeared after unattend")
+    target_id = request.query_params.get("target_id", "event-attendance")
+    return toast("Marked as not attended", body=_render_event_attendance(request, event, target_id=target_id))
 
 
 @app.post("/api/unattend-bulk", response_class=HTMLResponse)

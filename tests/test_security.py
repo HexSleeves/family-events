@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import re
 import socket
+from datetime import UTC, datetime
 
-from src.db.models import Source
+from src.db.models import Event, Source
 from src.scrapers.analyzer import validate_public_http_url
 from src.scrapers.router import extract_domain
 
@@ -243,3 +244,59 @@ def test_delete_source_returns_refresh_trigger(client, create_user):
     assert response.text == ""
     deleted = asyncio.run(client.app.state.db.get_source(source.id))
     assert deleted is None
+
+
+def test_attend_returns_updated_attendance_partial(client, create_user):
+    user = create_user(email="attend@example.com")
+    login(client, email=user.email)
+
+    event = Event(
+        source="test",
+        source_url="https://example.com/event",
+        source_id="evt-1",
+        title="Story Time",
+        location_city="Austin",
+        start_time=datetime.now(tz=UTC),
+    )
+    asyncio.run(client.app.state.db.upsert_event(event))
+    page = client.get(f"/event/{event.id}")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(
+        f"/api/attend/{event.id}?target_id=event-attendance",
+        data={"csrf_token": csrf_token},
+    )
+
+    assert response.status_code == 200
+    assert "Attended" in response.text
+    assert "Undo" in response.text
+
+
+def test_unattend_bulk_undo_stays_reactive(client, create_user):
+    user = create_user(email="bulk@example.com")
+    login(client, email=user.email)
+
+    event = Event(
+        source="test",
+        source_url="https://example.com/event",
+        source_id="evt-bulk",
+        title="Museum Day",
+        location_city="Austin",
+        start_time=datetime.now(tz=UTC),
+        attended=True,
+    )
+    asyncio.run(client.app.state.db.upsert_event(event))
+    page = client.get("/events?attended=yes")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(
+        "/api/unattend-bulk",
+        data={"csrf_token": csrf_token, "event_ids": [event.id]},
+    )
+
+    assert response.status_code == 200
+    trigger = response.headers.get("HX-Trigger", "")
+    assert "Undo" in trigger
+    updated = asyncio.run(client.app.state.db.get_event(event.id))
+    assert updated is not None
+    assert updated.attended is False

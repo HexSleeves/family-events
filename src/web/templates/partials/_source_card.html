@@ -17,7 +17,7 @@
 } %}
 {% set badge_cls = status_badge.get(source.status, 'badge-muted') %}
 
-<div id="source-card-{{ source.id }}" class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-card)] transition-all duration-200 animate-fade-in-up">
+<div id="source-card-{{ source.id }}" class="source-card bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] hover:shadow-[var(--shadow-card)] transition-all duration-200 animate-fade-in-up">
   <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">
       <div class="flex items-center gap-2 mb-1">
@@ -39,12 +39,12 @@
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         Test
       </button>
-      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="outerHTML"
+      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="outerHTML" hx-select="#source-card-{{ source.id }}"
           aria-label="{{ 'Disable' if source.enabled else 'Enable' }} source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         {{ 'Disable' if source.enabled else 'Enable' }}
       </button>
-      <button hx-delete="/api/sources/{{ source.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="outerHTML" hx-confirm="Delete this source?"
+      <button hx-delete="/api/sources/{{ source.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="delete" hx-confirm="Delete this source?"
           aria-label="Delete source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
         Delete

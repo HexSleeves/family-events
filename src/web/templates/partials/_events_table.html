@@ -20,7 +20,7 @@
   </div>
   <button
     type="button"
-    onclick="bulkUnattend()"
+    onclick="bulkUnattend(this)"
     class="touch-target inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] transition-colors">
     <span aria-hidden="true">↩</span> Unattend selected
   </button>
@@ -112,7 +112,7 @@
     }
   })();
 
-  function bulkUnattend() {
+  function bulkUnattend(buttonEl) {
     var ids = Array.from(document.querySelectorAll('.attended-select:checked')).map(function (el) { return el.value; });
     if (!ids.length) {
       showToast('Select at least one event', 'warning');
@@ -127,7 +127,18 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body
-    }).then(function () { window.location.reload(); });
+    }).then(function (response) {
+      var trigger = response.headers.get('HX-Trigger');
+      if (trigger) {
+        try {
+          var data = JSON.parse(trigger);
+          if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
+        } catch (e) {}
+      }
+      if (buttonEl) {
+        buttonEl.dispatchEvent(new CustomEvent('refresh-events', { bubbles: true }));
+      }
+    });
   }
 </script>
 {% endif %}

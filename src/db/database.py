@@ -741,6 +741,12 @@ class Database:
         await self.db.commit()
         return source.id
 
+    async def get_event(self, event_id: str) -> Event | None:
+        """Get a single event by id."""
+        async with self.db.execute("SELECT * FROM events WHERE id = :id", {"id": event_id}) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_event(row) if row else None
+
     async def get_source(self, source_id: str) -> Source | None:
         """Get a single source by id."""
         async with self.db.execute(

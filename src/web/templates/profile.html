@@ -3,6 +3,7 @@
 {% block content %}
 
 <div class="max-w-4xl mx-auto animate-fade-in">
+  <div id="profile-status" class="mb-4"></div>
   <div class="mb-8">
     <h1 class="text-2xl font-bold text-[var(--color-heading)]">Settings</h1>
     <p class="text-sm text-[var(--color-muted)] mt-1">{{ current_user.email }} · Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
@@ -13,7 +14,7 @@
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
         <span aria-hidden="true">🧠</span> Child Onboarding Profile
       </h2>
-      <form hx-post="/api/profile/onboarding" hx-swap="none" class="space-y-4">
+      <form hx-post="/api/profile/onboarding" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Home City</label><input type="text" name="home_city" value="{{ current_user.home_city }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
@@ -44,7 +45,7 @@
 
     <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🎨</span> Appearance</h2>
-      <form hx-post="/api/profile/theme" hx-swap="none">
+      <form hx-post="/api/profile/theme" hx-target="#profile-status" hx-swap="none">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="flex items-center gap-2">
           {% for value, label in [('light', 'Light'), ('dark', 'Dark'), ('auto', 'System')] %}
@@ -60,7 +61,7 @@
 
     <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🔔</span> Notifications</h2>
-      <form hx-post="/api/profile/notifications" hx-swap="none" class="space-y-4">
+      <form hx-post="/api/profile/notifications" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child’s Name</label><input type="text" name="child_name" value="{{ current_user.child_name }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
@@ -78,7 +79,7 @@
 
     <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🔒</span> Change Password</h2>
-      <form hx-post="/api/profile/password" hx-swap="none" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <form hx-post="/api/profile/password" hx-target="#profile-status" hx-swap="innerHTML" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <input type="password" name="current_password" placeholder="Current password" required class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" />
         <input type="password" name="new_password" placeholder="New password" required class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" />

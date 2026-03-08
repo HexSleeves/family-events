@@ -488,7 +488,18 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': csrfToken },
             body: 'csrf_token=' + encodeURIComponent(csrfToken)
-          }).then(function () { window.location.reload(); });
+          }).then(function (response) {
+            var trigger = response.headers.get('HX-Trigger');
+            if (!trigger) return;
+            try {
+              var data = JSON.parse(trigger);
+              if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
+            } catch (e) {}
+            var eventsForm = document.getElementById('events-form');
+            if (eventsForm && window.htmx) {
+              window.htmx.trigger(eventsForm, 'submit');
+            }
+          });
         };
         el.appendChild(undoBtn);
       }

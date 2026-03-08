@@ -1,16 +1,5 @@
 {% extends "base.html" %} {% block title %}{{ event.title }}{% endblock %} {%
 block content %}
-<script>
-  document.body.addEventListener("htmx:afterRequest", function (evt) {
-    var path = evt.detail.requestConfig?.path || "";
-    if (
-      path.indexOf("/api/attend/") === 0 ||
-      path.indexOf("/api/unattend/") === 0
-    ) {
-      window.location.reload();
-    }
-  });
-</script>
 
 <div class="max-w-4xl mx-auto animate-fade-in">
   {# Back link #}
@@ -91,24 +80,7 @@ block content %}
       class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-body)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target">
       <span aria-hidden="true">🔗</span> Share
     </button>
-    <span id="attend-btn" class="inline-flex items-center gap-2">
-      {% if event.attended %}
-      <span class="badge badge-success">
-        <span aria-hidden="true">✅</span> Attended
-      </span>
-      <button hx-post="/api/unattend/{{ event.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-swap="none"
-        aria-label="Remove attended mark for {{ event.title }}"
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
-        Undo
-      </button>
-      {% else %}
-      <button hx-post="/api/attend/{{ event.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-swap="none"
-        aria-label="Mark {{ event.title }} as attended"
-        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors touch-target">
-        Mark Attended
-      </button>
-      {% endif %}
-    </span>
+    {% include "partials/_event_attendance.html" %}
   </div>
 </div>
 

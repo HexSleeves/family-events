@@ -101,15 +101,15 @@
     <div class="flex items-center justify-between gap-3">
       <p class="text-xs text-[var(--color-faint)]"><span aria-hidden="true">⚡</span> Filters auto-apply as you
         type/select.</p>
-      <button type="button" onclick="window.location.href='/events'"
+      <a href="/events"
         class="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] hover:underline underline-offset-2 transition-colors touch-target">
         Reset filters
-      </button>
+      </a>
     </div>
   </form>
 
   {# ═══ RESULTS ═══ #}
-  <div id="events-results-wrapper" class="relative min-h-48">
+  <div id="events-results-wrapper" class="relative min-h-48" hx-on:refresh-events="htmx.trigger('#events-form', 'submit')">
     {# Skeleton overlay #}
     <div class="skeleton-overlay" aria-busy="true">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">

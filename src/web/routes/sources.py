@@ -41,6 +41,10 @@ def _render_source_card(request: Request, source: Source) -> str:
     )
 
 
+def _render_source_list(request: Request, sources: list[Source]) -> str:
+    return "".join(_render_source_card(request, source) for source in sources)
+
+
 @router.get("/sources", response_class=HTMLResponse)
 async def sources_page(request: Request):
     db = get_db(request)
@@ -168,6 +172,7 @@ async def api_add_source(request: Request):
                 await job_db.update_source_status(source.id, status="failed", error=str(exc))
                 raise
 
+    sources = await db.get_user_sources(user.id)
     return await start_background_job(
         request,
         user=user,
@@ -177,6 +182,7 @@ async def api_add_source(request: Request):
         runner=runner,
         target_id="sources-job-status",
         source_id=source.id,
+        extra_body=_render_source_list(request, sources),
     )
 
 
@@ -196,6 +202,9 @@ async def api_reanalyze(request: Request, source_id: str):
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
     await db.update_source_status(source_id, status="analyzing")
+    updated_source = await db.get_source(source_id)
+    if updated_source is None:
+        raise ValueError("Source disappeared after reanalyze request")
 
     db_path = db.db_path
 
@@ -231,6 +240,7 @@ async def api_reanalyze(request: Request, source_id: str):
         runner=runner,
         target_id=f"source-job-{source_id}",
         source_id=source_id,
+        extra_body=_render_source_card(request, updated_source),
     )
 
 
@@ -376,7 +386,8 @@ async def api_add_predefined_source(request: Request):
     if existing:
         return toast("Source already added", "warning")
     await db.create_source(make_predefined_source(user_id=user.id, source_key=source_key))
+    sources = await db.get_user_sources(user.id)
     return toast(
         f"Added {source_config['name']}",
-        body='<script>setTimeout(()=>location.reload(),300)</script>',
+        body=_render_source_list(request, sources),
     )

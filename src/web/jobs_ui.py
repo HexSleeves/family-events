@@ -139,6 +139,7 @@ async def start_background_job(
     runner,
     target_id: str,
     source_id: str | None = None,
+    extra_body: str = "",
 ) -> HTMLResponse:
     """Start or reuse a background job and return a polling job card."""
     job, created = await job_registry.start_unique(
@@ -166,4 +167,4 @@ async def start_background_job(
             **job_template_context(job, target_id=target_id),
         )
     )
-    return toast(message, variant, body=body)
+    return toast(message, variant, body=extra_body + body)

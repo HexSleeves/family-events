@@ -1,0 +1,19 @@
+{% set attendance_target_id = target_id if target_id is defined else 'event-attendance' %}
+<span id="{{ attendance_target_id }}" class="inline-flex items-center gap-2">
+  {% if event.attended %}
+  <span class="badge badge-success">
+    <span aria-hidden="true">✅</span> Attended
+  </span>
+  <button hx-post="/api/unattend/{{ event.id }}?target_id={{ attendance_target_id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#{{ attendance_target_id }}" hx-swap="outerHTML"
+    aria-label="Remove attended mark for {{ event.title }}"
+    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
+    Undo
+  </button>
+  {% else %}
+  <button hx-post="/api/attend/{{ event.id }}?target_id={{ attendance_target_id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#{{ attendance_target_id }}" hx-swap="outerHTML"
+    aria-label="Mark {{ event.title }} as attended"
+    class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors touch-target">
+    Mark Attended
+  </button>
+  {% endif %}
+</span>
