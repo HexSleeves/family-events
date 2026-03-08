@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-import re
+import secrets
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -36,7 +36,7 @@ from src.ranker.scoring import (
     rank_events,
 )
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
-from src.scrapers.analyzer import PageAnalyzer
+from src.scrapers.analyzer import PageAnalyzer, validate_public_http_url
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import extract_domain, is_builtin_domain
 from src.web.auth import (
@@ -45,6 +45,7 @@ from src.web.auth import (
     hash_password,
     login_session,
     logout_session,
+    rotate_csrf_token,
     validate_password,
     verify_password,
 )
@@ -56,9 +57,6 @@ logger = logging.getLogger("uvicorn.error")
 
 _rate_limit_store: dict[str, deque[float]] = {}
 _bulk_unattend_undo_store: dict[str, list[str]] = {}
-_PRIVATE_HOST_RE = re.compile(
-    r"^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.|::1$)"
-)
 
 
 def _toast(
@@ -109,10 +107,17 @@ def _require_login(user: User | None) -> HTMLResponse | None:
     return _toast("Please log in first", "error", status_code=401)
 
 
+def _client_ip(request: Request) -> str:
+    """Return best-effort client IP, honoring one trusted forwarded header value."""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    if forwarded:
+        return forwarded
+    return request.client.host if request.client else "unknown"
+
+
 def _rate_limit_key(request: Request, route: str) -> str:
     """Build per-IP, per-route rate limit key."""
-    ip = request.client.host if request.client else "unknown"
-    return f"{ip}:{route}"
+    return f"{_client_ip(request)}:{route}"
 
 
 def _check_rate_limit(
@@ -149,9 +154,15 @@ def _format_ts(ts: datetime | None) -> str | None:
     return ts.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+def _expected_origin(request: Request) -> str:
+    """Return the expected origin for same-origin checks."""
+    base_url = settings.app_base_url.strip().rstrip("/") or str(request.base_url).rstrip("/")
+    return base_url
+
+
 def _require_safe_origin(request: Request) -> HTMLResponse | None:
     """Basic origin/referer check for unsafe methods."""
-    expected = str(request.base_url).rstrip("/")
+    expected = _expected_origin(request)
     for header in ("origin", "referer"):
         value = request.headers.get(header)
         if not value:
@@ -162,23 +173,17 @@ def _require_safe_origin(request: Request) -> HTMLResponse | None:
     return None
 
 
-async def _require_login_and_csrf(
-    request: Request,
-) -> tuple[User | None, FormData | None, HTMLResponse | None]:
-    """Return current user, parsed form, plus any auth/csrf denial response."""
-    user = await get_current_user(request, db)
-    if denied := _require_login(user):
-        return user, None, denied
+async def _require_csrf(request: Request) -> tuple[FormData | None, HTMLResponse | None]:
+    """Return parsed form plus any CSRF denial response."""
     form = await request.form()
     if denied := _require_safe_origin(request):
-        return user, form, denied
+        return form, denied
     expected = request.session.get("csrf_token")
     provided = (
         request.headers.get("X-CSRF-Token", "").strip() or str(form.get("csrf_token", "")).strip()
     )
-    if not expected or not provided or str(expected) != provided:
+    if not expected or not provided or not secrets.compare_digest(str(expected), provided):
         return (
-            user,
             form,
             _toast(
                 "Security check failed. Refresh the page and try again.",
@@ -186,21 +191,28 @@ async def _require_login_and_csrf(
                 status_code=403,
             ),
         )
-    return user, form, None
+    return form, None
+
+
+async def _require_login_and_csrf(
+    request: Request,
+) -> tuple[User | None, FormData | None, HTMLResponse | None]:
+    """Return current user, parsed form, plus any auth/csrf denial response."""
+    user = await get_current_user(request, db)
+    if denied := _require_login(user):
+        return user, None, denied
+    form, denied = await _require_csrf(request)
+    return user, form, denied
 
 
 def _validate_source_url(url: str) -> str | None:
     """Return error message if source URL is unsafe or invalid."""
     if len(url) > 2048:
         return "URL is too long"
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"}:
-        return "URL must start with http:// or https://"
-    host = (parsed.hostname or "").strip().lower()
-    if not host:
-        return "URL must include a hostname"
-    if _PRIVATE_HOST_RE.match(host):
-        return "Private or local network URLs are not allowed"
+    try:
+        validate_public_http_url(url)
+    except ValueError as exc:
+        return str(exc)
     return None
 
 
@@ -211,7 +223,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start) * 1000
-        ip = request.client.host if request.client else "unknown"
+        ip = _client_ip(request)
         logger.info(
             "%s %s status=%s duration_ms=%.1f ip=%s",
             request.method,
@@ -240,7 +252,10 @@ app.add_middleware(
     cast(Any, SessionMiddleware),
     secret_key=settings.session_secret,
     session_cookie="session",
-    max_age=60 * 60 * 24 * 30,  # 30 days
+    max_age=max(300, settings.session_max_age_seconds),
+    same_site=settings.session_cookie_same_site,
+    https_only=settings.session_cookie_secure,
+    domain=settings.session_cookie_domain or None,
 )
 
 
@@ -270,6 +285,9 @@ async def login_page(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login_submit(request: Request):
+    form, denied = await _require_csrf(request)
+    if denied:
+        return denied
     if throttled := _check_rate_limit(
         request,
         "login_submit",
@@ -279,7 +297,7 @@ async def login_submit(request: Request):
     ):
         return throttled
 
-    form = await request.form()
+    assert form is not None
     email = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", ""))
 
@@ -291,6 +309,7 @@ async def login_submit(request: Request):
         )
 
     login_session(request, user)
+    rotate_csrf_token(request)
     return RedirectResponse("/profile", status_code=302)
 
 
@@ -304,6 +323,9 @@ async def signup_page(request: Request):
 
 @app.post("/signup", response_class=HTMLResponse)
 async def signup_submit(request: Request):
+    form, denied = await _require_csrf(request)
+    if denied:
+        return denied
     if throttled := _check_rate_limit(
         request,
         "signup_submit",
@@ -313,7 +335,7 @@ async def signup_submit(request: Request):
     ):
         return throttled
 
-    form = await request.form()
+    assert form is not None
     email = str(form.get("email", "")).strip().lower()
     display_name = str(form.get("display_name", "")).strip()
     password = str(form.get("password", ""))
@@ -348,6 +370,7 @@ async def signup_submit(request: Request):
     )
     await db.create_user(user)
     login_session(request, user)
+    rotate_csrf_token(request)
     return RedirectResponse("/profile", status_code=302)
 
 

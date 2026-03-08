@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 
 
@@ -32,7 +34,12 @@ class Settings(BaseSettings):
     # App
     host: str = "0.0.0.0"
     port: int = 8000
+    app_base_url: str = ""
     session_secret: str = ""
+    session_cookie_secure: bool = True
+    session_cookie_same_site: Literal["lax", "strict", "none"] = "lax"
+    session_cookie_domain: str = ""
+    session_max_age_seconds: int = 60 * 60 * 24 * 30
 
     # Basic API rate limiting (per-IP, per-route)
     rate_limit_window_seconds: int = 60

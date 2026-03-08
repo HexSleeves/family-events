@@ -35,6 +35,13 @@ def ensure_csrf_token(request: Request) -> str:
     return str(token)
 
 
+def rotate_csrf_token(request: Request) -> str:
+    """Replace the session CSRF token after auth boundary changes."""
+    token = secrets.token_urlsafe(32)
+    request.session[CSRF_SESSION_KEY] = token
+    return token
+
+
 async def verify_csrf(request: Request) -> bool:
     """Validate CSRF token from header or form body against session token."""
     expected = request.session.get(CSRF_SESSION_KEY)

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
+import socket
 from datetime import UTC, datetime
+from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Comment
@@ -41,6 +45,10 @@ _STRIP_CLASSES = {
     "share",
 }
 _MAX_CLEAN_CHARS = 24_000  # ~6K tokens
+
+
+class UnsafeFetchTargetError(ValueError):
+    """Raised when a fetch target resolves to a non-public address."""
 
 RECIPE_SCHEMA = """
 {
@@ -81,6 +89,80 @@ Rules:
 otherwise use text content (format: "human")
 - Set fields to null if not present
 - confidence: your confidence that these selectors will extract events correctly"""
+
+
+def _is_public_ip_address(value: str) -> bool:
+    """Return True when the IP is acceptable for outbound scraping."""
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _resolve_public_addresses(hostname: str) -> list[str]:
+    """Resolve hostname and reject any private or local answers."""
+    try:
+        infos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise UnsafeFetchTargetError("Could not resolve hostname") from exc
+
+    addresses: list[str] = []
+    seen: set[str] = set()
+    for info in infos:
+        address = str(info[4][0])
+        if address not in seen:
+            seen.add(address)
+            addresses.append(address)
+    if not addresses:
+        raise UnsafeFetchTargetError("Could not resolve hostname")
+    for address in addresses:
+        if not _is_public_ip_address(address):
+            raise UnsafeFetchTargetError("Private or local network URLs are not allowed")
+    return addresses
+
+
+def validate_public_http_url(url: str) -> None:
+    """Validate scheme, hostname, and DNS resolution for an outbound URL."""
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise UnsafeFetchTargetError("URL must start with http:// or https://")
+    hostname = (parsed.hostname or "").strip().lower().rstrip(".")
+    if not hostname:
+        raise UnsafeFetchTargetError("URL must include a hostname")
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        _resolve_public_addresses(hostname)
+    else:
+        if not _is_public_ip_address(hostname):
+            raise UnsafeFetchTargetError("Private or local network URLs are not allowed")
+
+
+class _PublicIPOnlyTransport(httpx.AsyncBaseTransport):
+    """Wrap httpx transport to block requests that resolve to private/local IPs."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        self._transport = httpx.AsyncHTTPTransport(**kwargs)
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        validate_public_http_url(str(request.url))
+        response = await self._transport.handle_async_request(request)
+        if response.is_redirect:
+            location = response.headers.get("location")
+            if location:
+                validate_public_http_url(str(request.url.join(location)))
+        return response
+
+    async def aclose(self) -> None:
+        await self._transport.aclose()
 
 
 class PageAnalyzer:
@@ -208,10 +290,12 @@ class PageAnalyzer:
     # -- Fetch --------------------------------------------------------------
 
     async def _fetch(self, url: str) -> str:
+        validate_public_http_url(url)
         async with httpx.AsyncClient(
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=httpx.Timeout(20.0, connect=5.0),
             follow_redirects=True,
+            transport=_PublicIPOnlyTransport(retries=0),
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()

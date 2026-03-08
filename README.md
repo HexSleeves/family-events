@@ -137,6 +137,9 @@ Copy `.env.example` to `.env` and configure:
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | SMS sender configuration (recipient is set per user in profile) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot notifications |
 | `RESEND_API_KEY` / `EMAIL_FROM` | Email sender configuration (recipient is set per user in profile) |
+| `SESSION_SECRET` | Required for signed session cookies |
+| `APP_BASE_URL` | Public HTTPS origin used for same-origin CSRF checks behind a proxy |
+| `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAME_SITE` / `SESSION_COOKIE_DOMAIN` / `SESSION_MAX_AGE_SECONDS` | Session cookie hardening controls |
 
 ## Architecture
 
