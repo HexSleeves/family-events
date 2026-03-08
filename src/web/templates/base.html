@@ -184,10 +184,11 @@
         {% set nav_items = [
         ('/', 'Discover', 'discover', '🏠'),
         ('/events', 'Browse', 'events', '📋'),
-        ('/calendar', 'Calendar', 'calendar', '🗓️'),
+        ('/calendars', 'Calendars', 'calendar', '🗓️'),
         ('/events?attended=yes', 'Attended', 'attended', '✅'),
         ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡')
+        ('/sources', 'Sources', 'sources', '📡'),
+        ('/jobs', 'Jobs', 'jobs', '🛠️')
         ] %}
         {% for url, label, key, icon in nav_items %}
         <a href="{{ url }}"
@@ -223,10 +224,11 @@
         {% set mobile_nav = [
         ('/', 'Discover', 'discover', '🏠'),
         ('/events', 'Browse All', 'events', '📋'),
-        ('/calendar', 'Calendar', 'calendar', '🗓️'),
+        ('/calendars', 'Calendars', 'calendar', '🗓️'),
         ('/events?attended=yes', 'Attended', 'attended', '✅'),
         ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡')
+        ('/sources', 'Sources', 'sources', '📡'),
+        ('/jobs', 'Jobs', 'jobs', '🛠️')
         ] %}
         {% for url, label, key, icon in mobile_nav %}
         <a href="{{ url }}"
@@ -281,7 +283,7 @@
           <ul class="space-y-2">
             <li><a href="/" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Discover</a></li>
             <li><a href="/events" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Browse Events</a></li>
-            <li><a href="/calendar" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Calendar</a></li>
+            <li><a href="/calendars" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">Calendars</a></li>
             <li><a href="/weekend" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">This Weekend</a></li>
           </ul>
         </nav>

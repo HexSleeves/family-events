@@ -116,12 +116,8 @@ def _job_result_value(job: Job) -> Any:
         return job.result_json
 
 
-def _job_status_message(job: Job) -> str:
-    """Return human-readable job status text."""
-    if job.state == "running":
-        return f"{job.label} is running…"
-    if job.state == "failed":
-        return f"{job.label} failed: {job.error or 'Unknown error'}"
+def _job_result_summary(job: Job) -> str | None:
+    """Return a concise success summary for structured job results."""
     result = _job_result_value(job)
     if isinstance(result, int):
         noun = {
@@ -130,10 +126,35 @@ def _job_status_message(job: Job) -> str:
             "dedupe": "events merged",
             "source-test": "events found",
         }.get(job.kind, "items processed")
-        return f"{job.label} completed: {result} {noun}"
+        return f"{result} {noun}"
     if isinstance(result, str) and result.strip():
-        return f"{job.label} completed: {result}"
-    return f"{job.label} completed"
+        return result
+    if isinstance(result, dict):
+        if job.kind == "source-test":
+            count = result.get("count")
+            if isinstance(count, int):
+                return f"{count} events found"
+        if job.kind == "source-analyze":
+            strategy = result.get("strategy")
+            confidence = result.get("confidence")
+            if isinstance(confidence, (int, float)):
+                if strategy:
+                    return f"{strategy} strategy at {confidence:.0%} confidence"
+                return f"{confidence:.0%} confidence"
+        summary = result.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return summary
+    return None
+
+
+def _job_status_message(job: Job) -> str:
+    """Return human-readable job status text."""
+    if job.state == "running":
+        return f"{job.label} is running…"
+    if job.state == "failed":
+        return f"{job.label} failed: {job.error or 'Unknown error'}"
+    summary = _job_result_summary(job)
+    return f"{job.label} completed: {summary}" if summary else f"{job.label} completed"
 
 
 def _require_login(user: User | None) -> HTMLResponse | None:
@@ -308,7 +329,15 @@ async def _ctx(request: Request, **extra: object) -> dict:
     }
 
 
-def _job_template_context(job: Job, *, target_id: str) -> dict[str, Any]:
+def _job_template_context(
+    job: Job,
+    *,
+    target_id: str,
+    refresh_path: str = "",
+    refresh_select: str = "",
+    refresh_target_id: str = "",
+    auto_refresh_history: bool = False,
+) -> dict[str, Any]:
     """Build a shared template context for rendering a job card."""
     return {
         "job": job,
@@ -316,7 +345,36 @@ def _job_template_context(job: Job, *, target_id: str) -> dict[str, Any]:
         "message": _job_status_message(job),
         "started_at": _fmt_job_time(job.started_at or job.created_at),
         "finished_at": _fmt_job_time(job.finished_at),
+        "result": _job_result_value(job),
+        "result_summary": _job_result_summary(job),
+        "refresh_path": refresh_path,
+        "refresh_select": refresh_select,
+        "refresh_target_id": refresh_target_id,
+        "auto_refresh_history": auto_refresh_history,
     }
+
+
+def _render_job_cards(
+    jobs: list[Job],
+    *,
+    target_prefix: str,
+    refresh_path: str = "",
+    refresh_select: str = "",
+    refresh_target_id: str = "",
+    auto_refresh_history: bool = False,
+) -> list[dict[str, Any]]:
+    """Prepare template contexts for a collection of jobs."""
+    return [
+        _job_template_context(
+            job,
+            target_id=f"{target_prefix}{job.id}",
+            refresh_path=refresh_path,
+            refresh_select=refresh_select,
+            refresh_target_id=refresh_target_id,
+            auto_refresh_history=auto_refresh_history,
+        )
+        for job in jobs
+    ]
 
 
 async def _start_background_job(
@@ -636,6 +694,13 @@ async def dashboard(request: Request):
     timestamps = await db.get_pipeline_timestamps()
     user = await get_current_user(request, db)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=8) if user else []
+    recent_job_cards = _render_job_cards(
+        recent_jobs,
+        target_prefix="job-history-",
+        refresh_path="/",
+        refresh_select="#section-jobs",
+        refresh_target_id="section-jobs",
+    )
 
     top_events = sorted(
         [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
@@ -683,6 +748,7 @@ async def dashboard(request: Request):
             outdoor_events=outdoor_events,
             nature_events=nature_events,
             recent_jobs=recent_jobs,
+            recent_job_cards=recent_job_cards,
         ),
     )
 
@@ -815,6 +881,7 @@ async def event_detail(request: Request, event_id: str):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
+@app.get("/calendars", response_class=HTMLResponse)
 async def calendar_page(request: Request, month: str = "", attended: str = ""):
     today = datetime.now(tz=UTC).date()
     if month:
@@ -842,6 +909,13 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
         datetime.combine(next_month_start, datetime.min.time(), tzinfo=UTC),
         attended=attended,
     )
+    events.sort(
+        key=lambda event: (
+            event.start_time.astimezone(UTC)
+            if event.start_time.tzinfo is not None
+            else event.start_time.replace(tzinfo=UTC)
+        )
+    )
 
     events_by_day: dict[str, list[Any]] = {}
     for event in events:
@@ -854,25 +928,49 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
     for i in range(42):
         day = grid_start + timedelta(days=i)
         key = day.isoformat()
+        day_events = events_by_day.get(key, [])
         days.append(
             {
                 "date": day,
                 "key": key,
                 "in_month": day.month == month_start.month,
                 "is_today": day == today,
-                "events": events_by_day.get(key, []),
+                "is_weekend": day.weekday() >= 5,
+                "events": day_events,
+                "event_count": len(day_events),
             }
         )
+
+    weeks = [days[i : i + 7] for i in range(0, len(days), 7)]
+    month_days = [day for day in days if day["in_month"]]
+    active_days = [day for day in month_days if day["event_count"]]
+    attended_events = [event for event in events if getattr(event, "attended", False)]
+    free_events = [event for event in events if getattr(event, "is_free", False)]
+    cities = sorted({event.location_city for event in events if event.location_city})
+    sources = sorted({event.source for event in events if event.source})
+    featured_days = sorted(active_days, key=lambda day: day["event_count"], reverse=True)[:3]
+    upcoming_events = [event for event in events if event.start_time.date() >= today][:8]
 
     ctx = await _ctx(
         request,
         active_page="calendar",
         month_start=month_start,
+        month_label=month_start.strftime("%B %Y"),
         prev_month=prev_month,
         next_month=next_month_start,
         attended=attended,
         total_events=len(events),
-        days=days,
+        attended_events_count=len(attended_events),
+        free_events_count=len(free_events),
+        busy_days_count=len(active_days),
+        source_count=len(sources),
+        city_count=len(cities),
+        weeks=weeks,
+        featured_days=featured_days,
+        upcoming_events=upcoming_events,
+        cities=cities,
+        sources=sources,
+        today=today,
     )
 
     if request.headers.get("HX-Request"):
@@ -996,6 +1094,13 @@ async def sources_page(request: Request):
     sources = await db.get_user_sources(user.id)
     builtin_stats = await db.get_filter_options()
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=10)
+    recent_job_cards = _render_job_cards(
+        recent_jobs,
+        target_prefix="job-history-",
+        refresh_path="/sources",
+        refresh_select="#sources-jobs-panel",
+        refresh_target_id="sources-jobs-panel",
+    )
     return templates.TemplateResponse(
         "sources.html",
         await _ctx(
@@ -1004,6 +1109,7 @@ async def sources_page(request: Request):
             sources=sources,
             builtin_stats=builtin_stats,
             recent_jobs=recent_jobs,
+            recent_job_cards=recent_job_cards,
         ),
     )
 
@@ -1027,6 +1133,13 @@ async def source_detail(request: Request, source_id: str):
     if source.recipe_json:
         recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, source_id=source.id, limit=10)
+    recent_job_cards = _render_job_cards(
+        recent_jobs,
+        target_prefix="job-history-",
+        refresh_path=f"/source/{source.id}",
+        refresh_select="#source-job-history-panel",
+        refresh_target_id="source-job-history-panel",
+    )
     return templates.TemplateResponse(
         "source_detail.html",
         await _ctx(
@@ -1036,6 +1149,7 @@ async def source_detail(request: Request, source_id: str):
             recipe=recipe,
             events=events_from_source,
             recent_jobs=recent_jobs,
+            recent_job_cards=recent_job_cards,
         ),
     )
 
@@ -1054,6 +1168,59 @@ async def api_job_status(request: Request, job_id: str, target_id: str = "job-st
     return templates.TemplateResponse(
         "partials/_job_status.html",
         {"request": request, **_job_template_context(job, target_id=target_id)},
+    )
+
+
+@app.get("/jobs", response_class=HTMLResponse)
+async def jobs_page(
+    request: Request,
+    state: str = "",
+    kind: str = "",
+    source_id: str = "",
+    q: str = "",
+):
+    user = await get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    selected_source_id = source_id.strip() or None
+    selected_state = state.strip() or None
+    selected_kind = kind.strip() or None
+    search_query = q.strip()
+
+    jobs = await db.list_jobs(
+        owner_user_id=user.id,
+        source_id=selected_source_id,
+        state=selected_state,
+        kind=selected_kind,
+        q=search_query,
+        limit=100,
+    )
+    job_cards = _render_job_cards(
+        jobs,
+        target_prefix="jobs-page-",
+        refresh_path=f"/jobs?state={quote_plus(state)}&kind={quote_plus(kind)}&source_id={quote_plus(source_id)}&q={quote_plus(q)}",
+        refresh_select="#jobs-list-panel",
+        refresh_target_id="jobs-list-panel",
+        auto_refresh_history=True,
+    )
+    sources = await db.get_user_sources(user.id)
+    job_kinds = await db.list_job_kinds(owner_user_id=user.id)
+
+    return templates.TemplateResponse(
+        "jobs.html",
+        await _ctx(
+            request,
+            active_page="jobs",
+            jobs=jobs,
+            job_cards=job_cards,
+            sources=sources,
+            job_kinds=job_kinds,
+            selected_state=state,
+            selected_kind=kind,
+            selected_source_id=source_id,
+            q=q,
+        ),
     )
 
 
@@ -1290,7 +1457,7 @@ async def api_add_source(request: Request):
     )
     await db.create_source(source)
 
-    async def _runner() -> str:
+    async def _runner() -> dict[str, Any]:
         async with Database() as job_db:
             try:
                 analyzer = PageAnalyzer()
@@ -1300,7 +1467,13 @@ async def api_add_source(request: Request):
                     recipe.model_dump_json(),
                     status="active" if recipe.confidence >= 0.3 else "failed",
                 )
-                return f"Strategy: {recipe.strategy}, confidence: {recipe.confidence:.0%}"
+                return {
+                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
+                    "strategy": recipe.strategy,
+                    "confidence": recipe.confidence,
+                    "notes": recipe.notes,
+                    "recipe": recipe.model_dump(mode="json"),
+                }
             except Exception as exc:
                 await job_db.update_source_status(source.id, status="failed", error=str(exc))
                 raise
@@ -1333,7 +1506,7 @@ async def api_reanalyze(request: Request, source_id: str):
         return HTMLResponse("Forbidden", status_code=403)
     await db.update_source_status(source_id, status="analyzing")
 
-    async def _runner() -> str:
+    async def _runner() -> dict[str, Any]:
         async with Database() as job_db:
             source_for_job = await job_db.get_source(source_id)
             if not source_for_job:
@@ -1346,7 +1519,13 @@ async def api_reanalyze(request: Request, source_id: str):
                     recipe.model_dump_json(),
                     status="active" if recipe.confidence >= 0.3 else "failed",
                 )
-                return f"Confidence: {recipe.confidence:.0%}"
+                return {
+                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
+                    "strategy": recipe.strategy,
+                    "confidence": recipe.confidence,
+                    "notes": recipe.notes,
+                    "recipe": recipe.model_dump(mode="json"),
+                }
             except Exception as exc:
                 await job_db.update_source_status(source_id, status="failed", error=str(exc))
                 raise
@@ -1377,7 +1556,8 @@ async def api_test_source(request: Request, source_id: str):
         return HTMLResponse("No recipe to test", status_code=400)
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
-    async def _runner() -> int:
+
+    async def _runner() -> dict[str, Any]:
         from src.scrapers.generic import GenericScraper
 
         async with Database() as job_db:
@@ -1391,7 +1571,23 @@ async def api_test_source(request: Request, source_id: str):
                 recipe=recipe,
             )
             events = await scraper.scrape()
-            return len(events)
+            sample_events = [
+                {
+                    "title": event.title,
+                    "start_time": event.start_time.isoformat(),
+                    "location_name": event.location_name,
+                    "location_city": event.location_city,
+                    "source_url": event.source_url,
+                }
+                for event in events[:5]
+            ]
+            return {
+                "summary": f"{len(events)} events found",
+                "count": len(events),
+                "sample_events": sample_events,
+                "source_url": source_for_job.url,
+                "strategy": recipe.strategy,
+            }
 
     return await _start_background_job(
         request,
