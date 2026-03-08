@@ -56,17 +56,29 @@
     {% endfor %}
   </ul>
 
-  {% if recent_jobs %}
-  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3 animate-fade-in-up stagger-3">Recent Source Jobs</h2>
-  <div class="space-y-3 mb-8">
-    {% for job in recent_jobs %}
-      {% set target_id = "job-history-" ~ job.id %}
-      {% set message = job.label ~ " is running…" if job.state == 'running' else (job.label ~ " failed: " ~ (job.error or 'Unknown error')) if job.state == 'failed' else job.label ~ " completed" %}
-      {% set started_at = job.started_at.strftime('%b %d, %I:%M:%S %p') if job.started_at else job.created_at.strftime('%b %d, %I:%M:%S %p') %}
-      {% set finished_at = job.finished_at.strftime('%b %d, %I:%M:%S %p') if job.finished_at else '—' %}
-      {% include "partials/_job_status.html" %}
-    {% endfor %}
-  </div>
+  {% if recent_job_cards %}
+  <section id="sources-jobs-panel" class="mb-8">
+    <div class="flex items-center justify-between mb-3 animate-fade-in-up stagger-3">
+      <h2 class="text-lg font-semibold text-[var(--color-heading)]">Recent Source Jobs</h2>
+      <a href="/jobs" class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">View all →</a>
+    </div>
+    <div class="space-y-3">
+      {% for card in recent_job_cards %}
+        {% set job = card.job %}
+        {% set target_id = card.target_id %}
+        {% set message = card.message %}
+        {% set started_at = card.started_at %}
+        {% set finished_at = card.finished_at %}
+        {% set result = card.result %}
+        {% set result_summary = card.result_summary %}
+        {% set refresh_path = card.refresh_path %}
+        {% set refresh_select = card.refresh_select %}
+        {% set refresh_target_id = card.refresh_target_id %}
+        {% set auto_refresh_history = false %}
+        {% include "partials/_job_status.html" %}
+      {% endfor %}
+    </div>
+  </section>
   {% endif %}
 
   {# ═══ CUSTOM SOURCES ═══ #}

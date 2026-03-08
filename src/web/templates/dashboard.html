@@ -135,15 +135,22 @@
   </div>
 {% endmacro %}
 
-{% if current_user and recent_jobs %}
-<section class="mb-10 animate-fade-in-up stagger-1" aria-labelledby="section-jobs">
-  {{ section_heading("section-jobs", "🛠️", "Recent Jobs") }}
+{% if current_user and recent_job_cards %}
+<section id="section-jobs" class="mb-10 animate-fade-in-up stagger-1" aria-labelledby="section-jobs-heading">
+  {{ section_heading("section-jobs-heading", "🛠️", "Recent Jobs", "/jobs") }}
   <div class="space-y-3">
-    {% for job in recent_jobs %}
-      {% set target_id = "job-history-" ~ job.id %}
-      {% set message = job.label ~ " is running…" if job.state == 'running' else (job.label ~ " failed: " ~ (job.error or 'Unknown error')) if job.state == 'failed' else job.label ~ " completed" %}
-      {% set started_at = job.started_at.strftime('%b %d, %I:%M:%S %p') if job.started_at else job.created_at.strftime('%b %d, %I:%M:%S %p') %}
-      {% set finished_at = job.finished_at.strftime('%b %d, %I:%M:%S %p') if job.finished_at else '—' %}
+    {% for card in recent_job_cards %}
+      {% set job = card.job %}
+      {% set target_id = card.target_id %}
+      {% set message = card.message %}
+      {% set started_at = card.started_at %}
+      {% set finished_at = card.finished_at %}
+      {% set result = card.result %}
+      {% set result_summary = card.result_summary %}
+      {% set refresh_path = card.refresh_path %}
+      {% set refresh_select = card.refresh_select %}
+      {% set refresh_target_id = card.refresh_target_id %}
+      {% set auto_refresh_history = false %}
       {% include "partials/_job_status.html" %}
     {% endfor %}
   </div>

@@ -891,18 +891,44 @@ class Database:
         *,
         owner_user_id: str,
         source_id: str | None = None,
+        state: str | None = None,
+        kind: str | None = None,
+        q: str = "",
         limit: int = 20,
     ) -> list[Job]:
-        """List recent jobs for a user, optionally scoped to a source."""
+        """List recent jobs for a user with optional filters."""
         sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
         params: dict[str, Any] = {"owner_user_id": owner_user_id, "limit": limit}
         if source_id is not None:
             sql += " AND source_id = :source_id"
             params["source_id"] = source_id
+        if state:
+            sql += " AND state = :state"
+            params["state"] = state
+        if kind:
+            sql += " AND kind = :kind"
+            params["kind"] = kind
+        q = q.strip()
+        if q:
+            sql += " AND (label LIKE :q OR detail LIKE :q OR error LIKE :q)"
+            params["q"] = f"%{q}%"
         sql += " ORDER BY created_at DESC LIMIT :limit"
         async with self.db.execute(sql, params) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_job(r) for r in rows]
+
+    async def list_job_kinds(self, *, owner_user_id: str) -> list[str]:
+        """List distinct job kinds for a user."""
+        async with self.db.execute(
+            """
+            SELECT DISTINCT kind FROM jobs
+            WHERE owner_user_id = :owner_user_id
+            ORDER BY kind ASC
+            """,
+            {"owner_user_id": owner_user_id},
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [str(row["kind"]) for row in rows if row["kind"]]
 
     # ------------------------------------------------------------------
     # Users CRUD
