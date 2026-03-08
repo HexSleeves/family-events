@@ -7,7 +7,8 @@
 
   {# ═══ ADD SOURCE ═══ #}
   {% if current_user %}
-  <form hx-post="/api/sources" hx-swap="none" hx-indicator="#add-spinner"
+  <div id="sources-job-status" class="mb-4"></div>
+  <form hx-post="/api/sources" hx-target="#sources-job-status" hx-swap="innerHTML" hx-indicator="#add-spinner"
       class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 animate-fade-in-up stagger-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <h3 class="font-semibold text-[var(--color-heading)] mb-3">Add Custom Source</h3>

@@ -49,6 +49,7 @@ from src.web.auth import (
     validate_password,
     verify_password,
 )
+from src.web.jobs import WebJob, job_registry
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -98,6 +99,31 @@ def _null_response() -> HTMLResponse:
         status_code=204,
         headers={"HX-Trigger": json.dumps({})},
     )
+
+
+def _fmt_job_time(value: datetime | None) -> str:
+    """Format job timestamps for UI."""
+    return value.astimezone(UTC).strftime("%b %d, %I:%M:%S %p UTC") if value else "—"
+
+
+def _job_status_message(job: WebJob) -> str:
+    """Return human-readable job status text."""
+    if job.state == "running":
+        return f"{job.label} is running…"
+    if job.state == "failed":
+        return f"{job.label} failed: {job.error or 'Unknown error'}"
+    result = job.result
+    if isinstance(result, int):
+        noun = {
+            "scrape": "events scraped",
+            "tag": "events tagged",
+            "dedupe": "events merged",
+            "source-test": "events found",
+        }.get(job.kind, "items processed")
+        return f"{job.label} completed: {result} {noun}"
+    if isinstance(result, str) and result.strip():
+        return f"{job.label} completed: {result}"
+    return f"{job.label} completed"
 
 
 def _require_login(user: User | None) -> HTMLResponse | None:
@@ -270,6 +296,44 @@ async def _ctx(request: Request, **extra: object) -> dict:
         "active_page": extra.pop("active_page", ""),
         **extra,
     }
+
+
+async def _start_background_job(
+    request: Request,
+    *,
+    user: User,
+    kind: str,
+    key: str,
+    label: str,
+    runner,
+    target_id: str,
+    result_target_id: str = "",
+) -> HTMLResponse:
+    """Start or reuse a background job and return an HTMX polling shell."""
+    job, created = await job_registry.start_unique(
+        kind=kind,
+        key=key,
+        label=label,
+        owner_user_id=user.id,
+        runner=runner,
+    )
+    if created:
+        message = f"{label} started in the background"
+        variant = "info"
+    else:
+        message = f"{label} is already running"
+        variant = "warning"
+
+    body = templates.get_template("partials/_job_status.html").render(
+        request=request,
+        job=job,
+        target_id=target_id,
+        result_target_id=result_target_id,
+        message=_job_status_message(job),
+        started_at=_fmt_job_time(job.started_at or job.created_at),
+        finished_at=_fmt_job_time(job.finished_at),
+    )
+    return _toast(message, variant, body=body)
 
 
 # ----- Auth Pages -----
@@ -947,6 +1011,29 @@ async def source_detail(request: Request, source_id: str):
 # ----- API Endpoints (return HTML snippets for HTMX) -----
 
 
+@app.get("/api/jobs/{job_id}", response_class=HTMLResponse)
+async def api_job_status(request: Request, job_id: str, target_id: str = "job-status"):
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("", status_code=401)
+    job = await job_registry.get(job_id)
+    if not job or job.owner_user_id != user.id:
+        return HTMLResponse("", status_code=404)
+    result_target_id = request.query_params.get("result_target_id", "")
+    return templates.TemplateResponse(
+        "partials/_job_status.html",
+        {
+            "request": request,
+            "job": job,
+            "target_id": target_id,
+            "result_target_id": result_target_id,
+            "message": _job_status_message(job),
+            "started_at": _fmt_job_time(job.started_at or job.created_at),
+            "finished_at": _fmt_job_time(job.finished_at),
+        },
+    )
+
+
 @app.post("/api/scrape", response_class=HTMLResponse)
 async def api_scrape(request: Request):
     user, _form, denied = await _require_login_and_csrf(request)
@@ -958,8 +1045,15 @@ async def api_scrape(request: Request):
 
     from src.scheduler import run_scrape
 
-    count = await run_scrape(db)
-    return _toast(f"Scraped {count} events")
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="scrape",
+        key="pipeline:scrape",
+        label="Scrape job",
+        runner=run_scrape,
+        target_id="dashboard-job-status",
+    )
 
 
 @app.post("/api/tag", response_class=HTMLResponse)
@@ -973,8 +1067,15 @@ async def api_tag(request: Request):
 
     from src.scheduler import run_tag
 
-    count = await run_tag(db)
-    return _toast(f"Tagged {count} events")
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="tag",
+        key="pipeline:tag",
+        label="Tag job",
+        runner=run_tag,
+        target_id="dashboard-job-status",
+    )
 
 
 @app.post("/api/dedupe", response_class=HTMLResponse)
@@ -986,9 +1087,19 @@ async def api_dedupe(request: Request):
     if throttled := _check_rate_limit(request, "api_dedupe"):
         return throttled
 
-    result = await db.dedupe_existing_events()
-    return _toast(
-        f"Dedupe complete: merged {result['merged']} of {result['total_scanned']} scanned events"
+    async def _runner() -> int:
+        async with Database() as job_db:
+            result = await job_db.dedupe_existing_events()
+            return int(result["merged"])
+
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="dedupe",
+        key="pipeline:dedupe",
+        label="Dedupe job",
+        runner=_runner,
+        target_id="dashboard-job-status",
     )
 
 
@@ -1003,8 +1114,15 @@ async def api_notify(request: Request):
 
     from src.scheduler import run_notify
 
-    await run_notify(db, user=user)
-    return _toast("Notification sent!")
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="notify",
+        key=f"pipeline:notify:{user.id}",
+        label="Notification job",
+        runner=lambda: run_notify(user=user),
+        target_id="dashboard-job-status",
+    )
 
 
 @app.post("/api/attend/{event_id}", response_class=HTMLResponse)
@@ -1149,22 +1267,30 @@ async def api_add_source(request: Request):
     )
     await db.create_source(source)
 
-    # Analyze in-line (for now; could be background task later)
-    try:
-        analyzer = PageAnalyzer()
-        recipe = await analyzer.analyze(url)
-        await db.update_source_recipe(
-            source.id,
-            recipe.model_dump_json(),
-            status="active" if recipe.confidence >= 0.3 else "failed",
-        )
-        return _toast(
-            f"Source added! Strategy: {recipe.strategy}, confidence: {recipe.confidence:.0%}",
-            body="<script>setTimeout(()=>location.reload(),1000)</script>",
-        )
-    except Exception as e:
-        await db.update_source_status(source.id, status="failed", error=str(e))
-        return _toast(f"Analysis failed: {e}", "error")
+    async def _runner() -> str:
+        async with Database() as job_db:
+            try:
+                analyzer = PageAnalyzer()
+                recipe = await analyzer.analyze(url)
+                await job_db.update_source_recipe(
+                    source.id,
+                    recipe.model_dump_json(),
+                    status="active" if recipe.confidence >= 0.3 else "failed",
+                )
+                return f"Strategy: {recipe.strategy}, confidence: {recipe.confidence:.0%}"
+            except Exception as exc:
+                await job_db.update_source_status(source.id, status="failed", error=str(exc))
+                raise
+
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="source-analyze",
+        key=f"source:analyze:{source.id}",
+        label=f"Analyzing {source.name}",
+        runner=_runner,
+        target_id=f"source-job-{source.id}",
+    )
 
 
 @app.post("/api/sources/{source_id}/analyze", response_class=HTMLResponse)
@@ -1182,21 +1308,34 @@ async def api_reanalyze(request: Request, source_id: str):
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
     await db.update_source_status(source_id, status="analyzing")
-    try:
-        analyzer = PageAnalyzer()
-        recipe = await analyzer.analyze(source.url)
-        await db.update_source_recipe(
-            source_id,
-            recipe.model_dump_json(),
-            status="active" if recipe.confidence >= 0.3 else "failed",
-        )
-        return _toast(
-            f"Re-analyzed! Confidence: {recipe.confidence:.0%}",
-            body="<script>setTimeout(()=>location.reload(),1000)</script>",
-        )
-    except Exception as e:
-        await db.update_source_status(source_id, status="failed", error=str(e))
-        return _toast(f"Analysis failed: {e}", "error")
+
+    async def _runner() -> str:
+        async with Database() as job_db:
+            source_for_job = await job_db.get_source(source_id)
+            if not source_for_job:
+                raise ValueError("Source not found")
+            try:
+                analyzer = PageAnalyzer()
+                recipe = await analyzer.analyze(source_for_job.url)
+                await job_db.update_source_recipe(
+                    source_id,
+                    recipe.model_dump_json(),
+                    status="active" if recipe.confidence >= 0.3 else "failed",
+                )
+                return f"Confidence: {recipe.confidence:.0%}"
+            except Exception as exc:
+                await job_db.update_source_status(source_id, status="failed", error=str(exc))
+                raise
+
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="source-analyze",
+        key=f"source:analyze:{source_id}",
+        label=f"Analyzing {source.name}",
+        runner=_runner,
+        target_id=f"source-job-{source_id}",
+    )
 
 
 @app.post("/api/sources/{source_id}/test", response_class=HTMLResponse)
@@ -1213,18 +1352,31 @@ async def api_test_source(request: Request, source_id: str):
         return HTMLResponse("No recipe to test", status_code=400)
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
-    try:
+    async def _runner() -> int:
         from src.scrapers.generic import GenericScraper
 
-        recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
-        scraper = GenericScraper(url=source.url, source_id=source.id, recipe=recipe)
-        events = await scraper.scrape()
-        return templates.TemplateResponse(
-            "partials/_source_test_results.html",
-            {"request": request, "events": events, "count": len(events)},
-        )
-    except Exception as e:
-        return _toast(f"Test failed: {e}", "error")
+        async with Database() as job_db:
+            source_for_job = await job_db.get_source(source_id)
+            if not source_for_job or not source_for_job.recipe_json:
+                raise ValueError("No recipe to test")
+            recipe = ScrapeRecipe.model_validate_json(source_for_job.recipe_json)
+            scraper = GenericScraper(
+                url=source_for_job.url,
+                source_id=source_for_job.id,
+                recipe=recipe,
+            )
+            events = await scraper.scrape()
+            return len(events)
+
+    return await _start_background_job(
+        request,
+        user=user,
+        kind="source-test",
+        key=f"source:test:{source_id}",
+        label=f"Testing {source.name}",
+        runner=_runner,
+        target_id=f"source-job-{source_id}",
+    )
 
 
 @app.post("/api/sources/{source_id}/toggle", response_class=HTMLResponse)

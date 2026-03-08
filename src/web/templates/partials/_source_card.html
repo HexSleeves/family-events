@@ -34,7 +34,7 @@
     </div>
 
     <div class="flex items-center gap-2 shrink-0">
-      <button hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#test-{{ source.id }}" hx-swap="innerHTML"
+      <button hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-job-{{ source.id }}" hx-swap="innerHTML"
           aria-label="Test source {{ source.name }}"
           class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors">
         Test
@@ -51,5 +51,5 @@
       </button>
     </div>
   </div>
-  <div id="test-{{ source.id }}" class="mt-3"></div>
+  <div id="source-job-{{ source.id }}" class="mt-3"></div>
 </div>

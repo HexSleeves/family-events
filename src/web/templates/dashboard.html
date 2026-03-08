@@ -293,13 +293,15 @@
     </div>
   </div>
 
+  <div id="dashboard-job-status" class="mb-4"></div>
+
   {# ── Action buttons ── #}
   <div class="flex flex-wrap gap-2">
     <button
       hx-post="/api/scrape"
       hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-      hx-swap="none"
-      hx-on:htmx:after-request="window.location.reload()"
+      hx-target="#dashboard-job-status"
+      hx-swap="innerHTML"
       hx-indicator="this"
       hx-disabled-elt="this"
       aria-label="Run scrapers to fetch new events"
@@ -313,8 +315,8 @@
     <button
       hx-post="/api/tag"
       hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-      hx-swap="none"
-      hx-on:htmx:after-request="window.location.reload()"
+      hx-target="#dashboard-job-status"
+      hx-swap="innerHTML"
       hx-indicator="this"
       hx-disabled-elt="this"
       aria-label="Tag untagged events with AI"
@@ -328,8 +330,8 @@
     <button
       hx-post="/api/notify"
       hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-      hx-swap="none"
-      hx-on:htmx:after-request="window.location.reload()"
+      hx-target="#dashboard-job-status"
+      hx-swap="innerHTML"
       hx-indicator="this"
       hx-disabled-elt="this"
       aria-label="Send push notification to subscribers"
@@ -344,8 +346,8 @@
       hx-post="/api/dedupe"
       hx-vals='{"csrf_token":"{{ csrf_token }}"}'
       hx-confirm="Run dedupe on all events? This merges likely duplicates."
-      hx-swap="none"
-      hx-on:htmx:after-request="window.location.reload()"
+      hx-target="#dashboard-job-status"
+      hx-swap="innerHTML"
       hx-indicator="this"
       hx-disabled-elt="this"
       aria-label="Deduplicate events by merging likely duplicates"
