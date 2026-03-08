@@ -22,6 +22,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from src.config import settings
 from src.db.database import Database
 from src.db.models import Constraints, InterestProfile, User
+from src.tagger.taxonomy import TAGGING_VERSION
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events, score_event_breakdown
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
@@ -375,6 +376,7 @@ async def dashboard(request: Request):
     total = len(events)
     tagged = sum(1 for event in events if event.tags)
     untagged = total - tagged
+    stale_tagged = await db.count_stale_tagged_events(tagging_version=TAGGING_VERSION)
     sources = len(set(event.source for event in events))
     timestamps = await db.get_pipeline_timestamps()
     user = await get_current_user(request, db)
@@ -427,6 +429,7 @@ async def dashboard(request: Request):
             total=total,
             tagged=tagged,
             untagged=untagged,
+            stale_tagged=stale_tagged,
             sources=sources,
             last_scraped_at=timestamps["last_scraped_at"],
             last_tagged_at=timestamps["last_tagged_at"],
@@ -930,7 +933,13 @@ async def api_tag(request: Request):
     async def runner(job) -> int:
         async with Database(db_path) as job_db:
             await job.update(detail="Preparing tag batches…", result={"processed": 0, "total": 0, "succeeded": 0, "failed": 0})
-            return await run_tag(job_db, progress_callback=lambda progress: job.update(detail=progress.get("summary", "Running…"), result=progress))
+            return await run_tag(
+                job_db,
+                include_stale=False,
+                progress_callback=lambda progress: job.update(
+                    detail=progress.get("summary", "Running…"), result=progress
+                ),
+            )
 
     return await start_background_job(
         request,
@@ -1105,3 +1114,48 @@ async def not_found_handler(request: Request, _exc: Exception) -> HTMLResponse:
 async def server_error_handler(request: Request, _exc: Exception) -> HTMLResponse:
     """Render friendly 500 page for unhandled server errors."""
     return templates.TemplateResponse("500.html", await ctx(request), status_code=500)
+
+
+@app.post("/api/tag/stale", response_class=HTMLResponse)
+async def api_tag_stale(request: Request):
+    user, _form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None
+    if throttled := check_rate_limit(request, "api_tag_stale"):
+        return throttled
+
+    from src.scheduler import run_tag
+
+    db_path = db.db_path
+
+    async def runner(job) -> int:
+        async with Database(db_path) as job_db:
+            stale_count = await job_db.count_stale_tagged_events(tagging_version=TAGGING_VERSION)
+            await job.update(
+                detail="Preparing stale retag batches…",
+                result={
+                    "processed": 0,
+                    "total": stale_count,
+                    "succeeded": 0,
+                    "failed": 0,
+                    "summary": f"0/{stale_count} processed · 0 tagged · 0 failed",
+                },
+            )
+            return await run_tag(
+                job_db,
+                include_stale=True,
+                progress_callback=lambda progress: job.update(
+                    detail=progress.get("summary", "Running…"), result=progress
+                ),
+            )
+
+    return await start_background_job(
+        request,
+        user=user,
+        kind="tag",
+        key="pipeline:tag:stale",
+        label="Retag stale events",
+        runner=runner,
+        target_id="dashboard-job-status",
+    )

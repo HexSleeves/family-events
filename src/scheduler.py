@@ -89,6 +89,7 @@ async def run_tag(
     db: Database | None = None,
     *,
     progress_callback=None,
+    include_stale: bool = True,
 ) -> int:
     """Tag all untagged events with the LLM. Returns count tagged."""
     own_db = db is None
@@ -96,7 +97,10 @@ async def run_tag(
         db = Database()
         await db.connect()
 
-    untagged = await db.get_untagged_events(tagging_version=TAGGING_VERSION)
+    untagged = await db.get_untagged_events(
+        tagging_version=TAGGING_VERSION,
+        include_stale=include_stale,
+    )
     if not untagged:
         print("No untagged events found.")
         if progress_callback is not None:

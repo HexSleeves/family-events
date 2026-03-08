@@ -176,3 +176,54 @@ def test_get_untagged_events_includes_stale_tagging_versions(tmp_path):
             await db.close()
 
     asyncio.run(scenario())
+
+
+def test_count_stale_tagged_events(tmp_path):
+    async def scenario() -> None:
+        from src.db.database import Database
+        from src.db.models import Event, EventTags
+        from src.tagger.taxonomy import TAGGING_VERSION
+
+        db = Database(str(tmp_path / "stale-count.db"))
+        await db.connect()
+        try:
+            await db.upsert_event(
+                Event(
+                    title="Old tagged event",
+                    description="Fun",
+                    start_time=datetime(2026, 3, 8, 10, 0),
+                    end_time=None,
+                    source="test",
+                    source_url="https://example.com/stale-2",
+                    source_id="stale-2",
+                    location_name="Park",
+                    location_address="123 Main St",
+                    location_city="Lafayette",
+                    is_free=True,
+                    tags=EventTags(tagging_version="v1"),
+                    raw_data={},
+                )
+            )
+            await db.upsert_event(
+                Event(
+                    title="Fresh tagged event",
+                    description="Fun",
+                    start_time=datetime(2026, 3, 8, 11, 0),
+                    end_time=None,
+                    source="test",
+                    source_url="https://example.com/fresh-2",
+                    source_id="fresh-2",
+                    location_name="Park",
+                    location_address="123 Main St",
+                    location_city="Lafayette",
+                    is_free=True,
+                    tags=EventTags(tagging_version=TAGGING_VERSION),
+                    raw_data={},
+                )
+            )
+
+            assert await db.count_stale_tagged_events(tagging_version=TAGGING_VERSION) == 1
+        finally:
+            await db.close()
+
+    asyncio.run(scenario())

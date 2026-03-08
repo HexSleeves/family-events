@@ -460,9 +460,14 @@ class Database:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
 
-    async def get_untagged_events(self, *, tagging_version: str | None = None) -> list[Event]:
-        """Return events that have no tags, or stale tags when a version is requested."""
-        if tagging_version is None:
+    async def get_untagged_events(
+        self,
+        *,
+        tagging_version: str | None = None,
+        include_stale: bool = True,
+    ) -> list[Event]:
+        """Return events that have no tags, or stale tags when requested."""
+        if tagging_version is None or not include_stale:
             query = "SELECT * FROM events WHERE tags IS NULL ORDER BY start_time"
             params: dict[str, Any] = {}
         else:
@@ -476,6 +481,15 @@ class Database:
         async with self.db.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
+
+    async def count_stale_tagged_events(self, *, tagging_version: str) -> int:
+        """Count events tagged with an older tagging version."""
+        async with self.db.execute(
+            "SELECT COUNT(*) FROM events WHERE tags IS NOT NULL AND COALESCE(json_extract(tags, '$.tagging_version'), '') != :tagging_version",
+            {"tagging_version": tagging_version},
+        ) as cursor:
+            row = await cursor.fetchone()
+            return int(row[0] if row else 0)
 
     async def update_event_tags(
         self,

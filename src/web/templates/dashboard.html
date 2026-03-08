@@ -287,11 +287,12 @@
 
   {# ── Stats grid ── #}
   <div class="glass rounded-xl p-4 sm:p-5 mb-6 border border-[var(--color-edge-subtle)]">
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {% set stats = [
         (total, 'Events', 'text-[var(--color-accent)]'),
         (tagged, 'Tagged', 'text-[var(--color-success)]'),
         (untagged, 'Untagged', 'text-[var(--color-warning)]'),
+        (stale_tagged, 'Stale tags', 'text-[var(--color-danger)]'),
         (sources, 'Sources', 'text-[var(--color-info)]')
       ] %}
 
@@ -350,7 +351,23 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
       </svg>
-      Tag Events
+      Tag Untagged
+      <span class="htmx-indicator"><span class="spinner-brand"></span></span>
+    </button>
+    <button
+      hx-post="/api/tag/stale"
+      hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+      hx-target="#dashboard-job-status"
+      hx-swap="innerHTML"
+      hx-indicator="this"
+      hx-disabled-elt="this"
+      aria-label="Retag stale events using the latest tagging rules"
+      class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Retag Stale Events
+      {% if stale_tagged %}<span class="badge badge-warning">{{ stale_tagged }}</span>{% endif %}
       <span class="htmx-indicator"><span class="spinner-brand"></span></span>
     </button>
     <button
