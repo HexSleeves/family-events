@@ -1,7 +1,7 @@
 <div id="{{ target_id }}"
      class="mt-3 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-3 text-sm shadow-[var(--shadow-xs)]"
-     {% if not job.is_done %}
-     hx-get="/api/jobs/{{ job.id }}?target_id={{ target_id | urlencode }}{% if result_target_id %}&result_target_id={{ result_target_id | urlencode }}{% endif %}"
+     {% if job.state == 'running' %}
+     hx-get="/api/jobs/{{ job.id }}?target_id={{ target_id | urlencode }}"
      hx-trigger="load delay:800ms"
      hx-swap="outerHTML"
      {% endif %}>

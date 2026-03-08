@@ -13,7 +13,7 @@ from typing import Any
 
 import aiosqlite
 
-from .models import Event, EventTags, InterestProfile, Source, User
+from .models import Event, EventTags, InterestProfile, Job, Source, User
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "family_events.db")
 DEDUP_DEBUG = os.environ.get("DEDUP_DEBUG", "").lower() in {"1", "true", "yes", "on"}
@@ -85,6 +85,24 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """
 
+_CREATE_JOBS_TABLE = """
+CREATE TABLE IF NOT EXISTS jobs (
+    id            TEXT PRIMARY KEY,
+    kind          TEXT NOT NULL,
+    job_key       TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    owner_user_id TEXT NOT NULL,
+    source_id     TEXT,
+    state         TEXT NOT NULL DEFAULT 'running',
+    detail        TEXT NOT NULL DEFAULT 'Queued',
+    result_json   TEXT NOT NULL DEFAULT '',
+    error         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    started_at    TEXT,
+    finished_at   TEXT
+);
+"""
+
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);",
     "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source, source_id);",
@@ -92,6 +110,9 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_events_tags ON events(tags) WHERE tags IS NULL;",
     "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);",
     "CREATE INDEX IF NOT EXISTS idx_sources_user_id ON sources(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_owner_created ON jobs(owner_user_id, created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_source_created ON jobs(source_id, created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_key_state ON jobs(job_key, state);",
 ]
 
 
@@ -138,6 +159,15 @@ def _row_to_source(row: aiosqlite.Row) -> Source:
     d["created_at"] = datetime.fromisoformat(str(d["created_at"]))
     d["updated_at"] = datetime.fromisoformat(str(d["updated_at"]))
     return Source.model_validate(d)
+
+
+def _row_to_job(row: aiosqlite.Row) -> Job:
+    """Convert a database row to a Job model."""
+    d = dict(row)
+    d["created_at"] = datetime.fromisoformat(str(d["created_at"]))
+    d["started_at"] = datetime.fromisoformat(str(d["started_at"])) if d["started_at"] else None
+    d["finished_at"] = datetime.fromisoformat(str(d["finished_at"])) if d["finished_at"] else None
+    return Job.model_validate(d)
 
 
 def _canonicalize_title(title: str) -> str:
@@ -213,6 +243,7 @@ class Database:
         await self._db.execute(_CREATE_EVENTS_TABLE)
         await self._db.execute(_CREATE_SOURCES_TABLE)
         await self._db.execute(_CREATE_USERS_TABLE)
+        await self._db.execute(_CREATE_JOBS_TABLE)
         # Migrations for existing databases
         for migration in [
             "ALTER TABLE sources ADD COLUMN user_id TEXT",
@@ -773,6 +804,105 @@ class Database:
             {"id": event_id},
         )
         await self.db.commit()
+
+    # ------------------------------------------------------------------
+    # Jobs CRUD
+    # ------------------------------------------------------------------
+
+    async def create_job(self, job: Job) -> str:
+        """Insert a persisted web job record."""
+        await self.db.execute(
+            """
+            INSERT INTO jobs (
+                id, kind, job_key, label, owner_user_id, source_id,
+                state, detail, result_json, error,
+                created_at, started_at, finished_at
+            ) VALUES (
+                :id, :kind, :job_key, :label, :owner_user_id, :source_id,
+                :state, :detail, :result_json, :error,
+                :created_at, :started_at, :finished_at
+            )
+            """,
+            {
+                "id": job.id,
+                "kind": job.kind,
+                "job_key": job.job_key,
+                "label": job.label,
+                "owner_user_id": job.owner_user_id,
+                "source_id": job.source_id,
+                "state": job.state,
+                "detail": job.detail,
+                "result_json": job.result_json,
+                "error": job.error,
+                "created_at": job.created_at.isoformat(),
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            },
+        )
+        await self.db.commit()
+        return job.id
+
+    async def update_job(self, job_id: str, **fields: Any) -> None:
+        """Update selected persisted job fields."""
+        allowed = {
+            "state",
+            "detail",
+            "result_json",
+            "error",
+            "started_at",
+            "finished_at",
+        }
+        sets: list[str] = []
+        params: dict[str, Any] = {"id": job_id}
+        for key, value in fields.items():
+            if key not in allowed:
+                continue
+            if key in {"started_at", "finished_at"} and value is not None:
+                value = value.isoformat() if hasattr(value, "isoformat") else value
+            sets.append(f"{key} = :{key}")
+            params[key] = value
+        if not sets:
+            return
+        await self.db.execute(f"UPDATE jobs SET {', '.join(sets)} WHERE id = :id", params)
+        await self.db.commit()
+
+    async def get_job(self, job_id: str) -> Job | None:
+        """Get a persisted job by id."""
+        async with self.db.execute("SELECT * FROM jobs WHERE id = :id", {"id": job_id}) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_job(row) if row else None
+
+    async def get_active_job_by_key(self, job_key: str) -> Job | None:
+        """Return the newest active job for a logical key, if any."""
+        async with self.db.execute(
+            """
+            SELECT * FROM jobs
+            WHERE job_key = :job_key AND state = 'running'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            {"job_key": job_key},
+        ) as cursor:
+            row = await cursor.fetchone()
+            return _row_to_job(row) if row else None
+
+    async def list_jobs(
+        self,
+        *,
+        owner_user_id: str,
+        source_id: str | None = None,
+        limit: int = 20,
+    ) -> list[Job]:
+        """List recent jobs for a user, optionally scoped to a source."""
+        sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
+        params: dict[str, Any] = {"owner_user_id": owner_user_id, "limit": limit}
+        if source_id is not None:
+            sql += " AND source_id = :source_id"
+            params["source_id"] = source_id
+        sql += " ORDER BY created_at DESC LIMIT :limit"
+        async with self.db.execute(sql, params) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_job(r) for r in rows]
 
     # ------------------------------------------------------------------
     # Users CRUD

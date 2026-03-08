@@ -56,6 +56,19 @@
     {% endfor %}
   </ul>
 
+  {% if recent_jobs %}
+  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3 animate-fade-in-up stagger-3">Recent Source Jobs</h2>
+  <div class="space-y-3 mb-8">
+    {% for job in recent_jobs %}
+      {% set target_id = "job-history-" ~ job.id %}
+      {% set message = job.label ~ " is running…" if job.state == 'running' else (job.label ~ " failed: " ~ (job.error or 'Unknown error')) if job.state == 'failed' else job.label ~ " completed" %}
+      {% set started_at = job.started_at.strftime('%b %d, %I:%M:%S %p') if job.started_at else job.created_at.strftime('%b %d, %I:%M:%S %p') %}
+      {% set finished_at = job.finished_at.strftime('%b %d, %I:%M:%S %p') if job.finished_at else '—' %}
+      {% include "partials/_job_status.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {# ═══ CUSTOM SOURCES ═══ #}
   {% if sources %}
   <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3">Custom Sources</h2>

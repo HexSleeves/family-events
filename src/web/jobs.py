@@ -1,107 +1,116 @@
-"""In-memory background job registry for web-triggered tasks."""
+"""Runtime task tracker for persisted web-triggered background jobs."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
-from uuid import uuid4
+from typing import Any
 
-JobState = Literal["running", "succeeded", "failed"]
+from src.db.database import Database
+from src.db.models import Job
 
 
 @dataclass(slots=True)
-class WebJob:
+class ActiveJob:
     id: str
-    kind: str
-    key: str
-    label: str
-    owner_user_id: str
-    state: JobState = "running"
-    detail: str = "Queued"
-    result: Any = None
-    error: str = ""
-    created_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    task: asyncio.Task[Any] | None = None
-
-    @property
-    def is_done(self) -> bool:
-        return self.state in {"succeeded", "failed"}
+    job_key: str
+    task: asyncio.Task[Any]
+    started_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
 
 
 class JobRegistry:
-    """Track lightweight background tasks started from the web UI."""
+    """Track active tasks while persisting status/history in SQLite."""
 
     def __init__(self) -> None:
-        self._jobs_by_id: OrderedDict[str, WebJob] = OrderedDict()
-        self._active_job_ids_by_key: dict[str, str] = {}
+        self._active_by_id: OrderedDict[str, ActiveJob] = OrderedDict()
+        self._active_ids_by_key: dict[str, str] = {}
         self._lock = asyncio.Lock()
-        self._max_jobs = 200
+        self._max_active = 200
 
     async def start_unique(
         self,
         *,
         kind: str,
-        key: str,
+        job_key: str,
         label: str,
         owner_user_id: str,
+        source_id: str | None,
         runner: Callable[[], Awaitable[Any]],
-    ) -> tuple[WebJob, bool]:
+    ) -> tuple[Job, bool]:
         async with self._lock:
-            active_id = self._active_job_ids_by_key.get(key)
-            if active_id:
-                existing = self._jobs_by_id.get(active_id)
-                if existing and not existing.is_done:
+            active_id = self._active_ids_by_key.get(job_key)
+            if active_id and active_id in self._active_by_id:
+                async with Database() as db:
+                    existing = await db.get_job(active_id)
+                if existing and existing.state == "running":
                     return existing, False
+                self._active_ids_by_key.pop(job_key, None)
+                self._active_by_id.pop(active_id, None)
 
-            job = WebJob(
-                id=str(uuid4()),
-                kind=kind,
-                key=key,
-                label=label,
-                owner_user_id=owner_user_id,
-                detail="Starting…",
-            )
-            self._jobs_by_id[job.id] = job
-            self._active_job_ids_by_key[key] = job.id
+            async with Database() as db:
+                persisted = await db.get_active_job_by_key(job_key)
+                if persisted:
+                    return persisted, False
+
+                job = Job(
+                    kind=kind,
+                    job_key=job_key,
+                    label=label,
+                    owner_user_id=owner_user_id,
+                    source_id=source_id,
+                    state="running",
+                    detail="Starting…",
+                )
+                await db.create_job(job)
+
+            task = asyncio.create_task(self._run(job.id, job_key, runner))
+            self._active_by_id[job.id] = ActiveJob(id=job.id, job_key=job_key, task=task)
+            self._active_ids_by_key[job_key] = job.id
             self._trim_locked()
-            job.task = asyncio.create_task(self._run(job, runner))
             return job, True
 
-    async def _run(self, job: WebJob, runner: Callable[[], Awaitable[Any]]) -> None:
-        job.started_at = datetime.now(tz=UTC)
-        job.detail = "Running…"
+    async def _run(self, job_id: str, job_key: str, runner: Callable[[], Awaitable[Any]]) -> None:
+        started_at = datetime.now(tz=UTC)
+        async with Database() as db:
+            await db.update_job(job_id, detail="Running…", started_at=started_at)
         try:
-            job.result = await runner()
-            job.state = "succeeded"
-            job.detail = "Completed"
+            result = await runner()
+            async with Database() as db:
+                await db.update_job(
+                    job_id,
+                    state="succeeded",
+                    detail="Completed",
+                    result_json=json.dumps(result),
+                    finished_at=datetime.now(tz=UTC),
+                    error="",
+                )
         except Exception as exc:
-            job.state = "failed"
-            job.error = str(exc)
-            job.detail = "Failed"
+            async with Database() as db:
+                await db.update_job(
+                    job_id,
+                    state="failed",
+                    detail="Failed",
+                    error=str(exc),
+                    finished_at=datetime.now(tz=UTC),
+                )
         finally:
-            job.finished_at = datetime.now(tz=UTC)
             async with self._lock:
-                if self._active_job_ids_by_key.get(job.key) == job.id:
-                    self._active_job_ids_by_key.pop(job.key, None)
-
-    async def get(self, job_id: str) -> WebJob | None:
-        async with self._lock:
-            return self._jobs_by_id.get(job_id)
+                self._active_by_id.pop(job_id, None)
+                if self._active_ids_by_key.get(job_key) == job_id:
+                    self._active_ids_by_key.pop(job_key, None)
 
     def _trim_locked(self) -> None:
-        while len(self._jobs_by_id) > self._max_jobs:
-            oldest_id, oldest = self._jobs_by_id.popitem(last=False)
-            if self._active_job_ids_by_key.get(oldest.key) == oldest_id and not oldest.is_done:
-                self._jobs_by_id[oldest_id] = oldest
+        while len(self._active_by_id) > self._max_active:
+            oldest_id, oldest = self._active_by_id.popitem(last=False)
+            if not oldest.task.done():
+                self._active_by_id[oldest_id] = oldest
                 break
-            if self._active_job_ids_by_key.get(oldest.key) == oldest_id:
-                self._active_job_ids_by_key.pop(oldest.key, None)
+            if self._active_ids_by_key.get(oldest.job_key) == oldest_id:
+                self._active_ids_by_key.pop(oldest.job_key, None)
 
 
 job_registry = JobRegistry()

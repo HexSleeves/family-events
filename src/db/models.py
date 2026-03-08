@@ -136,6 +136,27 @@ class User(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Job - persisted web-triggered background job state
+# ---------------------------------------------------------------------------
+
+
+class Job(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: str
+    job_key: str
+    label: str
+    owner_user_id: str
+    source_id: str | None = None
+    state: Literal["running", "succeeded", "failed"] = "running"
+    detail: str = "Queued"
+    result_json: str = ""
+    error: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
 # Source - a user-defined scraping source
 # ---------------------------------------------------------------------------
 

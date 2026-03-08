@@ -25,7 +25,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src.config import settings
 from src.db.database import Database
-from src.db.models import Constraints, InterestProfile, Source, User
+from src.db.models import Constraints, InterestProfile, Job, Source, User
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import (
     _city_score,
@@ -49,7 +49,7 @@ from src.web.auth import (
     validate_password,
     verify_password,
 )
-from src.web.jobs import WebJob, job_registry
+from src.web.jobs import job_registry
 
 db = Database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -106,13 +106,23 @@ def _fmt_job_time(value: datetime | None) -> str:
     return value.astimezone(UTC).strftime("%b %d, %I:%M:%S %p UTC") if value else "—"
 
 
-def _job_status_message(job: WebJob) -> str:
+def _job_result_value(job: Job) -> Any:
+    """Parse persisted JSON job result when present."""
+    if not job.result_json:
+        return None
+    try:
+        return json.loads(job.result_json)
+    except json.JSONDecodeError:
+        return job.result_json
+
+
+def _job_status_message(job: Job) -> str:
     """Return human-readable job status text."""
     if job.state == "running":
         return f"{job.label} is running…"
     if job.state == "failed":
         return f"{job.label} failed: {job.error or 'Unknown error'}"
-    result = job.result
+    result = _job_result_value(job)
     if isinstance(result, int):
         noun = {
             "scrape": "events scraped",
@@ -298,6 +308,17 @@ async def _ctx(request: Request, **extra: object) -> dict:
     }
 
 
+def _job_template_context(job: Job, *, target_id: str) -> dict[str, Any]:
+    """Build a shared template context for rendering a job card."""
+    return {
+        "job": job,
+        "target_id": target_id,
+        "message": _job_status_message(job),
+        "started_at": _fmt_job_time(job.started_at or job.created_at),
+        "finished_at": _fmt_job_time(job.finished_at),
+    }
+
+
 async def _start_background_job(
     request: Request,
     *,
@@ -307,14 +328,15 @@ async def _start_background_job(
     label: str,
     runner,
     target_id: str,
-    result_target_id: str = "",
+    source_id: str | None = None,
 ) -> HTMLResponse:
     """Start or reuse a background job and return an HTMX polling shell."""
     job, created = await job_registry.start_unique(
         kind=kind,
-        key=key,
+        job_key=key,
         label=label,
         owner_user_id=user.id,
+        source_id=source_id,
         runner=runner,
     )
     if created:
@@ -326,12 +348,7 @@ async def _start_background_job(
 
     body = templates.get_template("partials/_job_status.html").render(
         request=request,
-        job=job,
-        target_id=target_id,
-        result_target_id=result_target_id,
-        message=_job_status_message(job),
-        started_at=_fmt_job_time(job.started_at or job.created_at),
-        finished_at=_fmt_job_time(job.finished_at),
+        **_job_template_context(job, target_id=target_id),
     )
     return _toast(message, variant, body=body)
 
@@ -617,6 +634,8 @@ async def dashboard(request: Request):
     untagged = total - tagged
     sources = len(set(e.source for e in events))
     timestamps = await db.get_pipeline_timestamps()
+    user = await get_current_user(request, db)
+    recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=8) if user else []
 
     top_events = sorted(
         [e for e in events if e.tags], key=lambda e: e.tags.toddler_score, reverse=True
@@ -639,7 +658,6 @@ async def dashboard(request: Request):
         reverse=True,
     )[:8]
 
-    user = await get_current_user(request, db)
     near_city = user.home_city if user else "Lafayette"
     near_you_events = sorted(
         [e for e in events if e.tags and e.location_city == near_city],
@@ -664,6 +682,7 @@ async def dashboard(request: Request):
             arts_events=arts_events,
             outdoor_events=outdoor_events,
             nature_events=nature_events,
+            recent_jobs=recent_jobs,
         ),
     )
 
@@ -976,9 +995,16 @@ async def sources_page(request: Request):
         return RedirectResponse("/login", status_code=302)
     sources = await db.get_user_sources(user.id)
     builtin_stats = await db.get_filter_options()
+    recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=10)
     return templates.TemplateResponse(
         "sources.html",
-        await _ctx(request, active_page="sources", sources=sources, builtin_stats=builtin_stats),
+        await _ctx(
+            request,
+            active_page="sources",
+            sources=sources,
+            builtin_stats=builtin_stats,
+            recent_jobs=recent_jobs,
+        ),
     )
 
 
@@ -1000,10 +1026,16 @@ async def source_detail(request: Request, source_id: str):
     recipe = None
     if source.recipe_json:
         recipe = ScrapeRecipe.model_validate_json(source.recipe_json)
+    recent_jobs = await db.list_jobs(owner_user_id=user.id, source_id=source.id, limit=10)
     return templates.TemplateResponse(
         "source_detail.html",
         await _ctx(
-            request, active_page="sources", source=source, recipe=recipe, events=events_from_source
+            request,
+            active_page="sources",
+            source=source,
+            recipe=recipe,
+            events=events_from_source,
+            recent_jobs=recent_jobs,
         ),
     )
 
@@ -1016,21 +1048,12 @@ async def api_job_status(request: Request, job_id: str, target_id: str = "job-st
     user = await get_current_user(request, db)
     if not user:
         return HTMLResponse("", status_code=401)
-    job = await job_registry.get(job_id)
+    job = await db.get_job(job_id)
     if not job or job.owner_user_id != user.id:
         return HTMLResponse("", status_code=404)
-    result_target_id = request.query_params.get("result_target_id", "")
     return templates.TemplateResponse(
         "partials/_job_status.html",
-        {
-            "request": request,
-            "job": job,
-            "target_id": target_id,
-            "result_target_id": result_target_id,
-            "message": _job_status_message(job),
-            "started_at": _fmt_job_time(job.started_at or job.created_at),
-            "finished_at": _fmt_job_time(job.finished_at),
-        },
+        {"request": request, **_job_template_context(job, target_id=target_id)},
     )
 
 
@@ -1290,6 +1313,7 @@ async def api_add_source(request: Request):
         label=f"Analyzing {source.name}",
         runner=_runner,
         target_id=f"source-job-{source.id}",
+        source_id=source.id,
     )
 
 
@@ -1335,6 +1359,7 @@ async def api_reanalyze(request: Request, source_id: str):
         label=f"Analyzing {source.name}",
         runner=_runner,
         target_id=f"source-job-{source_id}",
+        source_id=source_id,
     )
 
 
@@ -1376,6 +1401,7 @@ async def api_test_source(request: Request, source_id: str):
         label=f"Testing {source.name}",
         runner=_runner,
         target_id=f"source-job-{source_id}",
+        source_id=source_id,
     )
 
 

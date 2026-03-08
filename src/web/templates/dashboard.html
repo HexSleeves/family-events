@@ -135,6 +135,21 @@
   </div>
 {% endmacro %}
 
+{% if current_user and recent_jobs %}
+<section class="mb-10 animate-fade-in-up stagger-1" aria-labelledby="section-jobs">
+  {{ section_heading("section-jobs", "🛠️", "Recent Jobs") }}
+  <div class="space-y-3">
+    {% for job in recent_jobs %}
+      {% set target_id = "job-history-" ~ job.id %}
+      {% set message = job.label ~ " is running…" if job.state == 'running' else (job.label ~ " failed: " ~ (job.error or 'Unknown error')) if job.state == 'failed' else job.label ~ " completed" %}
+      {% set started_at = job.started_at.strftime('%b %d, %I:%M:%S %p') if job.started_at else job.created_at.strftime('%b %d, %I:%M:%S %p') %}
+      {% set finished_at = job.finished_at.strftime('%b %d, %I:%M:%S %p') if job.finished_at else '—' %}
+      {% include "partials/_job_status.html" %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 
 {# ═══════════════════════════════════════════════════════════
    TOP PICKS

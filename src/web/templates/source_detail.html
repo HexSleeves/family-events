@@ -58,8 +58,20 @@
   </div>
   {% endif %}
 
-  {# Test results placeholder #}
-  <div id="detail-result" class="animate-fade-in-up stagger-2"></div>
+  {% if recent_jobs %}
+  <div class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-4 animate-fade-in-up stagger-2">
+    <h2 class="font-semibold text-[var(--color-heading)] mb-3">Recent Jobs</h2>
+    <div class="space-y-3">
+      {% for job in recent_jobs %}
+        {% set target_id = "job-history-" ~ job.id %}
+        {% set message = job.label ~ " is running…" if job.state == 'running' else (job.label ~ " failed: " ~ (job.error or 'Unknown error')) if job.state == 'failed' else job.label ~ " completed" %}
+        {% set started_at = job.started_at.strftime('%b %d, %I:%M:%S %p') if job.started_at else job.created_at.strftime('%b %d, %I:%M:%S %p') %}
+        {% set finished_at = job.finished_at.strftime('%b %d, %I:%M:%S %p') if job.finished_at else '—' %}
+        {% include "partials/_job_status.html" %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   {# Recent events from source #}
   {% if events %}
