@@ -1,158 +1,137 @@
 # Architecture & Data Flow
 
-## System Overview
+## Overview
 
-The system has two entry points: a **web dashboard** (FastAPI) and a **cron scheduler**
-(APScheduler). Both share the same pipeline modules and PostgreSQL database.
+Family Events is a FastAPI app plus an APScheduler worker sharing one database.
+The project now targets **PostgreSQL first** for local and deployed environments,
+with SQLite retained only as a compatibility/testing path through the
+`create_database(...)` factory.
+
+Primary entry points:
+
+- **Web app**: `uv run python -m src.main serve`
+- **CLI**: `uv run python -m src.main ...`
+- **Scheduler**: `uv run python -m src.cron`
 
 ```mermaid
 graph TB
     subgraph Entry Points
-        WEB["Web Dashboard<br/>FastAPI :8000"]
-        CRON["Cron Scheduler<br/>APScheduler"]
-        CLI["CLI<br/>python -m src.main"]
+        WEB["FastAPI Web UI"]
+        CLI["CLI\npython -m src.main"]
+        CRON["APScheduler\npython -m src.cron"]
     end
 
-    subgraph Pipeline
-        SCR["Scrapers<br/>5 sources"]
-        TAG["Tagger<br/>OpenAI / Heuristic"]
-        RANK["Ranker<br/>Weighted scoring"]
-        WX["Weather Service<br/>OpenWeatherMap"]
-        FMT["Formatter<br/>Text message"]
-        NOTIFY["Dispatcher<br/>Console/SMS/Telegram/Email"]
+    subgraph Core Services
+        DBAPI["DB abstraction\ncreate_database(...)"]
+        SCRAPE["Scrapers\nbuilt-in + generic"]
+        TAG["Tagger\nOpenAI or heuristic"]
+        RANK["Ranker\nscore_event_breakdown"]
+        NOTIFY["Notification dispatcher"]
     end
 
-    DB[(PostgreSQL Database)]
+    PG[(PostgreSQL)]
 
-    CLI --> SCR
+    WEB --> DBAPI
+    WEB --> SCRAPE
+    WEB --> TAG
+    WEB --> RANK
+    WEB --> NOTIFY
+
+    CLI --> SCRAPE
     CLI --> TAG
+    CLI --> RANK
     CLI --> NOTIFY
-    WEB -->|"POST /api/scrape"| SCR
-    WEB -->|"POST /api/tag"| TAG
-    WEB -->|"POST /api/notify"| NOTIFY
-    CRON -->|"Daily 2AM"| SCR
-    CRON -->|"Daily 2AM"| TAG
-    CRON -->|"Friday 8AM"| RANK
-    CRON -->|"Friday 8AM"| NOTIFY
 
-    SCR -->|upsert events| DB
-    TAG -->|read untagged| DB
-    TAG -->|write tags| DB
-    RANK -->|read tagged events| DB
-    WX --> RANK
-    RANK --> FMT
-    FMT --> NOTIFY
-    WEB -->|read events| DB
+    CRON --> SCRAPE
+    CRON --> TAG
+    CRON --> NOTIFY
+
+    DBAPI --> PG
+    SCRAPE --> DBAPI
+    TAG --> DBAPI
+    RANK --> DBAPI
+    NOTIFY --> DBAPI
 ```
 
+## Runtime Topology
 
+### Web app
 
-## Data Pipeline Flow
+`src/web/app.py` owns:
 
-The full pipeline runs as: **Scrape → Tag → Rank → Notify**.
-Each step can also be triggered independently.
+- page routes (`/`, `/events`, `/weekend`, `/calendar`, `/jobs`)
+- action endpoints (`/api/scrape`, `/api/tag`, `/api/notify`, `/api/dedupe`)
+- event attendance APIs
+- health endpoint
+- session middleware and app lifespan DB wiring
 
-```mermaid
-sequenceDiagram
-    participant S as Scrapers
-    participant DB as PostgreSQL
-    participant T as Tagger (LLM)
-    participant R as Ranker
-    participant W as Weather API
-    participant F as Formatter
-    participant N as Notifier
+Feature routers live in:
 
-    Note over S,N: Full Pipeline (daily scrape + Friday notify)
+- `src/web/routes/auth.py`
+- `src/web/routes/profile.py`
+- `src/web/routes/sources.py`
 
-    S->>DB: Upsert ~1,500 events<br/>(dedup by source+source_id)
-    Note over S: BREC, Eventbrite,<br/>AllEvents, Lafayette,<br/>Libraries
+### Scheduler
 
-    DB->>T: Get untagged events
-    T->>T: OpenAI gpt-4o-mini<br/>or keyword heuristic
-    T->>DB: Save EventTags JSON<br/>(toddler_score, categories, ...)
+`src/cron.py` runs two scheduled flows:
 
-    Note over R,N: Friday notification flow
+- daily scrape + tag
+- Friday morning notifications per user
 
-    DB->>R: Get weekend events (Sat+Sun)
-    W->>R: Weekend forecast<br/>(temp, rain%, UV)
-    R->>R: Score each event<br/>(7 weighted factors)
-    R->>F: Top 10 ranked events
-    F->>N: Formatted message
-    N->>N: Route to channels<br/>(console, SMS, Telegram, email)
-```
+### Shared orchestration
 
+`src/scheduler.py` provides the reusable pipeline functions:
 
+- `run_scrape()`
+- `run_tag()`
+- `run_notify()`
 
-## Scraper Architecture
+Note: `src.main` still references `run_full_pipeline()`, but that function does
+not currently exist. Use `scrape`, `tag`, and `notify` separately.
 
-All scrapers inherit from `BaseScraper` and implement `async scrape() -> list[Event]`.
-Each scraper handles its own HTML parsing, deduplication key generation, and error recovery.
+## Database Architecture
 
-```mermaid
-classDiagram
-    class BaseScraper {
-        <<abstract>>
-        +name: str
-        +scrape() list~Event~*
-        #_client() AsyncContextManager
-    }
+## Backend selection
 
-    class BrecScraper {
-        +name = "brec"
-        -_scrape_month(url)
-        -_parse_event_card(el)
-    }
+`src/db/database.py` exposes a backend-agnostic factory:
 
-    class EventbriteScraper {
-        +name = "eventbrite"
-        -_scrape_city(city)
-        -_parse_jsonld(script)
-        -_parse_server_data(script)
-    }
+- Postgres when `DATABASE_URL` is a Postgres URL
+- SQLite when explicitly passed a SQLite path/URL
 
-    class AllEventsScraper {
-        +name = "allevents"
-        -_scrape_city(city)
-        -_parse_card(el)
-    }
+This preserves simple SQLite-backed tests while letting app/runtime use Postgres.
 
-    class LafayetteScraper {
-        +name = "lafayette"
-        -_scrape_mec_calendar(url, venue)
-        -_parse_mec_event(el)
-    }
+## Postgres schema
 
-    class LibraryScraper {
-        +name = "library"
-        -_scrape_libcal_rss(url)
-    }
+Alembic owns the Postgres schema via revision:
 
-    BaseScraper <|-- BrecScraper
-    BaseScraper <|-- EventbriteScraper
-    BaseScraper <|-- AllEventsScraper
-    BaseScraper <|-- LafayetteScraper
-    BaseScraper <|-- LibraryScraper
-```
+- `alembic/versions/91dae90b6493_create_initial_postgres_schema.py`
 
+Key Postgres-native choices:
 
-
-## Database Schema
-
-Core data lives in PostgreSQL. Events are uniquely identified by `(source, source_id)`.
-Tags and profiles are stored as `JSONB`, while relational ownership is enforced with foreign keys.
+- `UUID` primary keys with `gen_random_uuid()`
+- `CITEXT` for `users.email`
+- `JSONB` for tags and profile-like structures
+- foreign keys across `users`, `sources`, and `jobs`
+- `CHECK` constraints for enum-like text columns
+- trigram indexes for title/description search
+- JSON expression indexes for tag queries
 
 ```mermaid
 erDiagram
+    USERS ||--o{ SOURCES : owns
+    USERS ||--o{ JOBS : owns
+    SOURCES ||--o{ JOBS : related_to
+
     USERS {
         uuid id PK
         citext email UK
         text display_name
-        text theme
         jsonb preferred_cities
         jsonb notification_channels
         jsonb interest_profile
-        timestamptz created_at
-        timestamptz updated_at
+        text theme
+        text child_name
+        bool onboarding_complete
     }
 
     SOURCES {
@@ -163,17 +142,19 @@ erDiagram
         text domain
         text city
         text category
-        boolean builtin
+        bool builtin
+        bool enabled
         text status
+        text recipe_json
         timestamptz last_scraped_at
-        timestamptz created_at
-        timestamptz updated_at
+        int last_event_count
     }
 
     EVENTS {
         uuid id PK
         text source
         text source_id
+        text source_url
         text title
         text description
         text location_city
@@ -182,7 +163,7 @@ erDiagram
         jsonb raw_data
         jsonb tags
         jsonb score_breakdown
-        boolean attended
+        bool attended
     }
 
     JOBS {
@@ -192,225 +173,84 @@ erDiagram
         text kind
         text job_key
         text state
-        timestamptz created_at
-        timestamptz started_at
-        timestamptz finished_at
+        text detail
+        text result_json
     }
-
-    USERS ||--o{ SOURCES : owns
-    USERS ||--o{ JOBS : runs
-    SOURCES ||--o{ JOBS : related_to
 ```
 
-Postgres-specific schema features:
-- `UUID` primary keys with `gen_random_uuid()` defaults
-- `CITEXT` email uniqueness
-- `JSONB` for tag/profile documents
-- `CHECK` constraints for `theme`, `status`, and `state`
-- trigram indexes for title/description search
-- expression indexes for tag filtering
-
-
-
-### EventTags JSON Structure
-
-```json
-{
-  "toddler_score": 8,
-  "age_min_recommended": 0,
-  "age_max_recommended": 99,
-  "indoor_outdoor": "outdoor",
-  "noise_level": "moderate",
-  "crowd_level": "medium",
-  "energy_level": "active",
-  "stroller_friendly": true,
-  "parking_available": true,
-  "bathroom_accessible": true,
-  "food_available": false,
-  "nap_compatible": true,
-  "weather_dependent": true,
-  "good_for_rain": false,
-  "good_for_heat": false,
-  "categories": ["animals", "nature", "arts"],
-  "confidence_score": 0.5,
-  "parent_attention_required": "partial",
-  "meltdown_risk": "low"
-}
-```
-
-## Scoring Breakdown
-
-The ranker computes a weighted score for each tagged event. Higher is better.
+## Data flow
 
 ```mermaid
-graph LR
-    subgraph Inputs
-        TS["Toddler Score<br/>×3.0"]
-        IM["Interest Match<br/>×2.5"]
-        WC["Weather Compat<br/>×2.0"]
-        CP["City Proximity<br/>×2.0"]
-        TM["Timing Score<br/>×1.5"]
-        LG["Logistics<br/>×1.0"]
-        NV["Novelty<br/>×0.5"]
-    end
+sequenceDiagram
+    participant U as User / Cron / CLI
+    participant S as Scraper layer
+    participant D as Database
+    participant T as Tagger
+    participant R as Ranker
+    participant N as Dispatcher
 
-    TS --> SUM(("Sum"))
-    IM --> SUM
-    WC --> SUM
-    CP --> SUM
-    TM --> SUM
-    LG --> SUM
-    NV --> SUM
-    SUM --> FINAL["Final Score<br/>0-150+"]
-
-    style TS fill:#6366f1,color:#fff
-    style IM fill:#8b5cf6,color:#fff
-    style WC fill:#06b6d4,color:#fff
-    style CP fill:#10b981,color:#fff
-    style TM fill:#f59e0b,color:#fff
-    style LG fill:#ef4444,color:#fff
-    style NV fill:#6b7280,color:#fff
+    U->>S: run_scrape()
+    S->>D: upsert events
+    U->>T: run_tag()
+    T->>D: fetch untagged or stale-tagged events
+    T->>D: write tags + score_breakdown
+    U->>R: run_notify()
+    R->>D: fetch weekend events
+    R->>N: formatted ranked message
 ```
 
+## Scraper model
 
+There are two source classes in practice:
 
+1. **Predefined built-in sources** stored in `sources` with `builtin=True`
+2. **User-added custom sources** that use `recipe_json` plus `GenericScraper`
 
-| Factor         | Weight | Source          | How It Works                                                  |
-| -------------- | ------ | --------------- | ------------------------------------------------------------- |
-| Toddler Score  | ×3.0   | AI tags         | LLM rates 0-10 how appropriate for a 3-year-old               |
-| Interest Match | ×2.5   | Tags + Profile  | Compares event categories against loves/likes/dislikes        |
-| Weather Compat | ×2.0   | Tags + Forecast | Rain→indoor bonus, heat→shade bonus, outdoor→clear bonus      |
-| City Proximity | ×2.0   | Event location  | Lafayette=+10, Baton Rouge=+2, other=-5                       |
-| Timing         | ×1.5   | Event time      | Morning bonus, nap time (1-3pm) penalty, post-bedtime penalty |
-| Logistics      | ×1.0   | AI tags         | Stroller-friendly, parking, bathrooms, low meltdown risk      |
-| Novelty        | ×0.5   | Attended flag   | Not recently attended gets a bonus                            |
+Built-in routing is handled by `src/scrapers/router.py` using the source URL's
+normalized domain.
 
+## Search behavior
 
-## Notification Flow
+Search is implemented in the DB layer:
 
-```mermaid
-graph LR
-    RANKED["Ranked Events<br/>(top 3)"] --> FMT["Formatter<br/>format_console_message()"]
-    FMT --> DISPATCH["Dispatcher"]
+- SQLite uses `LIKE`
+- Postgres uses `ILIKE`
+- Postgres also has trigram indexes to support better title/description lookup
 
-    DISPATCH --> CON["Console<br/>stdout"]
-    DISPATCH --> SMS["SMS<br/>Twilio"]
-    DISPATCH --> TG["Telegram<br/>Bot API"]
-    DISPATCH --> EM["Email<br/>Resend"]
+The repository still merits additional end-to-end validation of search ranking
+and results behavior, but the storage/indexing side is now Postgres-native.
 
-    style CON fill:#10b981,color:#fff
-    style SMS fill:#6366f1,color:#fff
-    style TG fill:#0ea5e9,color:#fff
-    style EM fill:#f59e0b,color:#fff
-```
+## Jobs and background work
 
+Long-running web-triggered operations create persisted job records in `jobs`.
+The app restores/fails stale running jobs at startup.
 
+This is used for flows like:
 
-The formatter produces a plain-text message like:
+- source analysis
+- source test runs
+- scrape/tag/notify actions from the UI
 
-```
-🌟 Weekend Plans for Your Little One! 🌟
+## Security and request model
 
-Weather: ⛅ Sat 85°F / 🌤️ Sun 87°F
+Current web protections include:
 
-🥇 TOP PICK: Lafayette Farmers & Artisans Market
-   📍 Lafayette | 🕐 Sat 12:00pm | 💵 Free
-   ✨ animals, arts, outdoor, stroller-friendly
+- session middleware with configurable cookie settings
+- CSRF token checks on authenticated state-changing routes
+- same-origin aware configuration via `APP_BASE_URL`
+- simple in-memory rate limiting
 
-🥈: Movies at Moncus - Zootopia
-   ...
-```
+## Local development architecture
 
-## Module Dependency Graph
+Default local path:
 
-```mermaid
-graph TD
-    CONFIG["config.py<br/>Settings"] --> TAGGER
-    CONFIG --> WEATHER
-    CONFIG --> SMS_N["sms.py"]
-    CONFIG --> TG_N["telegram.py"]
-    CONFIG --> EM_N["email.py"]
-    CONFIG --> DISPATCH
+- Docker Compose Postgres on host port `5433`
+- app `DATABASE_URL=postgresql+asyncpg://family_events:family_events@localhost:5433/family_events`
+- Alembic migrations applied with `uv run alembic upgrade head`
 
-    MODELS["db/models.py<br/>Event, EventTags,<br/>InterestProfile"] --> DATABASE
-    MODELS --> SCRAPERS
-    MODELS --> TAGGER
-    MODELS --> SCORING
+Useful make targets:
 
-    DATABASE["db/database.py<br/>Database"] --> WEB
-    DATABASE --> SCHEDULER
-
-    SCRAPERS["scrapers/*<br/>5 scrapers"] --> SCHEDULER
-    TAGGER["tagger/llm.py<br/>EventTagger"] --> SCHEDULER
-    SCORING["ranker/scoring.py"] --> SCHEDULER
-    SCORING --> WEB
-    WEATHER["ranker/weather.py<br/>WeatherService"] --> SCHEDULER
-    WEATHER --> WEB
-    FORMATTER["notifications/formatter.py"] --> SCHEDULER
-    FORMATTER --> WEB
-    DISPATCH["notifications/dispatcher.py"] --> SCHEDULER
-    SMS_N --> DISPATCH
-    TG_N --> DISPATCH
-    EM_N --> DISPATCH
-    CON_N["console.py"] --> DISPATCH
-
-    SCHEDULER["scheduler.py<br/>run_scrape, run_tag,<br/>run_notify"] --> WEB
-    SCHEDULER --> CRON
-    SCHEDULER --> CLI_M["main.py (CLI)"]
-
-    WEB["web/app.py<br/>FastAPI"]
-    CRON["cron.py<br/>APScheduler"]
-
-    style MODELS fill:#6366f1,color:#fff
-    style DATABASE fill:#6366f1,color:#fff
-    style WEB fill:#10b981,color:#fff
-    style SCHEDULER fill:#f59e0b,color:#fff
-```
-
-
-
-## File Structure
-
-```
-family-events/
-├── pyproject.toml              # Dependencies, ruff + ty config
-├── .env / .env.example         # API keys
-├── family_events.db            # SQLite database (auto-created)
-├── family-events.service       # systemd: web server
-├── family-events-cron.service  # systemd: scheduler
-├── src/
-│   ├── config.py               # Settings from .env
-│   ├── main.py                 # CLI (scrape/tag/notify/serve/events)
-│   ├── scheduler.py            # Pipeline orchestrator
-│   ├── cron.py                 # APScheduler daemon
-│   ├── db/
-│   │   ├── models.py           # Event, EventTags, InterestProfile
-│   │   └── database.py         # Async SQLite (upsert, search, filter)
-│   ├── scrapers/
-│   │   ├── base.py             # BaseScraper ABC
-│   │   ├── brec.py             # BREC parks
-│   │   ├── eventbrite.py       # Eventbrite
-│   │   ├── allevents.py        # AllEvents.in
-│   │   ├── lafayette.py        # Moncus, Arts, Science Museum
-│   │   └── library.py          # Library calendars
-│   ├── tagger/
-│   │   └── llm.py              # OpenAI + heuristic fallback
-│   ├── ranker/
-│   │   ├── scoring.py          # Multi-factor weighted scoring
-│   │   └── weather.py          # OpenWeatherMap forecasts
-│   ├── notifications/
-│   │   ├── formatter.py        # Text message formatting
-│   │   ├── dispatcher.py       # Channel routing
-│   │   ├── console.py          # stdout
-│   │   ├── sms.py              # Twilio
-│   │   ├── telegram.py         # Telegram Bot
-│   │   └── email.py            # Resend
-│   └── web/
-│       ├── app.py              # FastAPI routes (221 lines)
-│       └── templates/          # 14 Jinja2 templates
-└── docs/
-    ├── architecture.md         # This file
-    ├── frontend.md             # HTMX + template docs
-    └── pipeline.md             # Scraping + tagging pipeline
-```
-
+- `make db-up`
+- `make db-down`
+- `make db-reset`
+- `make db-migrate`

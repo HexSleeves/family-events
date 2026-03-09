@@ -1,280 +1,267 @@
-# Scraping & Tagging Pipeline
+# Scraping, Tagging, Ranking, and Notifications
 
-This document explains how events flow from external websites into PostgreSQL,
-get tagged by AI, scored, ranked, and turned into notifications.
+This document describes the actual runtime pipeline in the repository as of the
+Postgres-native local/dev migration.
 
-## Pipeline Overview
+## Pipeline summary
 
-```mermaid
-flowchart LR
-    subgraph Sources
-        BREC["brec.org<br/>~1,400 events"]
-        EB["eventbrite.com<br/>~50 events"]
-        AE["allevents.in<br/>~30 events"]
-        LAF["Lafayette venues<br/>~55 events"]
-        LIB["Libraries<br/>RSS feeds"]
-    end
-
-    subgraph Scrape
-        BS[BrecScraper]
-        ES[EventbriteScraper]
-        AS[AllEventsScraper]
-        LS[LafayetteScraper]
-        LBS[LibraryScraper]
-    end
-
-    BREC --> BS
-    EB --> ES
-    AE --> AS
-    LAF --> LS
-    LIB --> LBS
-
-    BS & ES & AS & LS & LBS --> UPSERT["Database Upsert<br/>UNIQUE(source, source_id)"]
-    UPSERT --> DB[(PostgreSQL)]
-    DB --> TAG["AI Tagger<br/>OpenAI / Heuristic"]
-    TAG --> DB
+```text
+scrape -> tag -> notify
 ```
+
+Ranking happens inside `run_notify()` when weekend recommendations are built.
+There is no working standalone `run_full_pipeline()` implementation right now,
+even though the CLI still exposes a `pipeline` command.
+
+## Orchestration entry points
+
+### CLI
+
+```bash
+uv run python -m src.main scrape
+uv run python -m src.main tag
+uv run python -m src.main notify
+uv run python -m src.main events
+uv run python -m src.main serve
+uv run python -m src.main dedupe
+```
+
+### Scheduler
+
+```bash
+uv run python -m src.cron
+```
+
+Scheduled jobs in `src/cron.py`:
+
+- daily scrape + tag
+- Friday notifications for each user
 
 ## Stage 1: Scraping
 
-### How Each Scraper Works
+`src/scheduler.py::run_scrape()` loads **all stored sources** from the database
+and iterates over enabled ones.
 
-#### BREC (Baton Rouge parks)
+Source types:
 
-```mermaid
-flowchart TD
-    A["Fetch brec.org/calendar<br/>current + next month"] --> B["Parse HTML<br/>BeautifulSoup"]
-    B --> C["Extract event cards<br/>title, date, time, location"]
-    C --> D{"Has detail link?"}
-    D -->|Yes| E["Fetch detail page<br/>(optional enrichment)"]
-    D -->|No| F["Create Event model"]
-    E --> F
-    F --> G["source_id = slugify(title+date)"]
-```
-
-- Scrapes current month and next month
-- Parses park names from event titles and location fields
-- Generates `source_id` from title + date for dedup
-- ~1,400 events per scrape (most are recurring programs)
-
-#### Eventbrite
+- predefined built-in sources (`builtin=True`)
+- custom recipe-driven sources (`builtin=False`, `recipe_json` required)
 
 ```mermaid
 flowchart TD
-    A["Fetch Eventbrite search<br/>family events + city"] --> B{"Has JSON-LD?"}
-    B -->|Yes| C["Parse JSON-LD<br/>structured data"]
-    B -->|No| D{"Has __SERVER_DATA__?"}
-    D -->|Yes| E["Parse embedded JSON"]
-    D -->|No| F["HTML card fallback<br/>BeautifulSoup"]
-    C & E & F --> G["Create Event model"]
-    G --> H["source_id = eventbrite event ID"]
+    DB[(sources table)] --> LOAD[run_scrape]
+    LOAD --> BUILTIN{builtin?}
+    BUILTIN -->|yes| ROUTER[get_builtin_scraper]
+    BUILTIN -->|no| GENERIC[GenericScraper + ScrapeRecipe]
+    ROUTER --> SCRAPE[scrape source]
+    GENERIC --> SCRAPE
+    SCRAPE --> UPSERT[upsert_event]
+    UPSERT --> EVENTS[(events table)]
+    UPSERT --> STATUS[update_source_status]
 ```
 
-- Tries 3 parsing strategies in order: JSON-LD → server data → HTML
-- Scrapes for both Lafayette and Baton Rouge
-- Uses Eventbrite's native event IDs for dedup
+### Built-in scrapers
 
-#### AllEvents.in
+Current built-in routing domains:
 
-```mermaid
-flowchart TD
-    A["Fetch allevents.in<br/>family category + city"] --> B{"Has JSON-LD?"}
-    B -->|Yes| C["Parse JSON-LD array"]
-    B -->|No| D["Parse HTML event cards"]
-    C & D --> E["Create Event model"]
-    E --> F["source_id = URL slug"]
+- `brec.org`
+- `eventbrite.com`
+- `allevents.in`
+- `moncuspark.org`
+- `acadianacenterforthearts.org`
+- `lafayettesciencemuseum.org`
+- `lafayettela.libcal.com`
+- `ebrpl.libcal.com`
+
+### Generic/custom scraper flow
+
+Custom sources are analyzed once, saved as a `ScrapeRecipe`, then replayed by
+`GenericScraper`.
+
+- `jsonld` strategy: parse schema.org Event blocks
+- `css` strategy: replay selectors over repeating event containers
+
+### Source status lifecycle
+
+Source rows can move through statuses such as:
+
+- `pending`
+- `analyzing`
+- `active`
+- `stale`
+- `failed`
+- `disabled`
+
+`run_scrape()` updates source metadata after each run, including:
+
+- `last_scraped_at`
+- `last_event_count`
+- `last_error`
+
+## Event upsert and dedupe
+
+Events are always upserted through the DB layer.
+
+Primary dedupe:
+
+- unique key on `(source, source_id)`
+
+Additional cross-source dedupe:
+
+- title/date/city fingerprint matching
+- fuzzy title similarity around the same time window
+
+This dedupe behavior exists in both backends:
+
+- `src/db/database.py` for SQLite
+- `src/db/postgres.py` for Postgres
+
+There is also a CLI/web-accessible backfill dedupe operation:
+
+```bash
+uv run python -m src.main dedupe
 ```
 
-- Scrapes family/kids category pages for both cities
-- JSON-LD preferred, falls back to HTML card parsing
+## Stage 2: Tagging
 
-#### Lafayette Venues
+`src/scheduler.py::run_tag()` fetches events via:
 
-```mermaid
-flowchart TD
-    A["Fetch MEC WordPress<br/>calendar JSON"] --> B["Parse event array"]
-    B --> C["Extract: title, date,<br/>venue, description"]
-    C --> D["source_id = mec_event_id"]
-```
+- untagged events
+- optionally stale-tagged events when `tagging_version` changes
 
-- Three WordPress sites using Modern Events Calendar (MEC) plugin:
-  - Moncus Park
-  - Acadiana Center for the Arts
-  - Lafayette Science Museum
-- MEC exposes a JSON API endpoint for calendar data
+Tagging version comes from:
 
-#### Libraries
+- `src/tagger/taxonomy.py`
 
-- Attempts LibCal RSS feeds for Lafayette and East Baton Rouge
-- Falls back to HTML parsing
-- Some library calendars require JavaScript rendering (Playwright needed)
+### Tagger behavior
 
-### Deduplication
+`EventTagger` chooses between:
 
-Events are deduplicated on the Postgres unique constraint `UNIQUE(source, source_id)`:
+- OpenAI tagging when `OPENAI_API_KEY` is configured
+- heuristic tagging otherwise
 
-```sql
-INSERT INTO events (...) VALUES (...)
-ON CONFLICT(source, source_id) DO UPDATE SET
-    title = excluded.title,
-    description = excluded.description,
-    start_time = excluded.start_time,
-    ...
-```
+Config knobs in `src/config.py`:
 
-This means:
-- Re-scraping the same source updates existing events (new times, descriptions)
-- Tags and attended status are preserved across re-scrapes
-- Different sources can have the same event (not yet cross-source deduped)
+- `OPENAI_MODEL`
+- `OPENAI_TIMEOUT_SECONDS`
+- `OPENAI_MAX_RETRIES`
+- `TAGGER_CONCURRENCY`
+- `TAGGER_BATCH_SIZE`
 
-## Stage 2: AI Tagging
+For each successful tagged event, the pipeline writes:
 
-```mermaid
-flowchart TD
-    A["Get untagged events<br/>WHERE tags IS NULL"] --> B{"OpenAI key configured?"}
-    B -->|Yes| C["Send to gpt-4o-mini<br/>structured output"]
-    B -->|No| D["Keyword heuristic<br/>fallback"]
-    C --> E["Parse EventTags JSON"]
-    D --> E
-    E --> F["UPDATE events SET tags = ?"]
+- `tags`
+- `tagged_at`
+- `score_breakdown`
 
-    style C fill:#10b981,color:#fff
-    style D fill:#f59e0b,color:#000
-```
+## EventTags shape
 
-### OpenAI Tagging (Primary)
+The tag payload is richer than the original docs implied. It includes fields such as:
 
-Sends event title + description to `gpt-4o-mini` with a structured output prompt:
-
-```
-You are an expert at evaluating events for toddler-friendliness.
-Rate this event on these dimensions:
-- toddler_score (0-10)
-- indoor_outdoor (indoor/outdoor/both)
-- noise_level, crowd_level, energy_level
-- stroller_friendly, parking_available, ...
-- categories (list of tags)
-- meltdown_risk (low/medium/high)
-Return valid JSON matching the EventTags schema.
-```
-
-Cost: ~$0.001 per event (gpt-4o-mini pricing).
-
-### Heuristic Tagging (Fallback)
-
-When no OpenAI key is configured, uses keyword matching:
-
-```python
-# Example heuristic rules
-if any(w in title_lower for w in ["kids", "children", "toddler", "youth"]):
-    score += 3
-if any(w in title_lower for w in ["playground", "splash", "play"]):
-    score += 2
-if any(w in title_lower for w in ["beer", "wine", "cocktail", "21+"]):
-    score -= 5
-```
-
-Categories are assigned by keyword detection ("art" → arts, "animal" → animals, etc.).
-Heuristic tags have `confidence_score = 0.5` vs LLM's `0.8+`.
+- `tagging_version`
+- `toddler_score`
+- `indoor_outdoor`
+- `noise_level`
+- `crowd_level`
+- `energy_level`
+- `stroller_friendly`
+- `parking_available`
+- `bathroom_accessible`
+- `food_available`
+- `nap_compatible`
+- `weather_dependent`
+- `good_for_rain`
+- `good_for_heat`
+- `confidence_score`
+- `parent_attention_required`
+- `meltdown_risk`
+- `audience`
+- `positive_signals`
+- `caution_signals`
+- `exclusion_signals`
+- `raw_rule_score`
 
 ## Stage 3: Ranking
 
-The ranker takes tagged events and produces a sorted list with scores.
+Ranking is done by `src/ranker/scoring.py` during notification generation and
+some UI rendering.
+
+Current weighted components:
+
+- toddler fit (`2.2`)
+- intrinsic/rule score (`0.35`)
+- interest match (`1.4`)
+- weather (`1.0`)
+- timing (`1.0`)
+- logistics (`0.9`)
+- novelty (`0.4`)
+- city (`0.8`)
+- confidence (`0.5`)
+- minus budget penalty
+- minus rule penalty
+
+The implementation is centered on:
+
+- `score_event_breakdown(...)`
+- `score_event(...)`
+- `rank_events(...)`
 
 ```mermaid
-flowchart TD
-    EVENTS["Tagged weekend events"] --> SCORE
-    PROFILE["Interest Profile<br/>loves, likes, dislikes"] --> SCORE
-    WEATHER["Weekend Forecast<br/>temp, rain%, UV"] --> SCORE
-
-    SCORE["score_event()"] --> |"7 weighted factors"| RANKED["Sorted by score DESC"]
-    RANKED --> TOP["Top 10 for display<br/>Top 3 for notification"]
+flowchart LR
+    TAGS[Event tags] --> SCORE[score_event_breakdown]
+    PROFILE[InterestProfile] --> SCORE
+    WEATHER[Weekend forecast] --> SCORE
+    SCORE --> RANK[rank_events]
+    RANK --> TOP[Top weekend recommendations]
 ```
-
-### Scoring Details
-
-#### Toddler Score (×3.0)
-Direct from AI tags. A "Kids at Play" event scores 8-10, a "Beer Festival" scores 0-1.
-
-#### Interest Match (×2.5)
-Compares event `categories` against the child's profile:
-- Each category in `loves` → +2 points
-- Each category in `likes` → +1 point
-- Each category in `dislikes` → -2 points
-
-#### Weather Compatibility (×2.0)
-- Rainy forecast + indoor event = +10
-- Rainy forecast + outdoor event = -5
-- Hot forecast (>90°F) + water play = +5
-- Hot forecast + outdoor non-water = -3
-
-#### City Proximity (×2.0)
-- Lafayette (home city) = +10
-- Baton Rouge = +2
-- Other = -5
-
-#### Timing (×1.5)
-- Morning (8-11am) = +5 (toddler peak energy)
-- During nap (1-3pm) = -8
-- After bedtime (7:30pm+) = -10
-- Afternoon (3-5pm) = +2
-
-#### Logistics (×1.0)
-- Stroller-friendly = +3
-- Parking available = +2
-- Bathrooms accessible = +2
-- Low meltdown risk = +3
-
-#### Novelty (×0.5)
-- Not previously attended = +5
-- Already attended = 0
 
 ## Stage 4: Notification
 
-```mermaid
-flowchart TD
-    RANKED["Top 3 events"] --> FORMAT["format_console_message()"]
-    WEATHER["Weekend forecast"] --> FORMAT
-    FORMAT --> MSG["Plain text message"]
-    MSG --> DISPATCH{"Dispatcher"}
+`run_notify()`:
 
-    DISPATCH --> CON["ConsoleNotifier<br/>print(message)"]
-    DISPATCH --> SMS["SMSNotifier<br/>Twilio REST API"]
-    DISPATCH --> TG["TelegramNotifier<br/>sendMessage endpoint"]
-    DISPATCH --> EM["EmailNotifier<br/>Resend API"]
+1. selects the target weekend
+2. fetches weather
+3. loads weekend events
+4. expands with nearby upcoming events when the weekend pool is too small
+5. filters to tagged events
+6. ranks them
+7. formats a message
+8. dispatches by user-configured channels
 
-    CONFIG["settings.notification_channels"] -->|list| DISPATCH
-```
+Dispatcher implementation:
 
-Channels are configured via `NOTIFICATION_CHANNELS` env var (JSON array).
-Default is `["console"]` (stdout only).
+- `console`
+- `sms`
+- `telegram`
+- `email`
 
-## Scheduling
+Recipients are now primarily per-user:
 
-```mermaid
-gantt
-    title Weekly Schedule
-    dateFormat HH:mm
-    axisFormat %H:%M
+- `user.email_to`
+- `user.sms_to`
+- `user.notification_channels`
+- `user.child_name`
 
-    section Daily (Mon-Sun)
-    Scrape all sources   :crit, 02:00, 30min
-    Tag new events       :02:30, 15min
+## Data storage notes
 
-    section Friday
-    Scrape all sources   :crit, 02:00, 30min
-    Tag new events       :02:30, 15min
-    Rank + Notify        :active, 08:00, 5min
-```
+### Postgres
 
-The cron scheduler (`src/cron.py`) runs as a separate systemd service:
-- **Daily at 2:00 AM** — Scrape all sources + tag new events
-- **Friday at 8:00 AM** — Rank weekend events + send notification
+The intended runtime backend is now Postgres.
 
-## Error Handling
+Important event storage choices:
 
-- Each scraper runs independently; one failure doesn't block others
-- HTTP errors are caught and logged, scraper returns empty list
-- OpenAI failures fall back to heuristic tagging
-- Weather API failures use default Louisiana forecast (85°F, partly cloudy)
-- Database uses WAL mode for concurrent read/write safety
+- `tags` as `JSONB`
+- `score_breakdown` as `JSONB`
+- trigram indexes on `lower(title)` and `lower(description)`
+- expression indexes on `tags->>'tagging_version'` and toddler score
+
+### SQLite
+
+SQLite remains available for compatibility/tests, but docs and local dev should
+assume Postgres unless explicitly stated otherwise.
+
+## Operational caveats
+
+- `src.main pipeline` is still broken because `run_full_pipeline()` does not exist.
+- Search behavior has had backend/schema fixes, but still deserves manual smoke testing.
+- Library scraping remains the most fragile source family.

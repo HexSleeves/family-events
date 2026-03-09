@@ -1,233 +1,217 @@
 # Web Frontend
 
-The web UI is server-rendered HTML using **Jinja2** templates, **HTMX** for interactivity,
-and **Tailwind CSS** (CDN) for styling. There is zero custom JavaScript in the project.
+The frontend is a server-rendered FastAPI app using:
 
-## Stack
+- Jinja2 templates
+- HTMX for progressive interactivity
+- Tailwind-based styling from static assets / CDN-friendly patterns
 
-| Technology | Role | Loaded via |
-|------------|------|------------|
-| Jinja2 | Template engine with inheritance | FastAPI built-in |
-| HTMX 2.0.4 | Declarative AJAX (search, pagination, actions) | CDN `<script>` |
-| Tailwind CSS | Utility-first CSS | CDN play script |
+There is no SPA framework. Most behavior is HTML-first with HTMX swaps.
 
-No npm, no bundler, no build step. The entire frontend is HTML with `hx-*` attributes.
+## Route map
 
-## Template Hierarchy
+### Page routes
 
-```mermaid
-graph TD
-    BASE["base.html<br/><i>Layout, nav, CDN scripts,<br/>skeleton CSS, progress bar</i>"] --> DASH["dashboard.html"]
-    BASE --> EVENTS["events.html"]
-    BASE --> DETAIL["event_detail.html"]
-    BASE --> WEEKEND["weekend.html"]
+Implemented primarily in `src/web/app.py` plus feature routers:
 
-    DASH -->|include| STATS["_stats.html"]
-    DASH -->|include| CARD["_event_card.html"]
-    DASH -->|include| SKEL_ACT["_skeleton_action.html"]
+- `/` — dashboard
+- `/events` — searchable/filterable event list
+- `/event/{event_id}` — event detail
+- `/calendar` and `/calendars` — calendar views
+- `/calendar.ics` — ICS feed
+- `/weekend` — ranked weekend recommendations
+- `/jobs` — job history
+- `/login`
+- `/signup`
+- `/profile`
+- `/sources`
+- `/source/{source_id}`
 
-    EVENTS -->|include| TABLE["_events_table.html"]
-    EVENTS -->|include| SKEL_TBL["_skeleton_table.html"]
+### Action/API routes
 
-    TABLE -->|include| ROW["_event_row.html"]
+- `/api/scrape`
+- `/api/tag`
+- `/api/tag/stale`
+- `/api/dedupe`
+- `/api/notify`
+- `/api/attend/{event_id}`
+- `/api/unattend/{event_id}`
+- `/api/unattend-bulk`
+- `/api/unattend-bulk/undo/{undo_token}`
+- `/api/jobs/{job_id}`
+- `/api/jobs/{job_id}/cancel`
+- `/api/profile/...`
+- `/api/sources...`
+- `/health`
 
-    DETAIL -->|include| TAGS["_tags_grid.html"]
+## Page behavior
 
-    WEEKEND -->|include| CARD
-    WEEKEND -->|include| NOTIF["_notification.html"]
+## Dashboard
 
-    style BASE fill:#6366f1,color:#fff
-    style TABLE fill:#f59e0b,color:#000
-    style SKEL_TBL fill:#d1d5db,color:#000
-    style SKEL_ACT fill:#d1d5db,color:#000
-```
+The dashboard aggregates:
 
-## HTMX Interaction Map
+- event totals
+- tagged / untagged counts
+- stale-tagged count
+- recent pipeline timestamps
+- top toddler-friendly events
+- category slices like arts/outdoor/nature
+- recent background jobs
 
-Every interactive element uses HTMX attributes instead of JavaScript.
+## Events page
+
+`/events` supports server-side filtering via the DB layer.
+
+Current filters/sorts exposed by the route:
+
+- `q`
+- `city`
+- `source`
+- `tagged`
+- `attended`
+- `score_min`
+- `sort`
+- `page`
+
+Results are paginated at 25 per page.
+
+The route returns a partial only when the HTMX target is `events-results`.
+
+## Event detail
+
+The event detail page shows:
+
+- normalized event fields
+- tag grid
+- raw JSON payload
+- attendance controls
+
+## Weekend page
+
+The weekend page renders ranked recommendations using the current user profile
+plus weather-aware ranking.
+
+## Calendar
+
+The app includes both HTML calendar views and an ICS endpoint:
+
+- `/calendar`
+- `/calendars`
+- `/calendar.ics`
+
+## Sources UI
+
+The sources experience is now a first-class feature.
+
+Users can:
+
+- view predefined sources
+- add catalog sources
+- add custom URLs
+- trigger source analysis jobs
+- re-analyze custom sources
+- test recipe-driven sources
+- enable/disable or delete sources
+
+## Auth/profile UI
+
+Authentication and profile settings are fully part of the web surface:
+
+- signup with onboarding fields
+- login/logout
+- profile editing
+- notification preferences
+- password change
+- theme switching
+
+## HTMX patterns
+
+Common patterns used across the app:
+
+- partial rendering for tables/cards
+- optimistic-feeling action buttons with loading indicators
+- in-place replacement of status blocks
+- background job polling
+- toast-style feedback responses
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant B as Browser (HTMX)
-    participant S as Server (FastAPI)
+    participant H as HTMX
+    participant W as FastAPI
+    participant J as Job system
 
-    Note over U,S: Events Page - Search
-    U->>B: Types in search box
-    B->>B: 300ms debounce (hx-trigger)
-    B->>S: GET /events?q=kids&page=1
-    Note over S: Detects HX-Request header
-    S->>B: Returns _events_table.html partial only
-    B->>B: Swaps #events-results innerHTML
-    B->>B: Updates URL bar (hx-push-url)
-
-    Note over U,S: Events Page - Filter Change
-    U->>B: Changes city dropdown
-    B->>S: GET /events?city=Lafayette&page=1
-    B->>B: Shows skeleton overlay (.htmx-request)
-    S->>B: Returns _events_table.html partial
-    B->>B: Swaps content, hides skeleton
-
-    Note over U,S: Dashboard - Run Scrapers
-    U->>B: Clicks "Run Scrapers"
-    B->>B: Disables button (hx-disabled-elt)
-    B->>B: Shows spinner (hx-indicator)
-    B->>S: POST /api/scrape
-    S->>S: Runs all 5 scrapers
-    S->>B: HTML snippet: "Scraped 42 events ✅"
-    B->>B: Swaps #action-status innerHTML
-    B->>B: Re-enables button, hides spinner
-
-    Note over U,S: Event Detail - Mark Attended
-    U->>B: Clicks "Mark Attended"
-    B->>B: Shows spinner on button
-    B->>S: POST /api/attend/{id}
-    S->>B: HTML: "Attended ✅" label
-    B->>B: Replaces button with label (outerHTML)
+    U->>H: submit source URL
+    H->>W: POST /api/sources
+    W->>J: create background job
+    W-->>H: updated source list + job card
+    H->>W: poll /api/jobs/{job_id}
+    W-->>H: job status partial
 ```
 
-## HTMX Patterns Used
+## Templates
 
-### 1. Partial Page Rendering
+Top-level templates include:
 
-The `/events` route detects HTMX requests via the `HX-Request` header and returns
-only the table partial instead of the full page:
+- `base.html`
+- `dashboard.html`
+- `events.html`
+- `event_detail.html`
+- `calendar.html`
+- `weekend.html`
+- `jobs.html`
+- `login.html`
+- `signup.html`
+- `profile.html`
+- `sources.html`
+- `source_detail.html`
+- `404.html`
+- `500.html`
 
-```python
-# src/web/app.py
-if request.headers.get("HX-Request"):
-    return templates.TemplateResponse("partials/_events_table.html", ctx)
-return templates.TemplateResponse("events.html", ctx)
-```
+Key partials include:
 
-This means the same URL works for both:
+- `_events_table.html`
+- `_event_row.html`
+- `_event_card.html`
+- `_tags_grid.html`
+- `_notification.html`
+- `_job_status.html`
+- `_profile_status.html`
+- `_source_card.html`
+- `_source_test_results.html`
+- `_calendar_grid.html`
+- `_calendar_shell.html`
+- skeleton partials for loading states
 
-- **Full page load** (browser navigation) → full HTML with `<html>`, nav, etc.
-- **HTMX request** (search/filter/pagination) → just the table + pagination fragment
+## Middleware and request handling
 
-### 2. Debounced Search
+The app uses:
 
-```html
-<input
-    hx-get="/events"
-    hx-target="#events-results"
-    hx-trigger="keyup changed delay:300ms"
-    hx-include="#events-form"
-    hx-push-url="true"
-/>
-```
+- `RequestLoggingMiddleware`
+- `SessionMiddleware`
 
-- `keyup changed` — only fires when value actually changes
-- `delay:300ms` — debounces to avoid hammering the server
-- `hx-include` — sends all form fields (filters, sort, page) with the request
-- `hx-push-url` — updates browser URL for bookmarkability
+Session/cookie behavior is driven by config such as:
 
-### 3. Auto-Submit Filters
+- `SESSION_SECRET`
+- `SESSION_COOKIE_SECURE`
+- `SESSION_COOKIE_SAME_SITE`
+- `SESSION_COOKIE_DOMAIN`
+- `SESSION_MAX_AGE_SECONDS`
 
-```html
-<select name="city" class="auto-submit">
-```
+CSRF protection is enforced on state-changing authenticated routes.
 
-The form has `hx-trigger="submit, change from:.auto-submit"`, so changing any
-filter dropdown immediately fires a new request.
+## Health endpoint
 
-### 4. Button Loading States
+`/health` returns service status and DB-derived stats:
 
-```html
-<button
-    hx-post="/api/scrape"
-    hx-target="#action-status"
-    hx-indicator="this"
-    hx-disabled-elt="this"
->
-    🔄 Run Scrapers
-    <span class="htmx-indicator"><span class="spinner"></span></span>
-</button>
-```
+- `status`
+- database ok flag
+- `event_count`
+- `latest_scraped_at`
 
-- `hx-indicator="this"` — adds `.htmx-request` to the button itself
-- `hx-disabled-elt="this"` — sets `disabled` during the request
-- The spinner is hidden by default, shown when `.htmx-request` is on parent
+## Frontend implementation notes
 
-### 5. In-Place Element Swap
-
-```html
-<button
-    hx-post="/api/attend/{id}"
-    hx-target="#attend-btn"
-    hx-swap="outerHTML"
->
-```
-
-The server returns a static label that replaces the button entirely.
-
-## Skeleton Loading System
-
-Loading states are CSS-only, triggered by HTMX's built-in `.htmx-request` class.
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle: Page loaded
-    Idle --> Loading: HTMX request starts<br/>.htmx-request added
-    Loading --> Idle: Response received<br/>content swapped
-
-    state Loading {
-        [*] --> ProgressBar: Global top bar animates
-        [*] --> SkeletonOverlay: Table overlay fades in
-        [*] --> ButtonSpinner: Spinner appears, button disabled
-    }
-```
-
-### CSS Animations
-
-| Animation | Element | Duration | CSS |
-|-----------|---------|----------|-----|
-| Shimmer | `.skeleton` | 1.4s loop | `background-position` sweep |
-| Spinner | `.spinner` | 0.6s loop | `border-top` rotation |
-| Progress bar | `#global-progress .bar` | 1.0s loop | `translateX` slide |
-| Overlay fade | `.skeleton-overlay` | 150ms | `opacity` transition |
-
-### Skeleton Overlay Pattern
-
-The events table uses an absolutely-positioned overlay that sits on top of the content:
-
-```html
-<div id="events-results-wrapper" class="relative">
-    <!-- Skeleton: hidden by default (opacity: 0) -->
-    <div class="skeleton-overlay">
-        {% include "_skeleton_table.html" %}
-    </div>
-    <!-- Real content -->
-    <div id="events-results">
-        {% include "_events_table.html" %}
-    </div>
-</div>
-```
-
-When HTMX adds `.htmx-request` to the wrapper (via `hx-indicator`),
-CSS transitions the overlay to `opacity: 1`, showing shimmer rows.
-When the response arrives and content is swapped, the class is removed
-and the overlay fades out.
-
-## Page Data Requirements
-
-| Page | Route | Template Data |
-|------|-------|---------------|
-| Dashboard | `GET /` | `total`, `tagged`, `untagged`, `sources`, `top_events` (5 events) |
-| Events | `GET /events` | `events`, `total`, `page`, `per_page`, `total_pages`, `q`, `city`, `source`, `tagged`, `score_min`, `sort`, `cities`, `sources` |
-| Event Detail | `GET /event/{id}` | `event`, `raw_data` (JSON string) |
-| Weekend | `GET /weekend` | `saturday`, `sunday`, `weather`, `ranked` (event+score tuples), `message` |
-
-## Design System
-
-The UI uses Tailwind utility classes following a consistent design language:
-
-| Element | Classes |
-|---------|---------|
-| Card | `bg-white rounded-xl p-5 mb-4 shadow-xs` |
-| Badge (green) | `inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800` |
-| Badge (orange) | `...bg-orange-100 text-orange-800` |
-| Badge (gray) | `...bg-gray-100 text-gray-700` |
-| Primary button | `bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm` |
-| Score number | `text-3xl font-bold text-indigo-500` |
-| Header | `bg-linear-to-r from-indigo-500 to-purple-500` |
+- The UI is mostly HTML+HTMX, but the repo does include `package.json` and CSS assets.
+- The docs should not describe the frontend as only four pages anymore.
+- Background job UX is now an important part of the product surface.
+- Sources management and onboarding/profile flows are part of the real app, not future design work.
