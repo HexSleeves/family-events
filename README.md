@@ -417,3 +417,14 @@ npm run css:watch
 - [docs/frontend.md](docs/frontend.md)
 - [docs/design-generic-scraper.md](docs/design-generic-scraper.md)
 - [docs/migration.md](docs/migration.md)
+
+
+## External HTTP behavior
+
+Outbound HTTP calls now use a shared client helper with:
+- a standardized user-agent/header baseline
+- centralized connect/read timeout defaults
+- retry/backoff for transient GET failures
+- consistent structured logging context for remote failures
+
+This shared behavior is used by scrapers, page analysis, weather, and notification delivery integrations.

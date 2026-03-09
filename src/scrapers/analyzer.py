@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup, Comment
 from openai import AsyncOpenAI
 
 from src.config import settings
+from src.http import build_async_client, default_timeout
 
 from .recipe import ScrapeRecipe
 
@@ -292,11 +293,10 @@ class PageAnalyzer:
 
     async def _fetch(self, url: str) -> str:
         validate_public_http_url(url)
-        async with httpx.AsyncClient(
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=httpx.Timeout(20.0, connect=5.0),
-            follow_redirects=True,
-            transport=_PublicIPOnlyTransport(retries=0),
+        async with build_async_client(
+            service="scraper.page_analyzer",
+            timeout=default_timeout(),
+            transport_factory=lambda: _PublicIPOnlyTransport(retries=0),
         ) as client:
             resp = await client.get(url)
             resp.raise_for_status()

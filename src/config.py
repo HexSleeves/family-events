@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     tagger_batch_size: int = 25
     background_job_timeout_seconds: int = 3600
 
+    # External HTTP
+    external_http_timeout_seconds: float = 20.0
+    external_http_connect_timeout_seconds: float = 5.0
+    external_http_max_retries: int = 2
+    external_http_retry_backoff_seconds: float = 0.25
+
     # Weather
     weather_api_key: str = ""  # OpenWeatherMap
     weather_lat: float = 30.2241  # Lafayette, LA

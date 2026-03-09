@@ -1,11 +1,13 @@
 """Weather forecasting via OpenWeatherMap."""
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 
-import httpx
-
 from src.config import settings
+from src.http import build_async_client, default_timeout
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass
@@ -28,7 +30,11 @@ class WeatherService:
             return self._default_forecast(sat, sun)
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with build_async_client(
+                service="weather.openweathermap",
+                timeout=default_timeout(),
+                headers={"Accept": "application/json"},
+            ) as client:
                 resp = await client.get(
                     "https://api.openweathermap.org/data/2.5/forecast",
                     params={
@@ -44,8 +50,14 @@ class WeatherService:
             sat_forecast = self._summarize_day(data, sat)
             sun_forecast = self._summarize_day(data, sun)
             return {"saturday": sat_forecast, "sunday": sun_forecast}
-        except Exception as e:
-            print(f"Weather API error: {e}")
+        except Exception as exc:
+            logger.warning(
+                "weather_fetch_failed service=%s url=%s timeout=%ss error=%s",
+                "weather.openweathermap",
+                "https://api.openweathermap.org/data/2.5/forecast",
+                settings.external_http_timeout_seconds,
+                exc,
+            )
             return self._default_forecast(sat, sun)
 
     # ------------------------------------------------------------------

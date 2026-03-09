@@ -128,3 +128,62 @@ def test_score_breakdown_can_be_persisted_on_event_model():
     event.score_breakdown = {"final": breakdown.final, "intrinsic": breakdown.intrinsic}
 
     assert event.score_breakdown == {"final": breakdown.final, "intrinsic": breakdown.intrinsic}
+
+
+def test_weather_service_uses_shared_http_client(monkeypatch):
+    import asyncio
+
+    from src.ranker.weather import WeatherService
+
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "list": [
+                    {
+                        "dt_txt": "2026-03-07 12:00:00",
+                        "main": {"temp": 80},
+                        "pop": 0.1,
+                        "weather": [{"description": "clear sky"}],
+                    },
+                    {
+                        "dt_txt": "2026-03-08 12:00:00",
+                        "main": {"temp": 82},
+                        "pop": 0.2,
+                        "weather": [{"description": "partly cloudy"}],
+                    },
+                ]
+            }
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, url: str, **kwargs):
+            captured["url"] = url
+            captured["params"] = kwargs["params"]
+            return FakeResponse()
+
+    def fake_build_async_client(**kwargs):
+        captured["client_kwargs"] = kwargs
+        return FakeClient()
+
+    monkeypatch.setattr("src.ranker.weather.build_async_client", fake_build_async_client)
+    monkeypatch.setattr("src.ranker.weather.settings.weather_api_key", "weather-key")
+
+    async def scenario() -> None:
+        forecast = await WeatherService().get_weekend_forecast(date(2026, 3, 7), date(2026, 3, 8))
+        assert forecast["saturday"].temp_high_f == 80
+        assert forecast["sunday"].temp_high_f == 82
+
+    asyncio.run(scenario())
+
+    assert captured["client_kwargs"]["service"] == "weather.openweathermap"
+    assert captured["url"] == "https://api.openweathermap.org/data/2.5/forecast"
