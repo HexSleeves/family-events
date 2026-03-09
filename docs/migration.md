@@ -142,7 +142,7 @@ Key files:
 
 ### Still noteworthy
 
-- `python -m src.main pipeline` is still broken because `run_full_pipeline()` is missing
+- Postgres startup now fails fast if Alembic migrations have not been applied to the connected database
 - search behavior still deserves more end-to-end inspection
 - SQLite remains supported in code, but is no longer the primary documented local path
 

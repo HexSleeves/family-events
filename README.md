@@ -58,9 +58,7 @@ uv run python -m src.main serve-dev
 
 # 5. Seed data through normal app flows
 # Signup creates predefined sources for the new user
-uv run python -m src.main scrape
-uv run python -m src.main tag
-uv run python -m src.main notify
+uv run python -m src.main pipeline
 
 # 6. Optional: inspect upcoming events in the terminal
 uv run python -m src.main events
@@ -259,16 +257,15 @@ uv run python -m src.main serve-dev  # local development with autoreload
 uv run python -m src.main dedupe
 ```
 
-### Important note about `pipeline`
+### `pipeline` CLI command
 
-The CLI still exposes `uv run python -m src.main pipeline`, but it currently
-calls a missing `run_full_pipeline()` implementation. For now, use:
+The CLI now exposes a working pipeline command:
 
 ```bash
-uv run python -m src.main scrape
-uv run python -m src.main tag
-uv run python -m src.main notify
+uv run python -m src.main pipeline
 ```
+
+That runs the normal scrape+tag flow first, then sends notifications.
 
 ## Scheduler
 

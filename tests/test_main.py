@@ -27,3 +27,23 @@ def test_serve_dev_enables_autoreload(monkeypatch):
 
     assert captured["app"] == "src.web.app:app"
     assert captured["reload"] is True
+
+
+def test_pipeline_cli_runs_scrape_tag_then_notify(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_scrape_then_tag():
+        calls.append("scrape_then_tag")
+        return {"summary": "done"}
+
+    async def fake_notify():
+        calls.append("notify")
+        return "ok"
+
+    monkeypatch.setattr("src.scheduler.run_scrape_then_tag", fake_scrape_then_tag)
+    monkeypatch.setattr("src.scheduler.run_notify", fake_notify)
+    monkeypatch.setattr("sys.argv", ["src.main", "pipeline"])
+
+    main.cli()
+
+    assert calls == ["scrape_then_tag", "notify"]

@@ -10,8 +10,7 @@ scrape -> tag -> notify
 ```
 
 Ranking happens inside `run_notify()` when weekend recommendations are built.
-There is no working standalone `run_full_pipeline()` implementation right now,
-even though the CLI still exposes a `pipeline` command.
+The CLI `pipeline` command runs the shared scrape+tag flow and then notify.
 
 ## Orchestration entry points
 
@@ -21,6 +20,7 @@ even though the CLI still exposes a `pipeline` command.
 uv run python -m src.main scrape
 uv run python -m src.main tag
 uv run python -m src.main notify
+uv run python -m src.main pipeline
 uv run python -m src.main events
 uv run python -m src.main serve
 uv run python -m src.main dedupe

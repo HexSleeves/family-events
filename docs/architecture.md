@@ -84,10 +84,10 @@ Feature routers live in:
 
 - `run_scrape()`
 - `run_tag()`
+- `run_scrape_then_tag()`
 - `run_notify()`
 
-Note: `src.main` still references `run_full_pipeline()`, but that function does
-not currently exist. Use `scrape`, `tag`, and `notify` separately.
+`src.main pipeline` now runs the normal scrape+tag flow followed by notify.
 
 ## Database Architecture
 

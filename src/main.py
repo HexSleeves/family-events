@@ -39,9 +39,14 @@ def cli() -> None:
         asyncio.run(run_notify())
 
     elif args.command == "pipeline":
-        from src.scheduler import run_full_pipeline
+        from src.scheduler import run_notify, run_scrape_then_tag
 
-        asyncio.run(run_full_pipeline())
+        async def pipeline() -> None:
+            result = await run_scrape_then_tag()
+            print(result["summary"])
+            await run_notify()
+
+        asyncio.run(pipeline())
 
     elif args.command == "serve":
         _serve(reload=False)

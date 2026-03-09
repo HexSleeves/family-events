@@ -23,6 +23,7 @@ from src.db.common import (
     time_window,
     title_similarity,
 )
+from src.db.migrations import ensure_postgres_schema_current
 from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
 from src.db.session import get_engine, get_sessionmaker
 
@@ -96,7 +97,7 @@ class PostgresDatabase:
         self.engine = get_engine(self.database_url)
         self.sessionmaker = get_sessionmaker(self.database_url)
         async with self.engine.connect() as conn:
-            await conn.run_sync(lambda _sync_conn: None)
+            await ensure_postgres_schema_current(conn)
 
     async def close(self) -> None:
         if self.engine is not None:
