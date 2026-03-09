@@ -1252,6 +1252,9 @@ def create_database(
     db_path: str | None = None, database_url: str | None = None
 ) -> SqliteDatabase | PostgresDatabase:
     """Database factory used by the rest of the app."""
+    if db_path is not None and database_url is None:
+        return SqliteDatabase(db_path=db_path, database_url=f"sqlite+aiosqlite:///{db_path}")
+
     resolved_url = database_url or settings.database_url
     if resolved_url.startswith("sqlite+aiosqlite:///"):
         return SqliteDatabase(db_path=db_path, database_url=resolved_url)

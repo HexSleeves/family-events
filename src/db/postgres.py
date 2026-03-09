@@ -6,17 +6,27 @@ import hashlib
 import json
 import logging
 import re
+import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
 from src.db.session import get_engine, get_sessionmaker
 
 logger = logging.getLogger("uvicorn.error")
+
+
+def _uuid_param(value: str | None) -> uuid.UUID | str | None:
+    if value is None:
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return value
 
 
 def _canonicalize_title(title: str) -> str:
@@ -44,8 +54,17 @@ def _title_similarity(a: str, b: str) -> float:
     return overlap / union if union else 0.0
 
 
+def _normalize_uuid(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return str(value)
+
+
 def _row_to_event(row: Any) -> Event:
     data = dict(row)
+    data["id"] = _normalize_uuid(data.get("id"))
     tags = data.get("tags")
     data["tags"] = EventTags.model_validate(tags) if tags else None
     return Event.model_validate(data)
@@ -53,6 +72,7 @@ def _row_to_event(row: Any) -> Event:
 
 def _row_to_user(row: Any) -> User:
     data = dict(row)
+    data["id"] = _normalize_uuid(data.get("id"))
     raw_profile = data.get("interest_profile") or {}
     data["interest_profile"] = (
         InterestProfile.model_validate(raw_profile) if raw_profile else InterestProfile()
@@ -61,11 +81,18 @@ def _row_to_user(row: Any) -> User:
 
 
 def _row_to_job(row: Any) -> Job:
-    return Job.model_validate(dict(row))
+    data = dict(row)
+    data["id"] = _normalize_uuid(data.get("id"))
+    data["owner_user_id"] = _normalize_uuid(data.get("owner_user_id"))
+    data["source_id"] = _normalize_uuid(data.get("source_id"))
+    return Job.model_validate(data)
 
 
 def _row_to_source(row: Any) -> Source:
-    return Source.model_validate(dict(row))
+    data = dict(row)
+    data["id"] = _normalize_uuid(data.get("id"))
+    data["user_id"] = _normalize_uuid(data.get("user_id"))
+    return Source.model_validate(data)
 
 
 class PostgresDatabase:
@@ -118,7 +145,7 @@ class PostgresDatabase:
             )
             existing = existing_result.mappings().first()
             if existing:
-                event.id = str(existing["id"])
+                event.id = _normalize_uuid(existing["id"]) or event.id
 
             if not existing:
                 canonical_id, _dedupe_reason = await self._find_duplicate_event_id(event, session=session)
@@ -206,11 +233,11 @@ class PostgresDatabase:
                 {"source": event.source, "source_id": event.source_id},
             )
             row = result.mappings().first()
-            return str(row["id"]) if row else event.id
+            return _normalize_uuid(row["id"]) if row else event.id
 
     def _event_params(self, event: Event) -> dict[str, Any]:
         return {
-            "id": event.id,
+            "id": _uuid_param(event.id),
             "source": event.source,
             "source_url": event.source_url,
             "source_id": event.source_id,
@@ -274,11 +301,11 @@ class PostgresDatabase:
                     ).encode()
                 ).hexdigest()
                 if candidate_fp == fp:
-                    return str(row["id"]), "fingerprint"
+                    return _normalize_uuid(row["id"]), "fingerprint"
             for row in rows:
                 similarity = _title_similarity(event.title, str(row["title"]))
                 if similarity >= 0.75:
-                    return str(row["id"]), f"title_similarity:{similarity:.2f}"
+                    return _normalize_uuid(row["id"]), f"title_similarity:{similarity:.2f}"
             return None, None
         finally:
             if own_session:
@@ -342,7 +369,7 @@ class PostgresDatabase:
                     "tags": json.dumps(tags.model_dump()),
                     "score_breakdown": json.dumps(score_breakdown) if score_breakdown else None,
                     "tagged_at": datetime.now(tz=UTC),
-                    "id": event_id,
+                    "id": _uuid_param(event_id),
                 },
             )
             await session.commit()
@@ -360,7 +387,7 @@ class PostgresDatabase:
 
     async def get_event(self, event_id: str) -> Event | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM events WHERE id = :id"), {"id": event_id})
+            result = await session.execute(text("SELECT * FROM events WHERE id = :id"), {"id": _uuid_param(event_id)})
             row = result.mappings().first()
             return _row_to_event(row) if row else None
 
@@ -485,14 +512,18 @@ class PostgresDatabase:
                     )
                     """
                 ),
-                source.model_dump(),
+                {
+                    **source.model_dump(),
+                    "id": _uuid_param(source.id),
+                    "user_id": _uuid_param(source.user_id),
+                },
             )
             await session.commit()
             return source.id
 
     async def get_source(self, source_id: str) -> Source | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM sources WHERE id = :id"), {"id": source_id})
+            result = await session.execute(text("SELECT * FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)})
             row = result.mappings().first()
             return _row_to_source(row) if row else None
 
@@ -520,7 +551,7 @@ class PostgresDatabase:
         async with self.session() as session:
             await session.execute(
                 text("UPDATE sources SET recipe_json = :recipe_json, status = :status, updated_at = :now WHERE id = :id"),
-                {"recipe_json": recipe_json, "status": status, "now": datetime.now(tz=UTC), "id": source_id},
+                {"recipe_json": recipe_json, "status": status, "now": datetime.now(tz=UTC), "id": _uuid_param(source_id)},
             )
             await session.commit()
 
@@ -533,7 +564,7 @@ class PostgresDatabase:
         error: str | None = None,
     ) -> None:
         sets = ["updated_at = :now"]
-        params: dict[str, Any] = {"now": datetime.now(tz=UTC), "id": source_id}
+        params: dict[str, Any] = {"now": datetime.now(tz=UTC), "id": _uuid_param(source_id)}
         if status is not None:
             sets.append("status = :status")
             params["status"] = status
@@ -563,7 +594,7 @@ class PostgresDatabase:
                     WHERE id = :id
                     """
                 ),
-                {"now": datetime.now(tz=UTC), "id": source_id},
+                {"now": datetime.now(tz=UTC), "id": _uuid_param(source_id)},
             )
             await session.commit()
         source = await self.get_source(source_id)
@@ -577,7 +608,7 @@ class PostgresDatabase:
                     text("DELETE FROM events WHERE source = :source"),
                     {"source": f"custom:{source_id}"},
                 )
-            await session.execute(text("DELETE FROM sources WHERE id = :id"), {"id": source_id})
+            await session.execute(text("DELETE FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)})
             await session.commit()
 
     async def mark_attended(self, event_id: str) -> None:
@@ -587,17 +618,20 @@ class PostgresDatabase:
         async with self.session() as session:
             await session.execute(
                 text("UPDATE events SET attended = :attended WHERE id = :id"),
-                {"attended": attended, "id": event_id},
+                {"attended": attended, "id": _uuid_param(event_id)},
             )
             await session.commit()
 
     async def set_attended_bulk(self, event_ids: list[str], *, attended: bool) -> None:
         if not event_ids:
             return
+        stmt = text("UPDATE events SET attended = :attended WHERE id = ANY(:event_ids)").bindparams(
+            bindparam("event_ids")
+        )
         async with self.session() as session:
             await session.execute(
-                text("UPDATE events SET attended = :attended WHERE id = ANY(:event_ids)"),
-                {"attended": attended, "event_ids": event_ids},
+                stmt,
+                {"attended": attended, "event_ids": [_uuid_param(event_id) for event_id in event_ids]},
             )
             await session.commit()
 
@@ -617,7 +651,12 @@ class PostgresDatabase:
                     )
                     """
                 ),
-                job.model_dump(),
+                {
+                    **job.model_dump(),
+                    "id": _uuid_param(job.id),
+                    "owner_user_id": _uuid_param(job.owner_user_id),
+                    "source_id": _uuid_param(job.source_id),
+                },
             )
             await session.commit()
             return job.id
@@ -625,7 +664,7 @@ class PostgresDatabase:
     async def update_job(self, job_id: str, **fields: Any) -> None:
         allowed = {"state", "detail", "result_json", "error", "started_at", "finished_at"}
         sets: list[str] = []
-        params: dict[str, Any] = {"id": job_id}
+        params: dict[str, Any] = {"id": _uuid_param(job_id)}
         for key, value in fields.items():
             if key not in allowed:
                 continue
@@ -639,7 +678,7 @@ class PostgresDatabase:
 
     async def get_job(self, job_id: str) -> Job | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM jobs WHERE id = :id"), {"id": job_id})
+            result = await session.execute(text("SELECT * FROM jobs WHERE id = :id"), {"id": _uuid_param(job_id)})
             row = result.mappings().first()
             return _row_to_job(row) if row else None
 
@@ -731,7 +770,7 @@ class PostgresDatabase:
                     """
                 ),
                 {
-                    "id": user.id,
+                    "id": _uuid_param(user.id),
                     "email": user.email,
                     "display_name": user.display_name,
                     "password_hash": user.password_hash,
@@ -753,7 +792,7 @@ class PostgresDatabase:
 
     async def get_user(self, user_id: str) -> User | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM users WHERE id = :id"), {"id": user_id})
+            result = await session.execute(text("SELECT * FROM users WHERE id = :id"), {"id": _uuid_param(user_id)})
             row = result.mappings().first()
             return _row_to_user(row) if row else None
 
@@ -780,7 +819,7 @@ class PostgresDatabase:
             "interest_profile",
             "password_hash",
         }
-        params: dict[str, Any] = {"id": user_id, "updated_at": datetime.now(tz=UTC)}
+        params: dict[str, Any] = {"id": _uuid_param(user_id), "updated_at": datetime.now(tz=UTC)}
         sets = ["updated_at = :updated_at"]
         for key, value in fields.items():
             if key not in allowed:
@@ -809,7 +848,7 @@ class PostgresDatabase:
                 text(
                     "SELECT * FROM sources WHERE user_id = :uid ORDER BY builtin DESC, city ASC, name ASC, created_at DESC"
                 ),
-                {"uid": user_id},
+                {"uid": _uuid_param(user_id)},
             )
             return [_row_to_source(row) for row in result.mappings().all()]
 
@@ -817,7 +856,7 @@ class PostgresDatabase:
         async with self.session() as session:
             result = await session.execute(
                 text("SELECT * FROM sources WHERE user_id = :user_id AND url = :url"),
-                {"user_id": user_id, "url": url},
+                {"user_id": _uuid_param(user_id), "url": url},
             )
             row = result.mappings().first()
             return _row_to_source(row) if row else None

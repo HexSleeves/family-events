@@ -8,6 +8,7 @@ import asyncio
 import json
 import sqlite3
 import sys
+import uuid
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,7 +55,7 @@ def _parse_json(value: Any, default: Any) -> Any:
 
 def _event_params(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": uuid.UUID(str(row["id"])),
         "source": row["source"],
         "source_url": row["source_url"],
         "source_id": row["source_id"],
@@ -86,13 +87,13 @@ def _event_params(row: sqlite3.Row) -> dict[str, Any]:
 
 def _source_params(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": uuid.UUID(str(row["id"])),
         "name": row["name"],
         "url": row["url"],
         "domain": row["domain"],
         "city": row["city"],
         "category": row["category"],
-        "user_id": row["user_id"],
+        "user_id": uuid.UUID(str(row["user_id"])) if row["user_id"] else None,
         "builtin": bool(row["builtin"]),
         "recipe_json": row["recipe_json"],
         "enabled": bool(row["enabled"]),
@@ -107,7 +108,7 @@ def _source_params(row: sqlite3.Row) -> dict[str, Any]:
 
 def _user_params(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": uuid.UUID(str(row["id"])),
         "email": row["email"],
         "display_name": row["display_name"],
         "password_hash": row["password_hash"],
@@ -127,12 +128,12 @@ def _user_params(row: sqlite3.Row) -> dict[str, Any]:
 
 def _job_params(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": uuid.UUID(str(row["id"])),
         "kind": row["kind"],
         "job_key": row["job_key"],
         "label": row["label"],
-        "owner_user_id": row["owner_user_id"],
-        "source_id": row["source_id"],
+        "owner_user_id": uuid.UUID(str(row["owner_user_id"])),
+        "source_id": uuid.UUID(str(row["source_id"])) if row["source_id"] else None,
         "state": row["state"],
         "detail": row["detail"],
         "result_json": row["result_json"],
