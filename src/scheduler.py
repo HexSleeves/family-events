@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from src.config import settings
 from src.db.database import Database, create_database
-from src.db.models import InterestProfile, Source, User
+from src.db.models import InterestProfile, Job, Source, User
 from src.notifications.dispatcher import NotificationDispatcher
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events, score_event_breakdown
@@ -16,6 +16,10 @@ from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import get_builtin_scraper
 from src.tagger.llm import EventTagger
 from src.tagger.taxonomy import TAGGING_VERSION
+from src.web.auth import hash_password
+
+SYSTEM_USER_EMAIL = "system@family-events.local"
+SYSTEM_USER_DISPLAY_NAME = "System"
 
 
 async def run_scrape(db: Database | None = None) -> int:
@@ -51,6 +55,25 @@ async def run_scrape(db: Database | None = None) -> int:
 
     print(f"\nTotal events upserted: {total}")
     return total
+
+
+async def ensure_system_user(db: Database) -> User:
+    """Ensure scheduled/system jobs have a durable synthetic owner."""
+    existing = await db.get_user_by_email(SYSTEM_USER_EMAIL)
+    if existing:
+        return existing
+
+    user = User(
+        email=SYSTEM_USER_EMAIL,
+        display_name=SYSTEM_USER_DISPLAY_NAME,
+        password_hash=hash_password("system-user-password-disabled"),
+        onboarding_complete=True,
+        notification_channels=["console"],
+    )
+    await db.create_user(user)
+    created = await db.get_user_by_email(SYSTEM_USER_EMAIL)
+    assert created is not None
+    return created
 
 
 def _build_scraper(source: Source):
@@ -152,6 +175,56 @@ async def run_tag(
     return len(tagged)
 
 
+async def run_scrape_then_tag(
+    db: Database | None = None,
+    *,
+    progress_callback=None,
+    include_stale: bool = False,
+) -> dict[str, int | str]:
+    """Run the normal ingestion pipeline: scrape first, then tag."""
+    own_db = db is None
+    if own_db:
+        db = create_database()
+        await db.connect()
+
+    try:
+        if progress_callback is not None:
+            await progress_callback(
+                {
+                    "phase": "scrape",
+                    "processed": 0,
+                    "total": 2,
+                    "summary": "Scraping sources…",
+                }
+            )
+        scraped = await run_scrape(db)
+
+        if progress_callback is not None:
+            await progress_callback(
+                {
+                    "phase": "tag",
+                    "processed": 1,
+                    "total": 2,
+                    "scraped": scraped,
+                    "summary": f"Scrape finished · {scraped} events scraped · tagging next",
+                }
+            )
+        tagged = await run_tag(db, progress_callback=progress_callback, include_stale=include_stale)
+        failed = max(0, scraped - tagged)
+        result = {
+            "scraped": scraped,
+            "tagged": tagged,
+            "failed": failed,
+            "summary": f"{scraped} events scraped · {tagged} tagged · {failed} failed",
+        }
+        if progress_callback is not None:
+            await progress_callback(result)
+        return result
+    finally:
+        if own_db:
+            await db.close()
+
+
 async def run_notify(
     db: Database | None = None,
     *,
@@ -228,3 +301,80 @@ async def run_notify(
         await db.close()
 
     return message
+
+
+async def create_scheduled_job(
+    db: Database,
+    *,
+    kind: str,
+    job_key: str,
+    label: str,
+    detail: str = "Queued",
+) -> str:
+    """Create a persisted scheduled/system job record."""
+    system_user = await ensure_system_user(db)
+
+    job = Job(
+        kind=kind,
+        job_key=job_key,
+        label=label,
+        owner_user_id=system_user.id,
+        state="running",
+        detail=detail,
+        started_at=datetime.now(tz=UTC),
+    )
+    await db.create_job(job)
+    return job.id
+
+
+async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
+    """Run the scheduled scrape+tag pipeline and persist it as a job."""
+    job_id = await create_scheduled_job(
+        db,
+        kind="pipeline",
+        job_key="scheduled:pipeline:scrape-tag",
+        label="Scheduled scrape + tag job",
+        detail="Scraping sources…",
+    )
+    try:
+        result = await run_scrape_then_tag(
+            db,
+            include_stale=False,
+            progress_callback=lambda progress: update_scheduled_job(
+                db,
+                job_id,
+                detail=progress.get("summary", "Running…"),
+                result=progress,
+            ),
+        )
+        await update_scheduled_job(db, job_id, state="succeeded", detail="Completed", result=result, error="")
+        return result
+    except Exception as exc:
+        await update_scheduled_job(db, job_id, state="failed", detail="Failed", error=str(exc))
+        raise
+
+
+async def update_scheduled_job(
+    db: Database,
+    job_id: str,
+    *,
+    state: str | None = None,
+    detail: str | None = None,
+    result: object | None = None,
+    error: str | None = None,
+) -> None:
+    """Update a persisted scheduled/system job."""
+    fields: dict[str, object] = {}
+    if state is not None:
+        fields["state"] = state
+    if detail is not None:
+        fields["detail"] = detail
+    if result is not None:
+        import json
+
+        fields["result_json"] = json.dumps(result)
+    if error is not None:
+        fields["error"] = error
+    if state in {"succeeded", "failed", "cancelled"}:
+        fields["finished_at"] = datetime.now(tz=UTC)
+    await db.update_job(job_id, **fields)

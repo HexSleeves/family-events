@@ -97,3 +97,31 @@ def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
     import asyncio
 
     asyncio.run(scenario())
+
+
+def test_list_jobs_supports_system_owned_records(tmp_path):
+    async def scenario() -> None:
+        db = create_database(str(tmp_path / "jobs-system.db"))
+        await db.connect()
+        try:
+            system_job = Job(
+                kind="pipeline",
+                job_key="scheduled:pipeline:scrape-tag",
+                label="Scheduled scrape + tag job",
+                owner_user_id="system-user",
+                state="succeeded",
+            )
+            await db.create_job(system_job)
+
+            jobs = await db.list_jobs(owner_user_id="system-user", limit=10)
+            kinds = await db.list_job_kinds(owner_user_id="system-user")
+
+            assert len(jobs) == 1
+            assert jobs[0].label == "Scheduled scrape + tag job"
+            assert kinds == ["pipeline"]
+        finally:
+            await db.close()
+
+    import asyncio
+
+    asyncio.run(scenario())

@@ -26,18 +26,21 @@ async def health_check(request: Request) -> JSONResponse:
     """Simple health probe for service/process monitors."""
     db = get_db(request)
     db_ok = False
-    event_count: int | None = None
-    latest_scrape_at: datetime | None = None
+    stats: dict[str, object] = {}
 
     try:
         stats = await db.health_stats()
-        event_count = int(stats["event_count"])
-        latest_scrape_at = stats["latest_scraped_at"]
         db_ok = True
     except Exception as exc:
         logger.exception("health_check_db_failed: %s", exc)
 
-    status = "ok" if db_ok else "degraded"
+    event_count = int(stats.get("event_count", 0) or 0)
+    latest_scrape_at = stats.get("latest_scraped_at")
+    latest_tagged_at = stats.get("latest_tagged_at")
+    latest_notified_at = stats.get("latest_notified_at")
+    stuck_running_jobs = int(stats.get("stuck_running_jobs", 0) or 0)
+
+    status = "ok" if db_ok and stuck_running_jobs == 0 else "degraded"
     payload = {
         "status": status,
         "service": "family-events",
@@ -46,11 +49,16 @@ async def health_check(request: Request) -> JSONResponse:
             "database": {
                 "ok": db_ok,
                 "event_count": event_count,
-                "latest_scraped_at": format_ts(latest_scrape_at),
-            }
+            },
+            "pipeline": {
+                "latest_scraped_at": format_ts(latest_scrape_at if isinstance(latest_scrape_at, datetime) else None),
+                "latest_tagged_at": format_ts(latest_tagged_at if isinstance(latest_tagged_at, datetime) else None),
+                "latest_notified_at": format_ts(latest_notified_at if isinstance(latest_notified_at, datetime) else None),
+                "stuck_running_jobs": stuck_running_jobs,
+            },
         },
     }
-    return JSONResponse(payload, status_code=200 if db_ok else 503)
+    return JSONResponse(payload, status_code=200 if status == "ok" else 503)
 
 
 @router.get("/", response_class=HTMLResponse)

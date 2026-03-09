@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from src.config import settings
 from src.db.common import (
     USER_UPDATE_FIELDS,
     canonicalize_title,
@@ -111,14 +112,31 @@ class PostgresDatabase:
             yield session
 
     async def health_stats(self) -> dict[str, Any]:
+        cutoff = datetime.now(tz=UTC) - timedelta(seconds=settings.background_job_timeout_seconds)
         async with self.session() as session:
-            result = await session.execute(
-                text("SELECT COUNT(*) AS n, MAX(scraped_at) AS latest FROM events")
+            event_result = await session.execute(
+                text(
+                    "SELECT COUNT(*) AS event_count, MAX(scraped_at) AS latest_scraped_at, MAX(tagged_at) AS latest_tagged_at FROM events"
+                )
             )
-            row = result.mappings().first()
+            event_row = event_result.mappings().first()
+            notify_result = await session.execute(
+                text("SELECT MAX(finished_at) AS latest_notified_at FROM jobs WHERE kind = 'notify' AND state = 'succeeded'")
+            )
+            notify_row = notify_result.mappings().first()
+            stuck_result = await session.execute(
+                text(
+                    "SELECT COUNT(*) AS stuck_running_jobs FROM jobs WHERE state = 'running' AND COALESCE(started_at, created_at) < :cutoff"
+                ),
+                {"cutoff": cutoff},
+            )
+            stuck_row = stuck_result.mappings().first()
             return {
-                "event_count": int(row["n"]) if row and row["n"] is not None else 0,
-                "latest_scraped_at": row["latest"] if row else None,
+                "event_count": int(event_row["event_count"]) if event_row and event_row["event_count"] is not None else 0,
+                "latest_scraped_at": event_row["latest_scraped_at"] if event_row else None,
+                "latest_tagged_at": event_row["latest_tagged_at"] if event_row else None,
+                "latest_notified_at": notify_row["latest_notified_at"] if notify_row else None,
+                "stuck_running_jobs": int(stuck_row["stuck_running_jobs"]) if stuck_row and stuck_row["stuck_running_jobs"] is not None else 0,
             }
 
     async def upsert_event(self, event: Event) -> str:
@@ -678,15 +696,19 @@ class PostgresDatabase:
     async def list_jobs(
         self,
         *,
-        owner_user_id: str,
+        owner_user_id: str | None,
         source_id: str | None = None,
         state: str | None = None,
         kind: str | None = None,
         q: str = "",
         limit: int = 20,
     ) -> list[Job]:
-        sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
-        params: dict[str, Any] = {"owner_user_id": owner_user_id, "limit": limit}
+        params: dict[str, Any] = {"limit": limit}
+        if owner_user_id is None:
+            sql = "SELECT * FROM jobs WHERE owner_user_id IS NULL"
+        else:
+            sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
+            params["owner_user_id"] = owner_user_id
         if source_id is not None:
             sql += " AND source_id = :source_id"
             params["source_id"] = source_id
@@ -705,12 +727,15 @@ class PostgresDatabase:
             result = await session.execute(text(sql), params)
             return [_row_to_job(row) for row in result.mappings().all()]
 
-    async def list_job_kinds(self, *, owner_user_id: str) -> list[str]:
+    async def list_job_kinds(self, *, owner_user_id: str | None) -> list[str]:
+        if owner_user_id is None:
+            sql = "SELECT DISTINCT kind FROM jobs WHERE owner_user_id IS NULL ORDER BY kind ASC"
+            params: dict[str, Any] = {}
+        else:
+            sql = "SELECT DISTINCT kind FROM jobs WHERE owner_user_id = :owner_user_id ORDER BY kind ASC"
+            params = {"owner_user_id": owner_user_id}
         async with self.session() as session:
-            result = await session.execute(
-                text("SELECT DISTINCT kind FROM jobs WHERE owner_user_id = :owner_user_id ORDER BY kind ASC"),
-                {"owner_user_id": owner_user_id},
-            )
+            result = await session.execute(text(sql), params)
             return [str(row[0]) for row in result.all() if row[0]]
 
     async def fail_stale_jobs(self, *, max_age_seconds: int) -> int:

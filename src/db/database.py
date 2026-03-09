@@ -277,6 +277,48 @@ class SqliteDatabase:
             raise RuntimeError("Database not connected. Call connect() first.")
         return self._db
 
+    async def health_stats(self) -> dict[str, Any]:
+        """Return basic health/freshness stats for the service."""
+        cutoff = (datetime.now(tz=UTC) - timedelta(seconds=settings.background_job_timeout_seconds)).isoformat()
+        async with self.db.execute(
+            """
+            SELECT
+                COUNT(*) AS event_count,
+                MAX(scraped_at) AS latest_scraped_at,
+                MAX(tagged_at) AS latest_tagged_at
+            FROM events
+            """
+        ) as cursor:
+            event_row = await cursor.fetchone()
+        async with self.db.execute(
+            """
+            SELECT MAX(finished_at) AS latest_notified_at
+            FROM jobs
+            WHERE kind = 'notify' AND state = 'succeeded'
+            """
+        ) as cursor:
+            notify_row = await cursor.fetchone()
+        async with self.db.execute(
+            """
+            SELECT COUNT(*) AS stuck_running_jobs
+            FROM jobs
+            WHERE state = 'running' AND COALESCE(started_at, created_at) < :cutoff
+            """,
+            {"cutoff": cutoff},
+        ) as cursor:
+            stuck_row = await cursor.fetchone()
+
+        latest_scraped_at = event_row["latest_scraped_at"] if event_row else None
+        latest_tagged_at = event_row["latest_tagged_at"] if event_row else None
+        latest_notified_at = notify_row["latest_notified_at"] if notify_row else None
+        return {
+            "event_count": int(event_row["event_count"]) if event_row and event_row["event_count"] is not None else 0,
+            "latest_scraped_at": datetime.fromisoformat(str(latest_scraped_at)) if latest_scraped_at else None,
+            "latest_tagged_at": datetime.fromisoformat(str(latest_tagged_at)) if latest_tagged_at else None,
+            "latest_notified_at": datetime.fromisoformat(str(latest_notified_at)) if latest_notified_at else None,
+            "stuck_running_jobs": int(stuck_row["stuck_running_jobs"]) if stuck_row and stuck_row["stuck_running_jobs"] is not None else 0,
+        }
+
     # ------------------------------------------------------------------
     # Upsert
     # ------------------------------------------------------------------
@@ -951,16 +993,20 @@ class SqliteDatabase:
     async def list_jobs(
         self,
         *,
-        owner_user_id: str,
+        owner_user_id: str | None,
         source_id: str | None = None,
         state: str | None = None,
         kind: str | None = None,
         q: str = "",
         limit: int = 20,
     ) -> list[Job]:
-        """List recent jobs for a user with optional filters."""
-        sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
-        params: dict[str, Any] = {"owner_user_id": owner_user_id, "limit": limit}
+        """List recent jobs with optional user/source filters."""
+        params: dict[str, Any] = {"limit": limit}
+        if owner_user_id is None:
+            sql = "SELECT * FROM jobs WHERE owner_user_id IS NULL"
+        else:
+            sql = "SELECT * FROM jobs WHERE owner_user_id = :owner_user_id"
+            params["owner_user_id"] = owner_user_id
         if source_id is not None:
             sql += " AND source_id = :source_id"
             params["source_id"] = source_id
@@ -979,16 +1025,15 @@ class SqliteDatabase:
             rows = await cursor.fetchall()
             return [_row_to_job(r) for r in rows]
 
-    async def list_job_kinds(self, *, owner_user_id: str) -> list[str]:
-        """List distinct job kinds for a user."""
-        async with self.db.execute(
-            """
-            SELECT DISTINCT kind FROM jobs
-            WHERE owner_user_id = :owner_user_id
-            ORDER BY kind ASC
-            """,
-            {"owner_user_id": owner_user_id},
-        ) as cursor:
+    async def list_job_kinds(self, *, owner_user_id: str | None) -> list[str]:
+        """List distinct job kinds for a user or system jobs."""
+        if owner_user_id is None:
+            sql = "SELECT DISTINCT kind FROM jobs WHERE owner_user_id IS NULL ORDER BY kind ASC"
+            params: dict[str, Any] = {}
+        else:
+            sql = "SELECT DISTINCT kind FROM jobs WHERE owner_user_id = :owner_user_id ORDER BY kind ASC"
+            params = {"owner_user_id": owner_user_id}
+        async with self.db.execute(sql, params) as cursor:
             rows = await cursor.fetchall()
             return [str(row["kind"]) for row in rows if row["kind"]]
 

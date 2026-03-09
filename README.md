@@ -280,8 +280,11 @@ uv run python -m src.cron
 
 Current scheduled behavior:
 
-- daily scrape + tag
+- daily scrape + tag via the same shared pipeline path used by the dashboard
 - Friday morning notifications for each user
+
+The scheduler runs in `America/Chicago` and logs start/success/failure with duration.
+Scheduled scrape + tag runs are also persisted in the jobs table under the synthetic system user.
 
 ## Deployment
 

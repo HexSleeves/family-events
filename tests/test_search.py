@@ -71,3 +71,17 @@ def test_events_page_renders_query_in_global_search_inputs(client) -> None:
     assert response.status_code == 200
     assert response.text.count('data-global-event-search') >= 2
     assert response.text.count('value="Tennis"') >= 2
+
+
+def test_health_includes_pipeline_freshness(client) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["checks"]["database"]["ok"] is True
+    assert "pipeline" in payload["checks"]
+    assert "latest_scraped_at" in payload["checks"]["pipeline"]
+    assert "latest_tagged_at" in payload["checks"]["pipeline"]
+    assert "latest_notified_at" in payload["checks"]["pipeline"]
+    assert payload["checks"]["pipeline"]["stuck_running_jobs"] == 0

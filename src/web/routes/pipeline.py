@@ -13,6 +13,45 @@ from src.web.jobs_ui import start_background_job
 router = APIRouter()
 
 
+@router.post("/api/scrape-tag", response_class=HTMLResponse)
+async def api_scrape_tag(request: Request):
+    db = get_db(request)
+    user, _form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None
+    if throttled := check_rate_limit(request, "api_scrape_tag"):
+        return throttled
+
+    from src.scheduler import run_scrape_then_tag
+
+    database_url = db.database_url
+
+    async def runner(job) -> dict[str, int | str]:
+        async with create_database(database_url=database_url) as job_db:
+            await job.update(
+                detail="Preparing scrape + tag run…",
+                result={"phase": "scrape", "processed": 0, "total": 2, "summary": "Scraping sources…"},
+            )
+            return await run_scrape_then_tag(
+                job_db,
+                include_stale=False,
+                progress_callback=lambda progress: job.update(
+                    detail=progress.get("summary", "Running…"), result=progress
+                ),
+            )
+
+    return await start_background_job(
+        request,
+        user=user,
+        kind="pipeline",
+        key="pipeline:scrape-tag",
+        label="Scrape + tag job",
+        runner=runner,
+        target_id="dashboard-job-status",
+    )
+
+
 @router.post("/api/scrape", response_class=HTMLResponse)
 async def api_scrape(request: Request):
     db = get_db(request)

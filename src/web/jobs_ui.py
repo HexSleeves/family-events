@@ -48,6 +48,12 @@ def job_result_summary(job: Job) -> str | None:
     if isinstance(result, str) and result.strip():
         return result
     if isinstance(result, dict):
+        if job.kind == "pipeline":
+            scraped = result.get("scraped")
+            tagged = result.get("tagged")
+            failed = result.get("failed")
+            if all(isinstance(value, int) for value in (scraped, tagged, failed)):
+                return f"{scraped} events scraped · {tagged} tagged · {failed} failed"
         if job.kind == "source-test":
             count = result.get("count")
             if isinstance(count, int):
