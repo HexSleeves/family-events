@@ -13,7 +13,7 @@ for things to do this weekend.
 
 ## How It Works
 
-```
+```bash
 1. SCRAPE  →  2. TAG  →  3. RANK  →  4. NOTIFY
 ```
 
@@ -58,13 +58,14 @@ The dashboard is a server-rendered web app using **Jinja2** templates, **HTMX** 
 interactivity, and **Tailwind CSS** for styling. No JavaScript framework, no build step.
 
 | Page | Description |
-|------|-------------|
+| -----| ------------|
 | **Dashboard** (`/`) | Stats overview, action buttons (scrape/tag/notify), top 5 toddler-friendly events |
 | **Events** (`/events`) | Searchable, filterable, paginated table of all events (25/page) |
 | **Event Detail** (`/event/{id}`) | Full event info, AI tags grid, raw scraped data, mark attended |
 | **Weekend** (`/weekend`) | Ranked weekend picks with weather forecast, notification preview |
 
 ### Events Page Features
+
 - **Search** — Full-text search across titles and descriptions (300ms debounce)
 - **Filters** — City, source, tagged/untagged, minimum toddler score
 - **Sort** — Date, score, title (ascending/descending)
@@ -76,7 +77,7 @@ All interactions use HTMX — no page reloads, URL updates via `hx-push-url`.
 ## Data Sources
 
 | Source | Type | Region | Events | Status |
-|--------|------|--------|--------|--------|
+|--------|------|----------|---------|--------|
 | [BREC](https://www.brec.org) | HTML scraping | Baton Rouge | ~1,400/month | ✅ Working |
 | [Eventbrite](https://www.eventbrite.com) | JSON-LD + HTML | Both cities | ~50 | ✅ Working |
 | [AllEvents.in](https://allevents.in) | HTML scraping | Both cities | ~30 | ✅ Working |
@@ -149,12 +150,14 @@ Configured in `src/db/models.py` → `InterestProfile`:
 Copy `.env.example` to `.env` and configure:
 
 ### Required
+
 | Variable | Description |
 |----------|-------------|
 | `OPENAI_API_KEY` | For AI event tagging (falls back to keyword heuristics without it) |
 | `DATABASE_URL` | Database connection string. Default local setup uses Docker Postgres at `postgresql+asyncpg://family_events:family_events@localhost:5433/family_events`. SQLite remains supported only as a legacy compatibility path. |
 
 ### Optional
+
 | Variable | Description |
 |----------|-------------|
 | `WEATHER_API_KEY` | OpenWeatherMap — for weekend forecasts (defaults to typical Louisiana weather) |
@@ -197,11 +200,13 @@ Scheduler (Cron)                          Web Admin UI
 The app now runs primarily on **PostgreSQL**.
 
 Local default:
+
 ```bash
 postgresql+asyncpg://family_events:family_events@localhost:5433/family_events
 ```
 
 The Postgres schema is now fully native and includes:
+
 - `UUID` primary keys with `gen_random_uuid()` defaults
 - `CITEXT` for case-insensitive user emails
 - `JSONB` for event tags and user profile blobs
@@ -263,6 +268,7 @@ A one-time migration utility still exists at `scripts/migrate_sqlite_to_postgres
 It was built for the transition period and is now mainly for legacy recovery or reference.
 
 Important:
+
 - the current recommended path is a **fresh Postgres start**, not a SQLite import
 - the Postgres schema now uses native `UUID` primary keys and stricter constraints
 - if you need to import an older SQLite database with arbitrary text IDs, additional ID remapping may be required
