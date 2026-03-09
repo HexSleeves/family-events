@@ -13,9 +13,10 @@ from typing import Any
 
 import aiosqlite
 
+from src.config import settings
+
 from .models import Event, EventTags, InterestProfile, Job, Source, User
 
-DATABASE_PATH = os.environ.get("DATABASE_PATH", "family_events.db")
 DEDUP_DEBUG = os.environ.get("DEDUP_DEBUG", "").lower() in {"1", "true", "yes", "on"}
 logger = logging.getLogger("uvicorn.error")
 
@@ -240,15 +241,33 @@ def _event_to_params(event: Event) -> dict[str, Any]:
 
 
 class Database:
-    """Async SQLite database for family events."""
+    """Async SQLite database for family events.
 
-    def __init__(self, db_path: str | None = None) -> None:
-        self.db_path = db_path or DATABASE_PATH
+    Currently only SQLite is implemented. `database_url` is accepted now so we can
+    switch callers and config over before introducing the Postgres backend.
+    """
+
+    def __init__(self, db_path: str | None = None, database_url: str | None = None) -> None:
+        self.database_url = database_url or settings.database_url
+        self.db_path = db_path or self._sqlite_path_from_url(self.database_url) or settings.database_path
         self._db: aiosqlite.Connection | None = None
+
+    @staticmethod
+    def _sqlite_path_from_url(database_url: str) -> str | None:
+        prefix = "sqlite+aiosqlite:///"
+        if database_url.startswith(prefix):
+            return database_url.removeprefix(prefix)
+        return None
 
     async def connect(self) -> None:
         """Open the database connection, enable WAL mode, and create tables."""
-        self._db = await aiosqlite.connect(self.db_path)
+        sqlite_path = self._sqlite_path_from_url(self.database_url)
+        if sqlite_path is None:
+            raise NotImplementedError(
+                "Only sqlite+aiosqlite URLs are supported today. "
+                "Postgres support will be added in a follow-up step."
+            )
+        self._db = await aiosqlite.connect(sqlite_path)
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA journal_mode=WAL;")
         await self._db.execute("PRAGMA foreign_keys=ON;")

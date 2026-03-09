@@ -148,6 +148,7 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Description |
 |----------|-------------|
 | `OPENAI_API_KEY` | For AI event tagging (falls back to keyword heuristics without it) |
+| `DATABASE_URL` | Database connection string. Use `sqlite+aiosqlite:///family_events.db` locally; target `postgresql+asyncpg://...` in production. |
 
 ### Optional
 | Variable | Description |
@@ -199,6 +200,10 @@ uv run python -m src.main serve               # Start web server (port 8000)
 ```
 
 ## Deployment
+
+Current production runs on an [exe.dev](https://exe.dev) VM with two systemd services.
+The codebase is being prepared for a Postgres-backed deployment via `DATABASE_URL`,
+which will enable managed platforms like Render more cleanly.
 
 Runs on an [exe.dev](https://exe.dev) VM with two systemd services:
 

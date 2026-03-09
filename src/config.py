@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     # Database
+    database_url: str = "sqlite+aiosqlite:///family_events.db"
     database_path: str = "family_events.db"
 
     # OpenAI
