@@ -13,7 +13,15 @@ from typing import Any
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from src.db.common import canonicalize_title, event_fingerprint, title_similarity
+from src.db.common import (
+    USER_UPDATE_FIELDS,
+    canonicalize_title,
+    event_fingerprint,
+    normalize_email,
+    normalize_search_query,
+    time_window,
+    title_similarity,
+)
 from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
 from src.db.session import get_engine, get_sessionmaker
 
@@ -368,8 +376,7 @@ class PostgresDatabase:
             return _row_to_event(row) if row else None
 
     async def get_recent_events(self, days: int = 14) -> list[Event]:
-        now = datetime.now(tz=UTC)
-        future = now + timedelta(days=days)
+        now, future = time_window(days)
         async with self.session() as session:
             result = await session.execute(
                 text("SELECT * FROM events WHERE start_time >= :now AND start_time <= :future ORDER BY start_time"),
@@ -409,8 +416,7 @@ class PostgresDatabase:
         page: int = 1,
         per_page: int = 25,
     ) -> tuple[list[Event], int]:
-        now = datetime.now(tz=UTC)
-        future = now + timedelta(days=days)
+        now, future = time_window(days)
         conditions = ["start_time >= :now", "start_time <= :future"]
         params: dict[str, Any] = {"now": now, "future": future}
         if q:
@@ -690,7 +696,7 @@ class PostgresDatabase:
         if kind:
             sql += " AND kind = :kind"
             params["kind"] = kind
-        q = q.strip()
+        q = normalize_search_query(q)
         if q:
             sql += " AND (label ILIKE :q OR detail ILIKE :q OR error ILIKE :q)"
             params["q"] = f"%{q}%"
@@ -776,25 +782,13 @@ class PostgresDatabase:
         async with self.session() as session:
             result = await session.execute(
                 text("SELECT * FROM users WHERE email = :email"),
-                {"email": email.lower().strip()},
+                {"email": normalize_email(email)},
             )
             row = result.mappings().first()
             return _row_to_user(row) if row else None
 
     async def update_user(self, user_id: str, **fields: Any) -> None:
-        allowed = {
-            "display_name",
-            "home_city",
-            "preferred_cities",
-            "theme",
-            "notification_channels",
-            "email_to",
-            "sms_to",
-            "child_name",
-            "onboarding_complete",
-            "interest_profile",
-            "password_hash",
-        }
+        allowed = USER_UPDATE_FIELDS
         params: dict[str, Any] = {"id": _uuid_param(user_id), "updated_at": datetime.now(tz=UTC)}
         sets = ["updated_at = :updated_at"]
         for key, value in fields.items():

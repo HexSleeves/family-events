@@ -13,7 +13,15 @@ from typing import Any
 import aiosqlite
 
 from src.config import settings
-from src.db.common import canonicalize_title, event_fingerprint, title_similarity
+from src.db.common import (
+    USER_UPDATE_FIELDS,
+    canonicalize_title,
+    event_fingerprint,
+    normalize_email,
+    normalize_search_query,
+    time_window,
+    title_similarity,
+)
 from src.db.postgres import PostgresDatabase
 
 from .models import Event, EventTags, InterestProfile, Job, Source, User
@@ -523,15 +531,14 @@ class SqliteDatabase:
 
     async def get_recent_events(self, days: int = 14) -> list[Event]:
         """Return events with start_time within the next `days` days."""
-        now = datetime.now(tz=UTC).isoformat()
-        future = (datetime.now(tz=UTC) + timedelta(days=days)).isoformat()
+        now_dt, future_dt = time_window(days)
         async with self.db.execute(
             """
             SELECT * FROM events
             WHERE start_time >= :now AND start_time <= :future
             ORDER BY start_time
             """,
-            {"now": now, "future": future},
+            {"now": now_dt.isoformat(), "future": future_dt.isoformat()},
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
@@ -595,11 +602,10 @@ class SqliteDatabase:
         Returns:
             Tuple of (list of events, total matching count).
         """
-        now = datetime.now(tz=UTC).isoformat()
-        future = (datetime.now(tz=UTC) + timedelta(days=days)).isoformat()
+        now_dt, future_dt = time_window(days)
 
         conditions = ["start_time >= :now", "start_time <= :future"]
-        params: dict[str, Any] = {"now": now, "future": future}
+        params: dict[str, Any] = {"now": now_dt.isoformat(), "future": future_dt.isoformat()}
 
         if q:
             conditions.append("(title LIKE :q OR description LIKE :q)")
@@ -964,7 +970,7 @@ class SqliteDatabase:
         if kind:
             sql += " AND kind = :kind"
             params["kind"] = kind
-        q = q.strip()
+        q = normalize_search_query(q)
         if q:
             sql += " AND (label LIKE :q OR detail LIKE :q OR error LIKE :q)"
             params["q"] = f"%{q}%"
@@ -1058,26 +1064,14 @@ class SqliteDatabase:
     async def get_user_by_email(self, email: str) -> User | None:
         """Get a user by email address."""
         async with self.db.execute(
-            "SELECT * FROM users WHERE email = :email", {"email": email.lower().strip()}
+            "SELECT * FROM users WHERE email = :email", {"email": normalize_email(email)}
         ) as cursor:
             row = await cursor.fetchone()
             return _row_to_user(row) if row else None
 
     async def update_user(self, user_id: str, **fields: Any) -> None:
         """Update specific fields on a user."""
-        allowed = {
-            "display_name",
-            "home_city",
-            "preferred_cities",
-            "theme",
-            "notification_channels",
-            "email_to",
-            "sms_to",
-            "child_name",
-            "onboarding_complete",
-            "interest_profile",
-            "password_hash",
-        }
+        allowed = USER_UPDATE_FIELDS
         now = datetime.now(tz=UTC).isoformat()
         sets = ["updated_at = :now"]
         params: dict[str, Any] = {"now": now, "id": user_id}
