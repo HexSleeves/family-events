@@ -14,6 +14,7 @@ from typing import Any
 import aiosqlite
 
 from src.config import settings
+from src.db.postgres import PostgresDatabase
 
 from .models import Event, EventTags, InterestProfile, Job, Source, User
 
@@ -240,34 +241,24 @@ def _event_to_params(event: Event) -> dict[str, Any]:
     }
 
 
-class Database:
-    """Async SQLite database for family events.
+def _sqlite_path_from_url(database_url: str) -> str | None:
+    prefix = "sqlite+aiosqlite:///"
+    if database_url.startswith(prefix):
+        return database_url.removeprefix(prefix)
+    return None
 
-    Currently only SQLite is implemented. `database_url` is accepted now so we can
-    switch callers and config over before introducing the Postgres backend.
-    """
+
+class SqliteDatabase:
+    """Async SQLite database for family events."""
 
     def __init__(self, db_path: str | None = None, database_url: str | None = None) -> None:
         self.database_url = database_url or settings.database_url
-        self.db_path = db_path or self._sqlite_path_from_url(self.database_url) or settings.database_path
+        self.db_path = db_path or _sqlite_path_from_url(self.database_url) or settings.database_path
         self._db: aiosqlite.Connection | None = None
-
-    @staticmethod
-    def _sqlite_path_from_url(database_url: str) -> str | None:
-        prefix = "sqlite+aiosqlite:///"
-        if database_url.startswith(prefix):
-            return database_url.removeprefix(prefix)
-        return None
 
     async def connect(self) -> None:
         """Open the database connection, enable WAL mode, and create tables."""
-        sqlite_path = self._sqlite_path_from_url(self.database_url)
-        if sqlite_path is None:
-            raise NotImplementedError(
-                "Only sqlite+aiosqlite URLs are supported today. "
-                "Postgres support will be added in a follow-up step."
-            )
-        self._db = await aiosqlite.connect(sqlite_path)
+        self._db = await aiosqlite.connect(self.db_path)
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA journal_mode=WAL;")
         await self._db.execute("PRAGMA foreign_keys=ON;")
@@ -1238,3 +1229,20 @@ class Database:
 
         await self.db.commit()
         return {"total_scanned": total, "merged": merged, "remaining": total - merged}
+
+
+class Database:
+    """Database factory used by the rest of the app.
+
+    SQLite remains the active implementation while Postgres support is built out.
+    """
+
+    def __new__(
+        cls, db_path: str | None = None, database_url: str | None = None
+    ) -> SqliteDatabase | PostgresDatabase:
+        resolved_url = database_url or settings.database_url
+        if resolved_url.startswith("sqlite+aiosqlite:///"):
+            return SqliteDatabase(db_path=db_path, database_url=resolved_url)
+        if resolved_url.startswith("postgresql+"):
+            return PostgresDatabase(database_url=resolved_url)
+        raise ValueError(f"Unsupported DATABASE_URL scheme: {resolved_url}")
