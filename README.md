@@ -282,6 +282,7 @@ Current scheduled behavior:
 
 The scheduler runs in `America/Chicago` and logs start/success/failure with duration.
 Scheduled scrape + tag runs are also persisted in the jobs table under the synthetic system user.
+Notification jobs now store per-channel delivery results so failures are visible in job history.
 
 ## Deployment
 

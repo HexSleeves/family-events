@@ -230,7 +230,7 @@ async def run_notify(
     *,
     user: User | None = None,
     child_name: str = "Your Little One",
-) -> str:
+) -> dict[str, object]:
     """Rank weekend events and send notification.
 
     If a User is provided, uses their profile for ranking and their
@@ -281,9 +281,16 @@ async def run_notify(
     if not tagged_events:
         msg = f"No events found for this weekend ({saturday} - {sunday}). Try running scrape + tag first."
         print(msg)
+        result = {
+            "summary": msg,
+            "message": msg,
+            "results": [],
+            "weekend_event_count": len(events),
+            "ranked_event_count": 0,
+        }
         if own_db:
             await db.close()
-        return msg
+        return result
 
     ranked = rank_events(tagged_events, profile, weather)
     message = format_console_message(ranked, weather, name)
@@ -297,10 +304,18 @@ async def run_notify(
     )
     print(f"Notification results: {results}")
 
+    result = {
+        "summary": f"{sum(1 for item in results if item['success'])}/{len(results)} deliveries succeeded",
+        "message": message,
+        "results": results,
+        "weekend_event_count": len(events),
+        "ranked_event_count": len(ranked),
+    }
+
     if own_db:
         await db.close()
 
-    return message
+    return result
 
 
 async def create_scheduled_job(

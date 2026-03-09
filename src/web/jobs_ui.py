@@ -54,6 +54,10 @@ def job_result_summary(job: Job) -> str | None:
             failed = result.get("failed")
             if all(isinstance(value, int) for value in (scraped, tagged, failed)):
                 return f"{scraped} events scraped · {tagged} tagged · {failed} failed"
+        if job.kind == "notify":
+            summary = result.get("summary")
+            if isinstance(summary, str) and summary.strip():
+                return summary
         if job.kind == "source-test":
             count = result.get("count")
             if isinstance(count, int):
