@@ -11,7 +11,7 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from src.db.database import Database
+from src.db.database import create_database
 from src.scheduler import run_notify, run_scrape, run_tag
 
 
@@ -33,7 +33,7 @@ async def friday_notification() -> None:
     print(f"[CRON] Friday notification at {datetime.now()}")
     print(f"{'=' * 60}")
     try:
-        async with Database() as db:
+        async with create_database() as db:
             users = await db.get_all_users()
             if not users:
                 print("[CRON] No users found, sending default notification")

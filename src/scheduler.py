@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from src.config import settings
-from src.db.database import Database
+from src.db.database import Database, create_database
 from src.db.models import InterestProfile, Source, User
 from src.notifications.dispatcher import NotificationDispatcher
 from src.notifications.formatter import format_console_message
@@ -22,7 +22,7 @@ async def run_scrape(db: Database | None = None) -> int:
     """Run all scrapers (built-in + user-defined) and store results."""
     own_db = db is None
     if own_db:
-        db = Database()
+        db = create_database()
         await db.connect()
 
     total = 0
@@ -74,7 +74,7 @@ async def run_tag(
     """Tag all untagged events with the LLM. Returns count tagged."""
     own_db = db is None
     if own_db:
-        db = Database()
+        db = create_database()
         await db.connect()
 
     untagged = await db.get_untagged_events(
@@ -166,7 +166,7 @@ async def run_notify(
     """
     own_db = db is None
     if own_db:
-        db = Database()
+        db = create_database()
         await db.connect()
 
     profile = user.interest_profile if user else InterestProfile()

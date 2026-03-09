@@ -868,9 +868,23 @@ class SqliteDatabase:
 
     async def mark_attended(self, event_id: str) -> None:
         """Mark an event as attended."""
+        await self.set_attended(event_id, attended=True)
+
+    async def set_attended(self, event_id: str, *, attended: bool) -> None:
+        """Set attendance flag for a single event."""
         await self.db.execute(
-            "UPDATE events SET attended = 1 WHERE id = :id",
-            {"id": event_id},
+            "UPDATE events SET attended = :attended WHERE id = :id",
+            {"attended": int(attended), "id": event_id},
+        )
+        await self.db.commit()
+
+    async def set_attended_bulk(self, event_ids: list[str], *, attended: bool) -> None:
+        """Set attendance for multiple events."""
+        if not event_ids:
+            return
+        await self.db.executemany(
+            "UPDATE events SET attended = ? WHERE id = ?",
+            [(int(attended), event_id) for event_id in event_ids],
         )
         await self.db.commit()
 
@@ -1231,18 +1245,16 @@ class SqliteDatabase:
         return {"total_scanned": total, "merged": merged, "remaining": total - merged}
 
 
-class Database:
-    """Database factory used by the rest of the app.
+Database = SqliteDatabase | PostgresDatabase
 
-    SQLite remains the active implementation while Postgres support is built out.
-    """
 
-    def __new__(
-        cls, db_path: str | None = None, database_url: str | None = None
-    ) -> SqliteDatabase | PostgresDatabase:
-        resolved_url = database_url or settings.database_url
-        if resolved_url.startswith("sqlite+aiosqlite:///"):
-            return SqliteDatabase(db_path=db_path, database_url=resolved_url)
-        if resolved_url.startswith("postgresql+"):
-            return PostgresDatabase(database_url=resolved_url)
-        raise ValueError(f"Unsupported DATABASE_URL scheme: {resolved_url}")
+def create_database(
+    db_path: str | None = None, database_url: str | None = None
+) -> SqliteDatabase | PostgresDatabase:
+    """Database factory used by the rest of the app."""
+    resolved_url = database_url or settings.database_url
+    if resolved_url.startswith("sqlite+aiosqlite:///"):
+        return SqliteDatabase(db_path=db_path, database_url=resolved_url)
+    if resolved_url.startswith("postgresql+"):
+        return PostgresDatabase(database_url=resolved_url)
+    raise ValueError(f"Unsupported DATABASE_URL scheme: {resolved_url}")

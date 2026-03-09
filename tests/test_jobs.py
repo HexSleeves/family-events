@@ -1,12 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
-from src.db.database import Database
+from src.db.database import create_database
 from src.db.models import Job
 
 
 def test_fail_stale_jobs_marks_old_running_jobs_failed(tmp_path):
     async def scenario() -> None:
-        db = Database(str(tmp_path / "jobs.db"))
+        db = create_database(str(tmp_path / "jobs.db"))
         await db.connect()
         try:
             stale_job = Job(
@@ -68,7 +68,7 @@ def test_job_progress_property_parses_result_json():
 def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
     async def scenario() -> None:
         db_path = str(tmp_path / "jobs-cancel.db")
-        db = Database(db_path)
+        db = create_database(db_path)
         await db.connect()
         try:
             job = Job(
@@ -85,7 +85,7 @@ def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
         import src.web.jobs as jobs_module
         from src.web.jobs import job_registry
 
-        monkeypatch.setattr(jobs_module, "Database", lambda: Database(db_path))
+        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
 
         updated = await job_registry.cancel(job_id=job.id, owner_user_id="user-1")
         assert updated is not None

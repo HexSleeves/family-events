@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from src.db.database import Database
+from src.db.database import create_database
 from src.db.models import Source
 from src.predefined_sources import (
     get_predefined_source,
@@ -154,10 +154,10 @@ async def api_add_source(request: Request):
     )
     await db.create_source(source)
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> dict[str, Any]:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             try:
                 recipe = await PageAnalyzer().analyze(url)
                 await job_db.update_source_recipe(
@@ -210,10 +210,10 @@ async def api_reanalyze(request: Request, source_id: str):
     if updated_source is None:
         raise ValueError("Source disappeared after reanalyze request")
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> dict[str, Any]:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             source_for_job = await job_db.get_source(source_id)
             if not source_for_job:
                 raise ValueError("Source not found")
@@ -264,12 +264,12 @@ async def api_test_source(request: Request, source_id: str):
     if source.user_id and source.user_id != user.id:
         return HTMLResponse("Forbidden", status_code=403)
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> dict[str, Any]:
         from src.scrapers.generic import GenericScraper
 
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             source_for_job = await job_db.get_source(source_id)
             if not source_for_job or not source_for_job.recipe_json:
                 raise ValueError("No recipe to test")

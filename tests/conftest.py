@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.db.database import Database
+from src.db.database import create_database
 from src.db.models import User
 from src.web import app as appmod
 from src.web.auth import hash_password
@@ -19,7 +19,7 @@ from src.web.auth import hash_password
 
 @pytest.fixture
 def client(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    test_db = Database(str(tmp_path / "test.db"))
+    test_db = create_database(str(tmp_path / "test.db"))
     monkeypatch.setattr(appmod, "db", test_db)
     appmod.app.state.db = test_db
     appmod._rate_limit_store.clear()

@@ -56,9 +56,9 @@ def cli() -> None:
 
 
 async def _list_events() -> None:
-    from src.db.database import Database
+    from src.db.database import create_database
 
-    async with Database() as db:
+    async with create_database() as db:
         events = await db.get_recent_events(days=30)
     if not events:
         print("No upcoming events. Run 'scrape' first.")
@@ -86,9 +86,9 @@ def _serve() -> None:
 
 
 async def _dedupe_events() -> None:
-    from src.db.database import Database
+    from src.db.database import create_database
 
-    async with Database() as db:
+    async with create_database() as db:
         result = await db.dedupe_existing_events()
     print(
         "Dedupe complete: "

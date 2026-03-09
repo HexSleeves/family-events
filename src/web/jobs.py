@@ -11,8 +11,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.config import settings
-from src.db.database import Database
+from src.db.database import create_database
 from src.db.models import Job
+
+Database = create_database
 
 
 @dataclass(slots=True)

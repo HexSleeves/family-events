@@ -20,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.config import settings
-from src.db.database import Database
+from src.db.database import Database, create_database
 from src.db.models import InterestProfile
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events, score_event_breakdown
@@ -45,7 +45,7 @@ from src.web.routes.auth import router as auth_router
 from src.web.routes.profile import router as profile_router
 from src.web.routes.sources import router as sources_router
 
-db = Database()
+db = create_database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 logger = logging.getLogger("uvicorn.error")
@@ -100,14 +100,9 @@ async def health_check() -> JSONResponse:
     latest_scrape_at: datetime | None = None
 
     try:
-        async with db.db.execute(
-            "SELECT COUNT(*) as n, MAX(scraped_at) as latest FROM events"
-        ) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                event_count = int(row["n"]) if row["n"] is not None else 0
-                latest = row["latest"]
-                latest_scrape_at = datetime.fromisoformat(str(latest)) if latest else None
+        stats = await db.health_stats()
+        event_count = int(stats["event_count"])
+        latest_scrape_at = stats["latest_scraped_at"]
         db_ok = True
     except Exception as exc:
         logger.exception("health_check_db_failed: %s", exc)
@@ -260,18 +255,13 @@ async def events_page(
 
 @app.get("/event/{event_id}", response_class=HTMLResponse)
 async def event_detail(request: Request, event_id: str):
-    from src.db.database import _row_to_event
-
-    async with db.db.execute("SELECT * FROM events WHERE id = :id", {"id": event_id}) as cursor:
-        row = await cursor.fetchone()
-    if not row:
+    event = await db.get_event(event_id)
+    if not event:
         return templates.TemplateResponse(
             "base.html",
             {"request": request, "content": "Event not found."},
             status_code=404,
         )
-
-    event = _row_to_event(row)
     raw_data = json.dumps(event.raw_data, indent=2, default=str)[:3000]
 
     map_query = ", ".join(
@@ -663,10 +653,10 @@ async def api_scrape(request: Request):
 
     from src.scheduler import run_scrape
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> int:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             return await run_scrape(job_db)
 
     return await start_background_job(
@@ -691,10 +681,10 @@ async def api_tag(request: Request):
 
     from src.scheduler import run_tag
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(job) -> int:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             await job.update(detail="Preparing tag batches…", result={"processed": 0, "total": 0, "succeeded": 0, "failed": 0})
             return await run_tag(
                 job_db,
@@ -724,10 +714,10 @@ async def api_dedupe(request: Request):
     if throttled := check_rate_limit(request, "api_dedupe"):
         return throttled
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> int:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             result = await job_db.dedupe_existing_events()
             return int(result["merged"])
 
@@ -753,10 +743,10 @@ async def api_notify(request: Request):
 
     from src.scheduler import run_notify
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(_job) -> str:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             return await run_notify(job_db, user=user)
 
     return await start_background_job(
@@ -805,8 +795,7 @@ async def api_unattend(request: Request, event_id: str):
     if throttled := check_rate_limit(request, "api_unattend"):
         return throttled
 
-    await db.db.execute("UPDATE events SET attended = 0 WHERE id = :id", {"id": event_id})
-    await db.db.commit()
+    await db.set_attended(event_id, attended=False)
     event = await db.get_event(event_id)
     if event is None:
         raise ValueError("Event disappeared after unattend")
@@ -827,11 +816,7 @@ async def api_unattend_bulk(request: Request):
     if not event_ids:
         return toast("Select at least one event", "warning", status_code=422)
 
-    await db.db.executemany(
-        "UPDATE events SET attended = 0 WHERE id = ?",
-        [(event_id,) for event_id in event_ids],
-    )
-    await db.db.commit()
+    await db.set_attended_bulk(event_ids, attended=False)
 
     undo_token = str(uuid4())
     _bulk_unattend_undo_store[undo_token] = event_ids
@@ -860,11 +845,7 @@ async def api_unattend_bulk_undo(request: Request, undo_token: str):
     if not event_ids:
         return toast("Nothing to undo", "warning")
 
-    await db.db.executemany(
-        "UPDATE events SET attended = 1 WHERE id = ?",
-        [(event_id,) for event_id in event_ids],
-    )
-    await db.db.commit()
+    await db.set_attended_bulk(event_ids, attended=True)
     return toast(f"Restored {len(event_ids)} event(s)")
 
 
@@ -907,10 +888,10 @@ async def api_tag_stale(request: Request):
 
     from src.scheduler import run_tag
 
-    db_path = db.db_path
+    database_url = db.database_url
 
     async def runner(job) -> int:
-        async with Database(db_path) as job_db:
+        async with create_database(database_url=database_url) as job_db:
             stale_count = await job_db.count_stale_tagged_events(tagging_version=TAGGING_VERSION)
             await job.update(
                 detail="Preparing stale retag batches…",
