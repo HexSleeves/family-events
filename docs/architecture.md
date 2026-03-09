@@ -3,7 +3,7 @@
 ## System Overview
 
 The system has two entry points: a **web dashboard** (FastAPI) and a **cron scheduler**
-(APScheduler). Both share the same pipeline modules and SQLite database.
+(APScheduler). Both share the same pipeline modules and PostgreSQL database.
 
 ```mermaid
 graph TB
@@ -22,7 +22,7 @@ graph TB
         NOTIFY["Dispatcher<br/>Console/SMS/Telegram/Email"]
     end
 
-    DB[(SQLite Database)]
+    DB[(PostgreSQL Database)]
 
     CLI --> SCR
     CLI --> TAG
@@ -55,7 +55,7 @@ Each step can also be triggered independently.
 ```mermaid
 sequenceDiagram
     participant S as Scrapers
-    participant DB as SQLite
+    participant DB as PostgreSQL
     participant T as Tagger (LLM)
     participant R as Ranker
     participant W as Weather API
@@ -138,37 +138,77 @@ classDiagram
 
 ## Database Schema
 
-Single table design. Events are uniquely identified by `(source, source_id)`.
-Tags are stored as a JSON blob in the `tags` column.
+Core data lives in PostgreSQL. Events are uniquely identified by `(source, source_id)`.
+Tags and profiles are stored as `JSONB`, while relational ownership is enforced with foreign keys.
 
 ```mermaid
 erDiagram
+    USERS {
+        uuid id PK
+        citext email UK
+        text display_name
+        text theme
+        jsonb preferred_cities
+        jsonb notification_channels
+        jsonb interest_profile
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    SOURCES {
+        uuid id PK
+        uuid user_id FK
+        text name
+        text url UK
+        text domain
+        text city
+        text category
+        boolean builtin
+        text status
+        timestamptz last_scraped_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     EVENTS {
-        text id PK "UUID"
-        text source "brec, eventbrite, ..."
-        text source_id "dedup key per source"
-        text source_url
+        uuid id PK
+        text source
+        text source_id
         text title
         text description
-        text location_name
-        text location_address
-        text location_city "Lafayette or Baton Rouge"
-        real latitude
-        real longitude
-        text start_time "ISO 8601"
-        text end_time "ISO 8601, nullable"
-        int is_recurring "0 or 1"
-        text recurrence_rule
-        int is_free "0 or 1"
-        real price_min
-        real price_max
-        text image_url
-        text scraped_at "ISO 8601"
-        text raw_data "JSON blob"
-        text tags "EventTags JSON, nullable"
-        int attended "0 or 1"
+        text location_city
+        timestamptz start_time
+        timestamptz end_time
+        jsonb raw_data
+        jsonb tags
+        jsonb score_breakdown
+        boolean attended
     }
+
+    JOBS {
+        uuid id PK
+        uuid owner_user_id FK
+        uuid source_id FK
+        text kind
+        text job_key
+        text state
+        timestamptz created_at
+        timestamptz started_at
+        timestamptz finished_at
+    }
+
+    USERS ||--o{ SOURCES : owns
+    USERS ||--o{ JOBS : runs
+    SOURCES ||--o{ JOBS : related_to
 ```
+
+Postgres-specific schema features:
+- `UUID` primary keys with `gen_random_uuid()` defaults
+- `CITEXT` email uniqueness
+- `JSONB` for tag/profile documents
+- `CHECK` constraints for `theme`, `status`, and `state`
+- trigram indexes for title/description search
+- expression indexes for tag filtering
 
 
 

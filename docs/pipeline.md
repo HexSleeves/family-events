@@ -1,6 +1,6 @@
 # Scraping & Tagging Pipeline
 
-This document explains how events flow from external websites into the database,
+This document explains how events flow from external websites into PostgreSQL,
 get tagged by AI, scored, ranked, and turned into notifications.
 
 ## Pipeline Overview
@@ -30,7 +30,7 @@ flowchart LR
     LIB --> LBS
 
     BS & ES & AS & LS & LBS --> UPSERT["Database Upsert<br/>UNIQUE(source, source_id)"]
-    UPSERT --> DB[(SQLite)]
+    UPSERT --> DB[(PostgreSQL)]
     DB --> TAG["AI Tagger<br/>OpenAI / Heuristic"]
     TAG --> DB
 ```
@@ -111,7 +111,7 @@ flowchart TD
 
 ### Deduplication
 
-Events are deduplicated on `UNIQUE(source, source_id)`:
+Events are deduplicated on the Postgres unique constraint `UNIQUE(source, source_id)`:
 
 ```sql
 INSERT INTO events (...) VALUES (...)

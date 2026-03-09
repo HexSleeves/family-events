@@ -39,14 +39,14 @@ cp .env.example .env
 docker compose up -d postgres
 uv run alembic upgrade head
 
-# 4. Run the pipeline
-uv run python -m src.main scrape    # Scrape all sources
+# 4. Start the web UI and create your account
+uv run python -m src.main serve     # http://localhost:8000
+# Sign up in the browser to seed your default sources
+
+# 5. Run the pipeline pieces
+uv run python -m src.main scrape    # Scrape all saved sources
 uv run python -m src.main tag       # Tag events with AI
 uv run python -m src.main notify    # Send weekend notification
-uv run python -m src.main pipeline  # All three in one
-
-# 5. Start the web UI
-uv run python -m src.main serve     # http://localhost:8000
 
 # 6. List upcoming events in terminal
 uv run python -m src.main events
@@ -152,7 +152,7 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Description |
 |----------|-------------|
 | `OPENAI_API_KEY` | For AI event tagging (falls back to keyword heuristics without it) |
-| `DATABASE_URL` | Database connection string. Default local setup uses Docker Postgres at `postgresql+asyncpg://family_events:family_events@localhost:5433/family_events`; SQLite remains available as `sqlite+aiosqlite:///family_events.db`. |
+| `DATABASE_URL` | Database connection string. Default local setup uses Docker Postgres at `postgresql+asyncpg://family_events:family_events@localhost:5433/family_events`. SQLite remains supported only as a legacy compatibility path. |
 
 ### Optional
 | Variable | Description |
@@ -186,10 +186,33 @@ Scheduler (Cron)                          Web Admin UI
 │ Libraries   │  │          │  │          │  │          │
 └─────────────┘  └──────────┘  └──────────┘  └──────────┘
                       │
-                ┌─────▼─────┐
-                │  SQLite   │
-                │  Database  │
-                └───────────┘
+                ┌──────────────┐
+                │  PostgreSQL  │
+                │   Database   │
+                └──────────────┘
+```
+
+## Database
+
+The app now runs primarily on **PostgreSQL**.
+
+Local default:
+```bash
+postgresql+asyncpg://family_events:family_events@localhost:5433/family_events
+```
+
+The Postgres schema is now fully native and includes:
+- `UUID` primary keys with `gen_random_uuid()` defaults
+- `CITEXT` for case-insensitive user emails
+- `JSONB` for event tags and user profile blobs
+- foreign keys between users, sources, and jobs
+- `CHECK` constraints for enum-like fields
+- trigram and JSON expression indexes for search/filter performance
+
+For GUI clients like TablePlus, use the standard Postgres URL without the async driver suffix:
+
+```bash
+postgresql://family_events:family_events@127.0.0.1:5433/family_events
 ```
 
 ## CLI Commands
@@ -198,16 +221,18 @@ Scheduler (Cron)                          Web Admin UI
 uv run python -m src.main scrape              # Run all scrapers
 uv run python -m src.main tag                 # Tag untagged events with LLM
 uv run python -m src.main notify --name Em    # Send notification
-uv run python -m src.main pipeline --name Em  # Full pipeline
 uv run python -m src.main events              # List upcoming events
 uv run python -m src.main serve               # Start web server (port 8000)
+uv run python -m src.main dedupe              # Backfill-dedupe existing events
 ```
+
+Note: the `pipeline` CLI command is currently not documented as a recommended path until its missing `run_full_pipeline` wiring is restored.
 
 ## Deployment
 
 Current production runs on an [exe.dev](https://exe.dev) VM with two systemd services.
-The codebase is being prepared for a Postgres-backed deployment via `DATABASE_URL`,
-which will enable managed platforms like Render more cleanly.
+The app now supports a fully Postgres-native deployment via `DATABASE_URL`,
+which makes managed platforms like Render much cleaner.
 
 ### Local Postgres with Docker Compose
 
@@ -232,41 +257,26 @@ docker compose down
 docker compose down -v  # also deletes local Postgres data volume
 ```
 
-### SQLite -> Postgres migration
+### Legacy SQLite -> Postgres migration
 
-A one-time migration utility is available at `scripts/migrate_sqlite_to_postgres.py`.
-It copies `users`, `sources`, `events`, and `jobs` from SQLite into an already-migrated
-Postgres database, then verifies row counts on both sides.
+A one-time migration utility still exists at `scripts/migrate_sqlite_to_postgres.py`.
+It was built for the transition period and is now mainly for legacy recovery or reference.
 
-Local validation flow:
+Important:
+- the current recommended path is a **fresh Postgres start**, not a SQLite import
+- the Postgres schema now uses native `UUID` primary keys and stricter constraints
+- if you need to import an older SQLite database with arbitrary text IDs, additional ID remapping may be required
+
+If you intentionally need the legacy migration path, use:
 
 ```bash
-# 1. Start local Postgres
 export DATABASE_URL='postgresql+asyncpg://family_events:family_events@localhost:5433/family_events'
 docker compose up -d postgres
-
-# 2. Create schema
 uv run alembic upgrade head
-
-# 3. Run the one-time data migration from the local SQLite file
 uv run python scripts/migrate_sqlite_to_postgres.py \
   --sqlite-path family_events.db \
   --postgres-url "$DATABASE_URL"
 ```
-
-The target Postgres database must be empty by default. Pass `--allow-non-empty`
-only if you intentionally want to append into an existing database.
-
-Suggested cutover checklist:
-
-1. Freeze writes to the SQLite-backed app and cron worker.
-2. Take a backup copy of `family_events.db`.
-3. Start Postgres and run `uv run alembic upgrade head`.
-4. Run `uv run python scripts/migrate_sqlite_to_postgres.py ...`.
-5. Confirm row-count verification passes.
-6. Start the app against Postgres and smoke-test scrape, tag, search, attend/unattend, sources, jobs, and weekend notification flows.
-7. Switch production services to the Postgres `DATABASE_URL`.
-8. Keep the SQLite backup until the Postgres deployment has been stable for a while.
 
 Runs on an [exe.dev](https://exe.dev) VM with two systemd services:
 
@@ -299,7 +309,7 @@ All three must pass clean before committing.
 | Templates | Jinja2 |
 | Frontend interactivity | HTMX 2.0.4 |
 | CSS | Tailwind CSS v4 (CLI build) |
-| Database | SQLite (WAL mode, aiosqlite) |
+| Database | PostgreSQL 16 + asyncpg + SQLAlchemy |
 | Scraping | httpx + BeautifulSoup4 |
 | AI tagging | OpenAI API (gpt-4o-mini) |
 | Scheduling | APScheduler |

@@ -44,7 +44,7 @@ class ActiveJob:
 
 
 class JobRegistry:
-    """Track active tasks while persisting status/history in SQLite."""
+    """Track active tasks while persisting status/history in the configured database."""
 
     def __init__(self) -> None:
         self._active_by_id: OrderedDict[str, ActiveJob] = OrderedDict()
