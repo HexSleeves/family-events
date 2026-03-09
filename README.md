@@ -281,6 +281,7 @@ Current scheduled behavior:
 - Friday morning notifications for each user
 
 The scheduler runs in `America/Chicago` and logs start/success/failure with duration.
+All canonical storage timestamps remain UTC, while weekend/date-window behavior is evaluated in `America/Chicago` so late-night UTC boundaries and DST changes map to the intended local day.
 Scheduled scrape + tag runs are also persisted in the jobs table under the synthetic system user.
 Notification jobs now store per-channel delivery results so failures are visible in job history.
 

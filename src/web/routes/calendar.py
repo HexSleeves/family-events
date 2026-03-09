@@ -9,16 +9,17 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 
+from src.timezones import as_local_date, local_date_range_utc, local_today, utc_now
 from src.web.common import ctx, get_db, is_htmx_request, template_response
 
 router = APIRouter()
 
 
 def _resolve_month_range(month: str) -> tuple[datetime.date, datetime.date, datetime.date, datetime.date]:
-    today = datetime.now(tz=UTC).date()
+    today = local_today()
     if month:
         try:
-            month_date = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC).date()
+            month_date = datetime.strptime(month, "%Y-%m").date()
             month_start = month_date.replace(day=1)
         except ValueError:
             month_start = today.replace(day=1)
@@ -44,9 +45,10 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
     db = get_db(request)
     today, month_start, next_month_start, prev_month = _resolve_month_range(month)
 
+    range_start, range_end = local_date_range_utc(month_start, next_month_start)
     events = await db.get_events_between(
-        datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),
-        datetime.combine(next_month_start, datetime.min.time(), tzinfo=UTC),
+        range_start,
+        range_end,
         attended=attended,
     )
     events.sort(
@@ -59,7 +61,7 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
 
     events_by_day: dict[str, list[Any]] = {}
     for event in events:
-        key = event.start_time.date().isoformat()
+        key = as_local_date(event.start_time).isoformat()
         events_by_day.setdefault(key, []).append(event)
 
     first_weekday = month_start.weekday()
@@ -89,7 +91,7 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
     cities = sorted({event.location_city for event in events if event.location_city})
     sources = sorted({event.source for event in events if event.source})
     featured_days = sorted(active_days, key=lambda day: day["event_count"], reverse=True)[:3]
-    upcoming_events = [event for event in events if event.start_time.date() >= today][:8]
+    upcoming_events = [event for event in events if as_local_date(event.start_time) >= today][:8]
 
     page_ctx = await ctx(
         request,
@@ -123,9 +125,10 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
     db = get_db(request)
     _today, month_start, next_month_start, _prev_month = _resolve_month_range(month)
 
+    range_start, range_end = local_date_range_utc(month_start, next_month_start)
     events = await db.get_events_between(
-        datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),
-        datetime.combine(next_month_start, datetime.min.time(), tzinfo=UTC),
+        range_start,
+        range_end,
         attended=attended,
     )
 
@@ -139,7 +142,7 @@ async def calendar_ics(request: Request, month: str = "", attended: str = ""):
     out.write("VERSION:2.0\r\n")
     out.write("PRODID:-//Family Events//Calendar Export//EN\r\n")
     out.write("CALSCALE:GREGORIAN\r\n")
-    generated = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+    generated = utc_now().strftime("%Y%m%dT%H%M%SZ")
 
     for event in events:
         start = event.start_time.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")

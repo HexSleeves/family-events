@@ -254,3 +254,9 @@ Useful make targets:
 - `make db-down`
 - `make db-reset`
 - `make db-migrate`
+
+## Timezone policy
+
+- Persist timestamps in UTC.
+- Evaluate weekend and calendar date windows in `America/Chicago`.
+- Convert event datetimes to the app timezone before deriving local dates for weekend selection, calendar grouping, and duplicate fingerprints.

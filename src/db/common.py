@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from src.db.models import Event
+from src.timezones import as_local_date, utc_now
 
 USER_UPDATE_FIELDS = frozenset(
     {
@@ -35,7 +36,7 @@ def canonicalize_title(title: str) -> str:
 
 def event_fingerprint(event: Event) -> str:
     """Build a stable cross-source fingerprint for likely duplicate events."""
-    date_part = event.start_time.date().isoformat()
+    date_part = as_local_date(event.start_time).isoformat()
     city = (event.location_city or "").lower().strip()
     title = canonicalize_title(event.title)
     key = f"{title}|{date_part}|{city}"
@@ -65,5 +66,5 @@ def normalize_search_query(query: str) -> str:
 
 def time_window(days: int) -> tuple[datetime, datetime]:
     """Return a UTC time window from now through the next N days."""
-    now = datetime.now(tz=UTC)
+    now = utc_now()
     return now, now + timedelta(days=days)

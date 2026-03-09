@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
-
 from src.config import settings
 from src.db.database import Database, create_database
 from src.db.models import InterestProfile, Job, Source, User
@@ -16,6 +14,7 @@ from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import get_builtin_scraper
 from src.tagger.llm import EventTagger
 from src.tagger.taxonomy import TAGGING_VERSION
+from src.timezones import current_weekend_dates, local_today, utc_now
 from src.web.auth import hash_password
 
 SYSTEM_USER_EMAIL = "system@family-events.local"
@@ -128,7 +127,8 @@ async def run_tag(
 
     async def on_batch_complete(start_idx, batch, tagged_batch, _all_results):
         nonlocal processed, succeeded
-        weather_stub = await WeatherService().get_weekend_forecast(date.today(), date.today())
+        today = local_today()
+        weather_stub = await WeatherService().get_weekend_forecast(today, today)
         for event, tags in tagged_batch:
             event.tags = tags
             breakdown = score_event_breakdown(event, InterestProfile(), weather_stub)
@@ -248,12 +248,7 @@ async def run_notify(
     sms_to = user.sms_to if user else ""
     name = user.child_name if user else child_name
 
-    today = date.today()
-    days_until_sat = (5 - today.weekday()) % 7
-    if days_until_sat == 0 and datetime.now().hour >= 12:
-        days_until_sat = 7
-    saturday = today + timedelta(days=days_until_sat)
-    sunday = saturday + timedelta(days=1)
+    saturday, sunday = current_weekend_dates(roll_after_saturday_noon=True)
 
     print(f"\nWeekend: {saturday} / {sunday}")
 
@@ -336,7 +331,7 @@ async def create_scheduled_job(
         owner_user_id=system_user.id,
         state="running",
         detail=detail,
-        started_at=datetime.now(tz=UTC),
+        started_at=utc_now(),
     )
     await db.create_job(job)
     return job.id
@@ -391,5 +386,5 @@ async def update_scheduled_job(
     if error is not None:
         fields["error"] = error
     if state in {"succeeded", "failed", "cancelled"}:
-        fields["finished_at"] = datetime.now(tz=UTC)
+        fields["finished_at"] = utc_now()
     await db.update_job(job_id, **fields)

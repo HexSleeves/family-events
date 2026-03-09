@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import bindparam, text
@@ -26,6 +26,7 @@ from src.db.common import (
 from src.db.migrations import ensure_postgres_schema_current
 from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
 from src.db.session import get_engine, get_sessionmaker
+from src.timezones import as_local_date, utc_now, weekend_window_utc
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -113,7 +114,7 @@ class PostgresDatabase:
             yield session
 
     async def health_stats(self) -> dict[str, Any]:
-        cutoff = datetime.now(tz=UTC) - timedelta(seconds=settings.background_job_timeout_seconds)
+        cutoff = utc_now() - timedelta(seconds=settings.background_job_timeout_seconds)
         async with self.session() as session:
             event_result = await session.execute(
                 text(
@@ -299,7 +300,7 @@ class PostgresDatabase:
                 candidate_fp = hashlib.sha1(
                     (
                         f"{canonicalize_title(str(row['title']))}|"
-                        f"{row['start_time'].date().isoformat()}|"
+                        f"{as_local_date(row['start_time']).isoformat()}|"
                         f"{str(row['location_city']).lower().strip()}"
                     ).encode()
                 ).hexdigest()
@@ -315,14 +316,13 @@ class PostgresDatabase:
                 await session_cm.__aexit__(None, None, None)
 
     async def get_events_for_weekend(self, sat_date: str, sun_date: str) -> list[Event]:
-        sat_start = datetime.fromisoformat(f"{sat_date}T00:00:00+00:00")
-        mon_start = datetime.fromisoformat(f"{sun_date}T23:59:59+00:00")
+        saturday = datetime.fromisoformat(sat_date).date()
+        sunday = datetime.fromisoformat(sun_date).date()
+        start, end = weekend_window_utc(saturday, sunday)
         async with self.session() as session:
             result = await session.execute(
-                text(
-                    "SELECT * FROM events WHERE start_time >= :sat_start AND start_time <= :mon_start ORDER BY start_time"
-                ),
-                {"sat_start": sat_start, "mon_start": mon_start},
+                text("SELECT * FROM events WHERE start_time >= :start AND start_time < :end ORDER BY start_time"),
+                {"start": start, "end": end},
             )
             return [_row_to_event(row) for row in result.mappings().all()]
 
@@ -371,7 +371,7 @@ class PostgresDatabase:
                 {
                     "tags": json.dumps(tags.model_dump()),
                     "score_breakdown": json.dumps(score_breakdown) if score_breakdown else None,
-                    "tagged_at": datetime.now(tz=UTC),
+                    "tagged_at": utc_now(),
                     "id": _uuid_param(event_id),
                 },
             )
@@ -552,7 +552,7 @@ class PostgresDatabase:
         async with self.session() as session:
             await session.execute(
                 text("UPDATE sources SET recipe_json = :recipe_json, status = :status, updated_at = :now WHERE id = :id"),
-                {"recipe_json": recipe_json, "status": status, "now": datetime.now(tz=UTC), "id": _uuid_param(source_id)},
+                {"recipe_json": recipe_json, "status": status, "now": utc_now(), "id": _uuid_param(source_id)},
             )
             await session.commit()
 
@@ -565,7 +565,7 @@ class PostgresDatabase:
         error: str | None = None,
     ) -> None:
         sets = ["updated_at = :now"]
-        params: dict[str, Any] = {"now": datetime.now(tz=UTC), "id": _uuid_param(source_id)}
+        params: dict[str, Any] = {"now": utc_now(), "id": _uuid_param(source_id)}
         if status is not None:
             sets.append("status = :status")
             params["status"] = status
@@ -595,7 +595,7 @@ class PostgresDatabase:
                     WHERE id = :id
                     """
                 ),
-                {"now": datetime.now(tz=UTC), "id": _uuid_param(source_id)},
+                {"now": utc_now(), "id": _uuid_param(source_id)},
             )
             await session.commit()
         source = await self.get_source(source_id)
@@ -740,7 +740,7 @@ class PostgresDatabase:
             return [str(row[0]) for row in result.all() if row[0]]
 
     async def fail_stale_jobs(self, *, max_age_seconds: int) -> int:
-        now = datetime.now(tz=UTC)
+        now = utc_now()
         cutoff = now - timedelta(seconds=max_age_seconds)
         async with self.session() as session:
             result = await session.execute(
@@ -815,7 +815,7 @@ class PostgresDatabase:
 
     async def update_user(self, user_id: str, **fields: Any) -> None:
         allowed = USER_UPDATE_FIELDS
-        params: dict[str, Any] = {"id": _uuid_param(user_id), "updated_at": datetime.now(tz=UTC)}
+        params: dict[str, Any] = {"id": _uuid_param(user_id), "updated_at": utc_now()}
         sets = ["updated_at = :updated_at"]
         for key, value in fields.items():
             if key not in allowed:

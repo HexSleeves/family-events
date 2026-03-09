@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -13,6 +13,7 @@ from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
 from src.tagger.taxonomy import TAGGING_VERSION
+from src.timezones import current_weekend_dates, utc_now
 from src.web.auth import get_current_user
 from src.web.common import ctx, format_ts, get_db, template_response
 from src.web.jobs_ui import render_job_cards
@@ -44,7 +45,7 @@ async def health_check(request: Request) -> JSONResponse:
     payload = {
         "status": status,
         "service": "family-events",
-        "time": datetime.now(tz=UTC).isoformat().replace("+00:00", "Z"),
+        "time": utc_now().isoformat().replace("+00:00", "Z"),
         "checks": {
             "database": {
                 "ok": db_ok,
@@ -141,10 +142,7 @@ async def dashboard(request: Request):
 @router.get("/weekend", response_class=HTMLResponse)
 async def weekend_page(request: Request):
     db = get_db(request)
-    today = date.today()
-    days_until_sat = (5 - today.weekday()) % 7
-    saturday = today + timedelta(days=days_until_sat)
-    sunday = saturday + timedelta(days=1)
+    saturday, sunday = current_weekend_dates()
 
     weather = await WeatherService().get_weekend_forecast(saturday, sunday)
     events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())

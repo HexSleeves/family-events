@@ -5,9 +5,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import src.scheduler as scheduler_module
+import src.web.routes.pages as pages_module
 from src.db.database import create_database
-from src.db.models import Event, Source
-from src.scheduler import run_scheduled_scrape_then_tag
+from src.db.models import Event, EventTags, Source
+from src.scheduler import run_notify, run_scheduled_scrape_then_tag
 from src.scrapers.router import extract_domain
 
 
@@ -84,3 +85,104 @@ def test_run_scheduled_scrape_then_tag_persists_job(tmp_path, monkeypatch):
             await db.close()
 
     asyncio.run(scenario())
+
+
+def test_run_notify_uses_central_timezone_for_weekend_selection(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        db = create_database(str(tmp_path / "notify-weekend.db"))
+        await db.connect()
+        try:
+            late_friday_utc = datetime(2025, 3, 8, 4, 30, tzinfo=UTC)
+            saturday_local = datetime(2025, 3, 8, 6, 0, tzinfo=UTC)
+            event = Event(
+                source="manual",
+                source_url="https://example.com/saturday-story-time",
+                source_id="saturday-story-time",
+                title="Saturday Story Time",
+                description="Weekend pick",
+                location_name="Library",
+                location_address="123 Main",
+                location_city="Lafayette",
+                start_time=saturday_local,
+                end_time=saturday_local + timedelta(hours=1),
+                scraped_at=late_friday_utc,
+                raw_data={},
+            )
+            await db.upsert_event(event)
+            await db.update_event_tags(event.id, EventTags(toddler_score=8))
+
+            monkeypatch.setattr(
+                scheduler_module,
+                "current_weekend_dates",
+                lambda *, now=None, roll_after_saturday_noon=False: (
+                    datetime(2025, 3, 8, tzinfo=UTC).date(),
+                    datetime(2025, 3, 9, tzinfo=UTC).date(),
+                ),
+            )
+
+            result = await run_notify(db)
+
+            assert result["weekend_event_count"] == 1
+            assert result["ranked_event_count"] == 1
+            assert result["results"]
+            assert result["results"][0]["success"] is True
+        finally:
+            await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_weekend_page_uses_central_timezone_boundary(client, monkeypatch):
+    import asyncio
+
+    late_friday_utc = datetime(2025, 3, 8, 4, 30, tzinfo=UTC)
+    saturday_local = datetime(2025, 3, 8, 6, 0, tzinfo=UTC)
+    weekday_local = datetime(2025, 3, 10, 18, 0, tzinfo=UTC)
+
+    weekend_event = Event(
+        source="manual",
+        source_url="https://example.com/saturday-story-time",
+        source_id="weekend-story-time",
+        title="Saturday Story Time",
+        description="Weekend pick",
+        location_name="Library",
+        location_address="123 Main",
+        location_city="Lafayette",
+        start_time=saturday_local,
+        end_time=saturday_local + timedelta(hours=1),
+        scraped_at=late_friday_utc,
+        raw_data={},
+        tags=EventTags(toddler_score=8),
+    )
+    weekday_event = Event(
+        source="manual",
+        source_url="https://example.com/monday-music",
+        source_id="monday-music",
+        title="Monday Music",
+        description="Not a weekend event",
+        location_name="Library",
+        location_address="123 Main",
+        location_city="Lafayette",
+        start_time=weekday_local,
+        end_time=weekday_local + timedelta(hours=1),
+        scraped_at=late_friday_utc,
+        raw_data={},
+        tags=EventTags(toddler_score=9),
+    )
+    asyncio.run(client.app.state.db.upsert_event(weekend_event))
+    asyncio.run(client.app.state.db.upsert_event(weekday_event))
+
+    monkeypatch.setattr(
+        pages_module,
+        "current_weekend_dates",
+        lambda *, now=None, roll_after_saturday_noon=False: (
+            datetime(2025, 3, 8, tzinfo=UTC).date(),
+            datetime(2025, 3, 9, tzinfo=UTC).date(),
+        ),
+    )
+
+    response = client.get("/weekend")
+
+    assert response.status_code == 200
+    assert "Saturday Story Time" in response.text
+    assert "Monday Music" not in response.text

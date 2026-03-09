@@ -23,6 +23,7 @@ from src.db.common import (
     title_similarity,
 )
 from src.db.postgres import PostgresDatabase
+from src.timezones import as_local_date, utc_now, weekend_window_utc
 
 from .models import Event, EventTags, InterestProfile, Job, Source, User
 
@@ -465,7 +466,7 @@ class SqliteDatabase:
             candidate_fp = hashlib.sha1(
                 (
                     f"{canonicalize_title(str(row['title']))}|"
-                    f"{datetime.fromisoformat(str(row['start_time'])).date().isoformat()}|"
+                    f"{as_local_date(datetime.fromisoformat(str(row['start_time']))).isoformat()}|"
                     f"{str(row['location_city']).lower().strip()}"
                 ).encode()
             ).hexdigest()
@@ -484,21 +485,18 @@ class SqliteDatabase:
     # ------------------------------------------------------------------
 
     async def get_events_for_weekend(self, sat_date: str, sun_date: str) -> list[Event]:
-        """Return events whose start_time falls on the given Saturday or Sunday.
-
-        Dates should be ISO date strings like '2025-07-12'.
-        """
+        """Return events whose local start date falls on the given Saturday or Sunday."""
+        saturday = datetime.fromisoformat(sat_date).date()
+        sunday = datetime.fromisoformat(sun_date).date()
+        start, end = weekend_window_utc(saturday, sunday)
         async with self.db.execute(
             """
             SELECT * FROM events
-            WHERE start_time >= :sat_start
-              AND start_time < :mon_start
+            WHERE start_time >= :start
+              AND start_time < :end
             ORDER BY start_time
             """,
-            {
-                "sat_start": f"{sat_date}T00:00:00",
-                "mon_start": f"{sun_date}T23:59:59",
-            },
+            {"start": start.isoformat(), "end": end.isoformat()},
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
@@ -542,7 +540,7 @@ class SqliteDatabase:
         score_breakdown: dict[str, float] | None = None,
     ) -> None:
         """Set the tags JSON for a specific event."""
-        now = datetime.now(tz=UTC).isoformat()
+        now = utc_now().isoformat()
         await self.db.execute(
             "UPDATE events SET tags = :tags, score_breakdown = :score_breakdown, tagged_at = :tagged_at WHERE id = :id",
             {
@@ -817,7 +815,7 @@ class SqliteDatabase:
         self, source_id: str, recipe_json: str, status: str = "active"
     ) -> None:
         """Save a generated recipe for a source."""
-        now = datetime.now(tz=UTC).isoformat()
+        now = utc_now().isoformat()
         await self.db.execute(
             """
             UPDATE sources
@@ -837,7 +835,7 @@ class SqliteDatabase:
         error: str | None = None,
     ) -> None:
         """Update scrape results on a source."""
-        now = datetime.now(tz=UTC).isoformat()
+        now = utc_now().isoformat()
         sets = ["updated_at = :now"]
         params: dict[str, Any] = {"now": now, "id": source_id}
         if status is not None:
@@ -861,7 +859,7 @@ class SqliteDatabase:
 
     async def toggle_source(self, source_id: str) -> bool:
         """Toggle enabled/disabled. Returns new enabled state."""
-        now = datetime.now(tz=UTC).isoformat()
+        now = utc_now().isoformat()
         await self.db.execute(
             """
             UPDATE sources
@@ -1039,8 +1037,9 @@ class SqliteDatabase:
 
     async def fail_stale_jobs(self, *, max_age_seconds: int) -> int:
         """Mark long-running jobs failed so stale records stop blocking new work."""
-        now = datetime.now(tz=UTC).isoformat()
-        cutoff = (datetime.now(tz=UTC) - timedelta(seconds=max_age_seconds)).isoformat()
+        now_dt = utc_now()
+        now = now_dt.isoformat()
+        cutoff = (now_dt - timedelta(seconds=max_age_seconds)).isoformat()
         async with self.db.execute(
             """
             UPDATE jobs
@@ -1117,7 +1116,7 @@ class SqliteDatabase:
     async def update_user(self, user_id: str, **fields: Any) -> None:
         """Update specific fields on a user."""
         allowed = USER_UPDATE_FIELDS
-        now = datetime.now(tz=UTC).isoformat()
+        now = utc_now().isoformat()
         sets = ["updated_at = :now"]
         params: dict[str, Any] = {"now": now, "id": user_id}
         for key, val in fields.items():
