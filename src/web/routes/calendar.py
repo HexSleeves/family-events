@@ -14,10 +14,7 @@ from src.web.common import ctx, get_db, is_htmx_request, template_response
 router = APIRouter()
 
 
-@router.get("/calendar", response_class=HTMLResponse)
-@router.get("/calendars", response_class=HTMLResponse)
-async def calendar_page(request: Request, month: str = "", attended: str = ""):
-    db = get_db(request)
+def _resolve_month_range(month: str) -> tuple[datetime.date, datetime.date, datetime.date, datetime.date]:
     today = datetime.now(tz=UTC).date()
     if month:
         try:
@@ -38,6 +35,14 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
         if month_start.month == 1
         else month_start.replace(month=month_start.month - 1, day=1)
     )
+    return today, month_start, next_month_start, prev_month
+
+
+@router.get("/calendar", response_class=HTMLResponse)
+@router.get("/calendars", response_class=HTMLResponse)
+async def calendar_page(request: Request, month: str = "", attended: str = ""):
+    db = get_db(request)
+    today, month_start, next_month_start, prev_month = _resolve_month_range(month)
 
     events = await db.get_events_between(
         datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),
@@ -116,20 +121,7 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
 @router.get("/calendar.ics")
 async def calendar_ics(request: Request, month: str = "", attended: str = ""):
     db = get_db(request)
-    today = datetime.now(tz=UTC).date()
-    if month:
-        try:
-            month_date = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC).date()
-            month_start = month_date.replace(day=1)
-        except ValueError:
-            month_start = today.replace(day=1)
-    else:
-        month_start = today.replace(day=1)
-
-    if month_start.month == 12:
-        next_month_start = month_start.replace(year=month_start.year + 1, month=1, day=1)
-    else:
-        next_month_start = month_start.replace(month=month_start.month + 1, day=1)
+    _today, month_start, next_month_start, _prev_month = _resolve_month_range(month)
 
     events = await db.get_events_between(
         datetime.combine(month_start, datetime.min.time(), tzinfo=UTC),

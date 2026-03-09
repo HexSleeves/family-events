@@ -247,3 +247,11 @@ def validate_source_url(url: str) -> str | None:
     except ValueError as exc:
         return str(exc)
     return None
+
+
+async def get_current_user_or_redirect(request: Request, location: str = "/login"):
+    """Return the current user or redirect unauthenticated page requests."""
+    user = await get_current_user(request, get_db(request))
+    if not user:
+        return None, htmx_redirect_or_redirect(request, location)
+    return user, None

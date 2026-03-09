@@ -11,9 +11,9 @@ from src.web.auth import ensure_csrf_token, get_current_user
 from src.web.common import (
     check_rate_limit,
     ctx,
+    get_current_user_or_redirect,
     get_db,
     get_templates,
-    htmx_redirect_or_redirect,
     require_login_and_csrf,
     template_response,
     toast,
@@ -35,7 +35,8 @@ async def api_job_status(request: Request, job_id: str, target_id: str = "job-st
     if not job or job.owner_user_id != user.id:
         return HTMLResponse("", status_code=404)
 
-    return get_templates(request).TemplateResponse(
+    return template_response(
+        request,
         "partials/_job_status.html",
         {
             "request": request,
@@ -77,9 +78,10 @@ async def jobs_page(
     q: str = "",
 ):
     db = get_db(request)
-    user = await get_current_user(request, db)
-    if not user:
-        return htmx_redirect_or_redirect(request, "/login")
+    user, redirect = await get_current_user_or_redirect(request)
+    if redirect:
+        return redirect
+    assert user is not None
 
     selected_source_id = source_id.strip() or None
     selected_state = state.strip() or None

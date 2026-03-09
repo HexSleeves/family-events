@@ -89,7 +89,8 @@ async def event_detail(request: Request, event_id: str):
     db = get_db(request)
     event = await db.get_event(event_id)
     if not event:
-        return get_templates(request).TemplateResponse(
+        return template_response(
+            request,
             "base.html",
             {"request": request, "content": "Event not found."},
             status_code=404,

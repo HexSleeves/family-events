@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -331,15 +330,9 @@ async def api_toggle_source(request: Request, source_id: str):
     if updated is None:
         raise ValueError("Source disappeared after toggle")
     state = "enabled" if enabled else "disabled"
-    return HTMLResponse(
-        content=_render_source_card(request, updated),
-        headers={
-            "HX-Trigger": json.dumps(
-                {
-                    "showToast": {"message": f"Source {state}", "variant": "success"},
-                }
-            )
-        },
+    return toast(
+        f"Source {state}",
+        body=_render_source_card(request, updated),
     )
 
 
@@ -360,16 +353,7 @@ async def api_delete_source(request: Request, source_id: str):
         return HTMLResponse("Forbidden", status_code=403)
 
     await db.delete_source(source_id)
-    return HTMLResponse(
-        content="",
-        headers={
-            "HX-Trigger": json.dumps(
-                {
-                    "showToast": {"message": "Source deleted", "variant": "success"},
-                }
-            )
-        },
-    )
+    return toast("Source deleted")
 
 
 @router.post("/api/sources/predefined", response_class=HTMLResponse)

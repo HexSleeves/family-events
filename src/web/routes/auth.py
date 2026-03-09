@@ -15,7 +15,6 @@ from src.onboarding import (
     validate_onboarding_form,
 )
 from src.web.auth import (
-    get_current_user,
     hash_password,
     login_session,
     logout_session,
@@ -26,6 +25,7 @@ from src.web.auth import (
 from src.web.common import (
     check_rate_limit,
     ctx,
+    get_current_user_or_redirect,
     get_db,
     htmx_redirect_or_redirect,
     is_htmx_request,
@@ -39,7 +39,7 @@ router = APIRouter()
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    user = await get_current_user(request, get_db(request))
+    user, _redirect = await get_current_user_or_redirect(request, "/profile")
     if user:
         return htmx_redirect_or_redirect(request, "/profile")
     return template_response(request, "login.html", await ctx(request, active_page="auth"))
@@ -81,7 +81,7 @@ async def login_submit(request: Request):
 
 @router.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
-    user = await get_current_user(request, get_db(request))
+    user, _redirect = await get_current_user_or_redirect(request, "/profile")
     if user:
         return htmx_redirect_or_redirect(request, "/profile")
     return template_response(request, "signup.html", await ctx(request, active_page="auth"))
