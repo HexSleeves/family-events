@@ -6,7 +6,7 @@ import json
 from urllib.parse import quote_plus
 from uuid import uuid4
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 from src.db.models import InterestProfile
@@ -27,6 +27,8 @@ from src.web.common import (
 )
 
 router = APIRouter()
+
+EVENTS_API_MAX_PER_PAGE = 100
 
 
 @router.get("/events", response_class=HTMLResponse)
@@ -267,17 +269,82 @@ async def api_unattend_bulk_undo(request: Request, undo_token: str):
 
 
 @router.get("/api/events")
-async def api_events(request: Request):
-    events = await get_db(request).get_recent_events(days=30)
-    return [
-        {
-            "id": event.id,
-            "title": event.title,
-            "source": event.source,
-            "city": event.location_city,
-            "start_time": event.start_time.isoformat(),
-            "tagged": event.tags is not None,
-            "toddler_score": event.tags.toddler_score if event.tags else None,
-        }
-        for event in events
-    ]
+async def api_events(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=25, ge=1, le=EVENTS_API_MAX_PER_PAGE),
+    q: str = "",
+    city: str = "",
+    source: str = "",
+    tagged: str = "",
+    attended: str = "",
+    score_min: int | None = Query(default=None, ge=0, le=10),
+    sort: str = "start_time",
+):
+    user = await get_current_user(request, get_db(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if throttled := check_rate_limit(request, "api_events"):
+        return throttled
+
+    if tagged and tagged not in {"yes", "no"}:
+        raise HTTPException(status_code=422, detail="tagged must be yes or no")
+    if attended and attended not in {"yes", "no"}:
+        raise HTTPException(status_code=422, detail="attended must be yes or no")
+    if sort not in {
+        "start_time",
+        "-start_time",
+        "title",
+        "-title",
+        "city",
+        "-city",
+        "source",
+        "-source",
+        "score",
+        "-score",
+    }:
+        raise HTTPException(status_code=422, detail="invalid sort")
+
+    db = get_db(request)
+    events, total = await db.search_events(
+        days=30,
+        q=q,
+        city=city,
+        source=source,
+        tagged=tagged,
+        attended=attended,
+        score_min=score_min,
+        sort=sort,
+        page=page,
+        per_page=per_page,
+    )
+    return {
+        "items": [
+            {
+                "id": event.id,
+                "title": event.title,
+                "source": event.source,
+                "city": event.location_city,
+                "start_time": event.start_time.isoformat(),
+                "tagged": event.tags is not None,
+                "toddler_score": event.tags.toddler_score if event.tags else None,
+                "attended": event.attended,
+            }
+            for event in events
+        ],
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": max(1, (total + per_page - 1) // per_page),
+        },
+        "filters": {
+            "q": q,
+            "city": city,
+            "source": source,
+            "tagged": tagged,
+            "attended": attended,
+            "score_min": score_min,
+            "sort": sort,
+        },
+    }

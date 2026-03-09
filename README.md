@@ -302,6 +302,51 @@ sudo systemctl enable --now family-events
 sudo systemctl enable --now family-events-cron
 ```
 
+## API surface
+
+The app's `/api/*` routes are internal UI endpoints, not a public integration API.
+For MVP, `/api/events` is authenticated and bounded:
+
+- requires a logged-in session
+- rate limited like other internal API routes
+- supports pagination via `page` and `per_page`
+- max `per_page` is 100
+- supports the same basic filters as the events page: `q`, `city`, `source`, `tagged`, `attended`, `score_min`, and `sort`
+
+Current `/api/events` response shape:
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "title": "...",
+      "source": "...",
+      "city": "...",
+      "start_time": "2025-01-01T10:00:00+00:00",
+      "tagged": true,
+      "toddler_score": 8,
+      "attended": false
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 25,
+    "total": 42,
+    "total_pages": 2
+  },
+  "filters": {
+    "q": "",
+    "city": "",
+    "source": "",
+    "tagged": "",
+    "attended": "",
+    "score_min": null,
+    "sort": "start_time"
+  }
+}
+```
+
 ## Legacy SQLite -> Postgres migration
 
 A one-time migration helper still exists at:
