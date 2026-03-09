@@ -7,13 +7,13 @@ import hashlib
 import json
 import logging
 import os
-import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiosqlite
 
 from src.config import settings
+from src.db.common import canonicalize_title, event_fingerprint, title_similarity
 from src.db.postgres import PostgresDatabase
 
 from .models import Event, EventTags, InterestProfile, Job, Source, User
@@ -182,33 +182,6 @@ def _row_to_job(row: aiosqlite.Row) -> Job:
     d["finished_at"] = datetime.fromisoformat(str(d["finished_at"])) if d["finished_at"] else None
     return Job.model_validate(d)
 
-
-def _canonicalize_title(title: str) -> str:
-    """Normalize title for fuzzy dedupe grouping."""
-    text = title.lower().strip()
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    text = re.sub(r"\s+", " ", text)
-    return text
-
-
-def _event_fingerprint(event: Event) -> str:
-    """Build a stable cross-source fingerprint for likely duplicate events."""
-    date_part = event.start_time.date().isoformat()
-    city = (event.location_city or "").lower().strip()
-    title = _canonicalize_title(event.title)
-    key = f"{title}|{date_part}|{city}"
-    return hashlib.sha1(key.encode()).hexdigest()
-
-
-def _title_similarity(a: str, b: str) -> float:
-    """Token overlap similarity for fuzzy title matching."""
-    a_tokens = set(_canonicalize_title(a).split())
-    b_tokens = set(_canonicalize_title(b).split())
-    if not a_tokens or not b_tokens:
-        return 0.0
-    overlap = len(a_tokens & b_tokens)
-    union = len(a_tokens | b_tokens)
-    return overlap / union if union else 0.0
 
 
 def _event_to_params(event: Event) -> dict[str, Any]:
@@ -437,11 +410,11 @@ class SqliteDatabase:
         ) as cursor:
             rows = await cursor.fetchall()
 
-        fp = _event_fingerprint(event)
+        fp = event_fingerprint(event)
         for row in rows:
             candidate_fp = hashlib.sha1(
                 (
-                    f"{_canonicalize_title(str(row['title']))}|"
+                    f"{canonicalize_title(str(row['title']))}|"
                     f"{datetime.fromisoformat(str(row['start_time'])).date().isoformat()}|"
                     f"{str(row['location_city']).lower().strip()}"
                 ).encode()
@@ -450,7 +423,7 @@ class SqliteDatabase:
                 return str(row["id"]), "fingerprint"
 
         for row in rows:
-            similarity = _title_similarity(event.title, str(row["title"]))
+            similarity = title_similarity(event.title, str(row["title"]))
             if similarity >= 0.75:
                 return str(row["id"]), f"title_similarity:{similarity:.2f}"
 
@@ -1189,9 +1162,9 @@ class SqliteDatabase:
             for event in bucket_events:
                 duplicate_of: Event | None = None
                 for c in canonical:
-                    fp_a = _event_fingerprint(event)
-                    fp_b = _event_fingerprint(c)
-                    sim = _title_similarity(event.title, c.title)
+                    fp_a = event_fingerprint(event)
+                    fp_b = event_fingerprint(c)
+                    sim = title_similarity(event.title, c.title)
                     if fp_a == fp_b or sim >= 0.75:
                         duplicate_of = c
                         break

@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -14,6 +13,7 @@ from typing import Any
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from src.db.common import canonicalize_title, event_fingerprint, title_similarity
 from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
 from src.db.session import get_engine, get_sessionmaker
 
@@ -28,30 +28,6 @@ def _uuid_param(value: str | None) -> uuid.UUID | str | None:
     except (ValueError, TypeError, AttributeError):
         return value
 
-
-def _canonicalize_title(title: str) -> str:
-    text_value = title.lower().strip()
-    text_value = re.sub(r"[^a-z0-9\s]", "", text_value)
-    text_value = re.sub(r"\s+", " ", text_value)
-    return text_value
-
-
-def _event_fingerprint(event: Event) -> str:
-    date_part = event.start_time.date().isoformat()
-    city = (event.location_city or "").lower().strip()
-    title = _canonicalize_title(event.title)
-    key = f"{title}|{date_part}|{city}"
-    return hashlib.sha1(key.encode()).hexdigest()
-
-
-def _title_similarity(a: str, b: str) -> float:
-    a_tokens = set(_canonicalize_title(a).split())
-    b_tokens = set(_canonicalize_title(b).split())
-    if not a_tokens or not b_tokens:
-        return 0.0
-    overlap = len(a_tokens & b_tokens)
-    union = len(a_tokens | b_tokens)
-    return overlap / union if union else 0.0
 
 
 def _normalize_uuid(value: Any) -> str | None:
@@ -291,11 +267,11 @@ class PostgresDatabase:
                 {"city": event.location_city, "start": start, "end": end},
             )
             rows = result.mappings().all()
-            fp = _event_fingerprint(event)
+            fp = event_fingerprint(event)
             for row in rows:
                 candidate_fp = hashlib.sha1(
                     (
-                        f"{_canonicalize_title(str(row['title']))}|"
+                        f"{canonicalize_title(str(row['title']))}|"
                         f"{row['start_time'].date().isoformat()}|"
                         f"{str(row['location_city']).lower().strip()}"
                     ).encode()
@@ -303,7 +279,7 @@ class PostgresDatabase:
                 if candidate_fp == fp:
                     return _normalize_uuid(row["id"]), "fingerprint"
             for row in rows:
-                similarity = _title_similarity(event.title, str(row["title"]))
+                similarity = title_similarity(event.title, str(row["title"]))
                 if similarity >= 0.75:
                     return _normalize_uuid(row["id"]), f"title_similarity:{similarity:.2f}"
             return None, None
@@ -880,7 +856,7 @@ class PostgresDatabase:
                 for event in bucket_events:
                     duplicate_of: Event | None = None
                     for c in canonical:
-                        if _event_fingerprint(event) == _event_fingerprint(c) or _title_similarity(event.title, c.title) >= 0.75:
+                        if event_fingerprint(event) == event_fingerprint(c) or title_similarity(event.title, c.title) >= 0.75:
                             duplicate_of = c
                             break
                     if not duplicate_of:
