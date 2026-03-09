@@ -16,7 +16,8 @@ def cli() -> None:
     notify_p.add_argument("--name", default="Your Little One", help="Child's name")
     pipeline_p = sub.add_parser("pipeline", help="Run full pipeline: scrape + tag + notify")
     pipeline_p.add_argument("--name", default="Your Little One", help="Child's name")
-    sub.add_parser("serve", help="Start the web server")
+    sub.add_parser("serve", help="Start the production web server")
+    sub.add_parser("serve-dev", help="Start the development web server with autoreload")
     sub.add_parser("events", help="List upcoming events")
     sub.add_parser("dedupe", help="Backfill-dedupe existing events in database")
 
@@ -43,7 +44,10 @@ def cli() -> None:
         asyncio.run(run_full_pipeline())
 
     elif args.command == "serve":
-        _serve()
+        _serve(reload=False)
+
+    elif args.command == "serve-dev":
+        _serve(reload=True)
 
     elif args.command == "events":
         asyncio.run(_list_events())
@@ -72,7 +76,7 @@ async def _list_events() -> None:
     print(f"\nTotal: {len(events)} events")
 
 
-def _serve() -> None:
+def _serve(*, reload: bool) -> None:
     import uvicorn
 
     from src.config import settings
@@ -81,7 +85,7 @@ def _serve() -> None:
         "src.web.app:app",
         host=settings.host,
         port=settings.port,
-        reload=True,
+        reload=reload,
     )
 
 

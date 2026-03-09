@@ -53,7 +53,7 @@ make db-up
 make db-migrate
 
 # 4. Start the web app
-uv run python -m src.main serve
+uv run python -m src.main serve-dev
 # Open http://localhost:8000 and sign up
 
 # 5. Seed data through normal app flows
@@ -254,7 +254,8 @@ uv run python -m src.main scrape
 uv run python -m src.main tag
 uv run python -m src.main notify
 uv run python -m src.main events
-uv run python -m src.main serve
+uv run python -m src.main serve      # production-style, no autoreload
+uv run python -m src.main serve-dev  # local development with autoreload
 uv run python -m src.main dedupe
 ```
 
@@ -286,6 +287,10 @@ Current scheduled behavior:
 
 Current production runs on an [exe.dev](https://exe.dev) VM with systemd services.
 The runtime now cleanly supports Postgres through `DATABASE_URL`.
+
+Production serving should use `uv run python -m src.main serve`, which runs
+without autoreload. Local development autoreload is intentionally separate via
+`uv run python -m src.main serve-dev` or `make dev`.
 
 Example service management:
 
