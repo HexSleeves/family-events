@@ -41,3 +41,19 @@ def test_builtin_router_builds_parameterized_allevents_scraper():
     assert scraper.city_slug == "new-orleans"
     assert scraper.category_slug == "family"
     assert scraper.city == "New Orleans"
+
+
+def test_validate_onboarding_form_rejects_invalid_schedule_fields():
+    from src.onboarding import validate_onboarding_form
+
+    errors = validate_onboarding_form(
+        {
+            "home_city": "Lafayette",
+            "child_name": "Em",
+            "temperament": "curious",
+            "nap_time": "",
+            "bedtime": "bad",
+        }
+    )
+
+    assert errors == ["bedtime must use HH:MM"]

@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # EventTags - AI-generated metadata about an event
@@ -89,20 +89,47 @@ class Constraints(BaseModel):
     bedtime: str = "19:30"  # HH:MM
     budget_per_event: float = 30.0
 
+    @field_validator("nap_time", mode="before")
+    @classmethod
+    def validate_nap_time(cls, value: object) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return "13:00-15:00"
+        parts = text.split("-", 1)
+        if len(parts) != 2:
+            raise ValueError("nap_time must be HH:MM-HH:MM")
+        cls._parse_clock(parts[0], field_name="nap_time")
+        cls._parse_clock(parts[1], field_name="nap_time")
+        return text
+
+    @field_validator("bedtime", mode="before")
+    @classmethod
+    def validate_bedtime(cls, value: object) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return "19:30"
+        cls._parse_clock(text, field_name="bedtime")
+        return text
+
+    @staticmethod
+    def _parse_clock(value: str, *, field_name: str) -> time:
+        parts = value.split(":", 1)
+        if len(parts) != 2:
+            raise ValueError(f"{field_name} must use HH:MM")
+        hour, minute = parts
+        return time(int(hour), int(minute))
+
     @property
     def nap_start(self) -> time:
-        h, m = self.nap_time.split("-")[0].split(":")
-        return time(int(h), int(m))
+        return self._parse_clock(self.nap_time.split("-", 1)[0], field_name="nap_time")
 
     @property
     def nap_end(self) -> time:
-        h, m = self.nap_time.split("-")[1].split(":")
-        return time(int(h), int(m))
+        return self._parse_clock(self.nap_time.split("-", 1)[1], field_name="nap_time")
 
     @property
     def bedtime_time(self) -> time:
-        h, m = self.bedtime.split(":")
-        return time(int(h), int(m))
+        return self._parse_clock(self.bedtime, field_name="bedtime")
 
 
 class InterestProfile(BaseModel):

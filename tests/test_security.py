@@ -308,3 +308,24 @@ def test_weekend_page_does_not_fall_back_to_recent_events_when_weekend_empty(cli
     assert response.status_code == 200
     assert "No weekend events yet" in response.text or "still need tagging" in response.text
     assert "Top 3 Picks for Your Weekend" not in response.text
+
+
+def test_weekend_page_tolerates_blank_legacy_nap_time(client, create_user):
+    user = create_user(email="legacy@example.com")
+    asyncio.run(
+        client.app.state.db.update_user(
+            user.id,
+            interest_profile={
+                **user.interest_profile.model_dump(),
+                "constraints": {
+                    **user.interest_profile.constraints.model_dump(),
+                    "nap_time": "",
+                },
+            },
+        )
+    )
+
+    login(client, email=user.email)
+    response = client.get("/weekend")
+
+    assert response.status_code == 200

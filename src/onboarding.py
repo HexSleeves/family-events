@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from src.db.models import Constraints, InterestProfile, User
 from src.predefined_sources import list_predefined_sources, make_predefined_source
 
@@ -60,6 +62,15 @@ def validate_onboarding_form(form) -> list[str]:
         errors.append("Child name is required.")
     if not str(form.get("temperament", "")).strip():
         errors.append("Tell us a bit about your child's temperament.")
+    try:
+        Constraints(
+            nap_time=str(form.get("nap_time", "13:00-15:00")).strip(),
+            bedtime=str(form.get("bedtime", "19:30")).strip(),
+        )
+    except ValidationError as exc:
+        errors.extend(
+            str(error["msg"]).removeprefix("Value error, ") for error in exc.errors()
+        )
     return errors
 
 
