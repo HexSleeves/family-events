@@ -1,4 +1,4 @@
-.PHONY: help install lint format typecheck check fix clean run dev scrape test deploy restart logs
+.PHONY: help install lint format typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -61,6 +61,22 @@ dev: ## Run the application in development mode
 
 scrape: ## Run the scraper/cron job manually
 	uv run python -m src.cron
+
+db-up: ## Start local Postgres via docker compose
+	docker compose up -d postgres
+
+db-down: ## Stop local Postgres
+	docker compose down
+
+db-logs: ## Tail local Postgres logs
+	docker compose logs -f postgres
+
+db-reset: ## Destroy and recreate local Postgres data
+	docker compose down -v
+	docker compose up -d postgres
+
+db-migrate: ## Apply Alembic migrations to DATABASE_URL
+	uv run alembic upgrade head
 
 # ──────────────────────────────────────────────
 # Deployment / Systemd

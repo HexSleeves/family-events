@@ -35,16 +35,20 @@ uv sync
 cp .env.example .env
 # Edit .env with your API keys (see Configuration below)
 
-# 3. Run the pipeline
+# 3. Start local Postgres
+docker compose up -d postgres
+uv run alembic upgrade head
+
+# 4. Run the pipeline
 uv run python -m src.main scrape    # Scrape all sources
 uv run python -m src.main tag       # Tag events with AI
 uv run python -m src.main notify    # Send weekend notification
 uv run python -m src.main pipeline  # All three in one
 
-# 4. Start the web UI
+# 5. Start the web UI
 uv run python -m src.main serve     # http://localhost:8000
 
-# 5. List upcoming events in terminal
+# 6. List upcoming events in terminal
 uv run python -m src.main events
 ```
 
@@ -148,7 +152,7 @@ Copy `.env.example` to `.env` and configure:
 | Variable | Description |
 |----------|-------------|
 | `OPENAI_API_KEY` | For AI event tagging (falls back to keyword heuristics without it) |
-| `DATABASE_URL` | Database connection string. Use `sqlite+aiosqlite:///family_events.db` locally; target `postgresql+asyncpg://...` in production. |
+| `DATABASE_URL` | Database connection string. Default local setup uses Docker Postgres at `postgresql+asyncpg://family_events:family_events@localhost:5433/family_events`; SQLite remains available as `sqlite+aiosqlite:///family_events.db`. |
 
 ### Optional
 | Variable | Description |
@@ -205,6 +209,29 @@ Current production runs on an [exe.dev](https://exe.dev) VM with two systemd ser
 The codebase is being prepared for a Postgres-backed deployment via `DATABASE_URL`,
 which will enable managed platforms like Render more cleanly.
 
+### Local Postgres with Docker Compose
+
+The default local setup now uses Postgres via Docker Compose.
+
+```bash
+# Start Postgres
+docker compose up -d postgres
+
+# Apply schema
+uv run alembic upgrade head
+
+# Optional: inspect the database
+docker compose exec postgres psql -U family_events -d family_events
+```
+
+Useful commands:
+
+```bash
+docker compose logs -f postgres
+docker compose down
+docker compose down -v  # also deletes local Postgres data volume
+```
+
 ### SQLite -> Postgres migration
 
 A one-time migration utility is available at `scripts/migrate_sqlite_to_postgres.py`.
@@ -214,14 +241,14 @@ Postgres database, then verifies row counts on both sides.
 Local validation flow:
 
 ```bash
-# 1. Start a local Postgres instance however you prefer
-# 2. Point DATABASE_URL at that Postgres database
-export DATABASE_URL='postgresql+asyncpg://user:password@localhost:5432/family_events'
+# 1. Start local Postgres
+export DATABASE_URL='postgresql+asyncpg://family_events:family_events@localhost:5433/family_events'
+docker compose up -d postgres
 
-# 3. Create schema
+# 2. Create schema
 uv run alembic upgrade head
 
-# 4. Run the one-time data migration from the local SQLite file
+# 3. Run the one-time data migration from the local SQLite file
 uv run python scripts/migrate_sqlite_to_postgres.py \
   --sqlite-path family_events.db \
   --postgres-url "$DATABASE_URL"
@@ -234,7 +261,7 @@ Suggested cutover checklist:
 
 1. Freeze writes to the SQLite-backed app and cron worker.
 2. Take a backup copy of `family_events.db`.
-3. Run `uv run alembic upgrade head` against Postgres.
+3. Start Postgres and run `uv run alembic upgrade head`.
 4. Run `uv run python scripts/migrate_sqlite_to_postgres.py ...`.
 5. Confirm row-count verification passes.
 6. Start the app against Postgres and smoke-test scrape, tag, search, attend/unattend, sources, jobs, and weekend notification flows.
