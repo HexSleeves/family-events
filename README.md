@@ -205,6 +205,42 @@ Current production runs on an [exe.dev](https://exe.dev) VM with two systemd ser
 The codebase is being prepared for a Postgres-backed deployment via `DATABASE_URL`,
 which will enable managed platforms like Render more cleanly.
 
+### SQLite -> Postgres migration
+
+A one-time migration utility is available at `scripts/migrate_sqlite_to_postgres.py`.
+It copies `users`, `sources`, `events`, and `jobs` from SQLite into an already-migrated
+Postgres database, then verifies row counts on both sides.
+
+Local validation flow:
+
+```bash
+# 1. Start a local Postgres instance however you prefer
+# 2. Point DATABASE_URL at that Postgres database
+export DATABASE_URL='postgresql+asyncpg://user:password@localhost:5432/family_events'
+
+# 3. Create schema
+uv run alembic upgrade head
+
+# 4. Run the one-time data migration from the local SQLite file
+uv run python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path family_events.db \
+  --postgres-url "$DATABASE_URL"
+```
+
+The target Postgres database must be empty by default. Pass `--allow-non-empty`
+only if you intentionally want to append into an existing database.
+
+Suggested cutover checklist:
+
+1. Freeze writes to the SQLite-backed app and cron worker.
+2. Take a backup copy of `family_events.db`.
+3. Run `uv run alembic upgrade head` against Postgres.
+4. Run `uv run python scripts/migrate_sqlite_to_postgres.py ...`.
+5. Confirm row-count verification passes.
+6. Start the app against Postgres and smoke-test scrape, tag, search, attend/unattend, sources, jobs, and weekend notification flows.
+7. Switch production services to the Postgres `DATABASE_URL`.
+8. Keep the SQLite backup until the Postgres deployment has been stable for a while.
+
 Runs on an [exe.dev](https://exe.dev) VM with two systemd services:
 
 ```bash
