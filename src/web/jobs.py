@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from typing import Any
 from src.config import settings
 from src.db.database import create_database
 from src.db.models import Job
+
+logger = logging.getLogger("uvicorn.error")
 
 Database = create_database
 
@@ -52,6 +55,16 @@ class JobRegistry:
         self._lock = asyncio.Lock()
         self._max_active = 200
 
+    async def recover_stale_jobs(self) -> int:
+        """Fail stale persisted jobs so they no longer block duplicate prevention."""
+        async with Database() as db:
+            updated = await db.fail_stale_jobs(
+                max_age_seconds=settings.background_job_timeout_seconds
+            )
+        if updated:
+            logger.warning("background_job_recovered_stale_jobs count=%s", updated)
+        return updated
+
     async def start_unique(
         self,
         *,
@@ -68,12 +81,13 @@ class JobRegistry:
                 async with Database() as db:
                     existing = await db.get_job(active_id)
                 if existing and existing.state == "running":
+                    existing.detail = existing.detail or "Running…"
                     return existing, False
                 self._active_ids_by_key.pop(job_key, None)
                 self._active_by_id.pop(active_id, None)
 
+            await self.recover_stale_jobs()
             async with Database() as db:
-                await db.fail_stale_jobs(max_age_seconds=settings.background_job_timeout_seconds)
                 persisted = await db.get_active_job_by_key(job_key)
                 if persisted:
                     return persisted, False

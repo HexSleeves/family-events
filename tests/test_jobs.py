@@ -125,3 +125,92 @@ def test_list_jobs_supports_system_owned_records(tmp_path):
     import asyncio
 
     asyncio.run(scenario())
+
+
+def test_recover_stale_jobs_marks_old_running_jobs_failed(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        db_path = str(tmp_path / "jobs-recover.db")
+        db = create_database(db_path)
+        await db.connect()
+        try:
+            stale_job = Job(
+                kind="pipeline",
+                job_key="pipeline:scrape-tag",
+                label="Scrape + tag job",
+                owner_user_id="user-1",
+                state="running",
+                created_at=datetime.now(tz=UTC) - timedelta(hours=2),
+                started_at=datetime.now(tz=UTC) - timedelta(hours=2),
+            )
+            await db.create_job(stale_job)
+        finally:
+            await db.close()
+
+        import src.web.jobs as jobs_module
+        from src.web.jobs import JobRegistry
+
+        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
+        registry = JobRegistry()
+
+        updated = await registry.recover_stale_jobs()
+        assert updated == 1
+
+        async with create_database(db_path) as check_db:
+            recovered = await check_db.get_job(stale_job.id)
+            assert recovered is not None
+            assert recovered.state == "failed"
+            assert recovered.finished_at is not None
+
+    import asyncio
+
+    asyncio.run(scenario())
+
+
+def test_start_unique_reuses_existing_running_job_without_creating_duplicate(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        db_path = str(tmp_path / "jobs-duplicate.db")
+        db = create_database(db_path)
+        await db.connect()
+        try:
+            existing_job = Job(
+                kind="pipeline",
+                job_key="pipeline:scrape-tag",
+                label="Scrape + tag job",
+                owner_user_id="user-1",
+                state="running",
+                detail="Running…",
+            )
+            await db.create_job(existing_job)
+        finally:
+            await db.close()
+
+        import src.web.jobs as jobs_module
+        from src.web.jobs import JobRegistry
+
+        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
+        registry = JobRegistry()
+
+        async def runner(_job):
+            raise AssertionError("runner should not execute when duplicate job exists")
+
+        job, created = await registry.start_unique(
+            kind="pipeline",
+            job_key="pipeline:scrape-tag",
+            label="Scrape + tag job",
+            owner_user_id="user-1",
+            source_id=None,
+            runner=runner,
+        )
+
+        assert created is False
+        assert job.id == existing_job.id
+
+        async with create_database(db_path) as check_db:
+            jobs = await check_db.list_jobs(owner_user_id="user-1", limit=10)
+            assert len(jobs) == 1
+            assert jobs[0].id == existing_job.id
+            assert jobs[0].state == "running"
+
+    import asyncio
+
+    asyncio.run(scenario())

@@ -329,3 +329,43 @@ def test_weekend_page_tolerates_blank_legacy_nap_time(client, create_user):
     response = client.get("/weekend")
 
     assert response.status_code == 200
+
+
+def test_duplicate_pipeline_request_reuses_existing_job_card(client, create_user, monkeypatch):
+    import src.web.jobs as jobs_module
+    from src.db.database import create_database
+    from src.web.jobs import JobRegistry
+
+    user = create_user(email="jobs@example.com")
+    login(client, email=user.email)
+
+    registry = JobRegistry()
+    database_url = client.app.state.db.database_url
+    monkeypatch.setattr(jobs_module, "Database", lambda: create_database(database_url=database_url))
+    monkeypatch.setattr(jobs_module, "job_registry", registry)
+    monkeypatch.setattr("src.web.jobs_ui.job_registry", registry)
+    monkeypatch.setattr("src.web.routes.jobs.job_registry", registry)
+
+    async def fake_scrape_then_tag(*args, **kwargs):
+        progress_callback = kwargs.get("progress_callback")
+        if progress_callback is not None:
+            await progress_callback({"summary": "Running…"})
+        await asyncio.sleep(0.2)
+        return {"scraped": 1, "tagged": 1, "failed": 0, "summary": "1 events scraped · 1 tagged · 0 failed"}
+
+    monkeypatch.setattr("src.scheduler.run_scrape_then_tag", fake_scrape_then_tag)
+
+    page = client.get("/")
+    csrf_token = extract_csrf_token(page.text)
+
+    first = client.post("/api/scrape-tag", data={"csrf_token": csrf_token})
+    second = client.post("/api/scrape-tag", data={"csrf_token": csrf_token})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert "started in the background" in first.headers.get("hx-trigger", "")
+    assert "already running" in second.headers.get("hx-trigger", "")
+
+    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=user.id, limit=10))
+    running_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
+    assert len(running_jobs) == 1

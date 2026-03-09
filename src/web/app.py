@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from src.config import settings
 from src.db.database import Database, create_database
 from src.web.common import ctx, template_response
+from src.web.jobs import job_registry
 from src.web.middleware import RequestLoggingMiddleware
 from src.web.routes.auth import router as auth_router
 from src.web.routes.calendar import router as calendar_router
@@ -36,9 +37,7 @@ _bulk_unattend_undo_store: dict[str, list[str]] = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await cast(Database, app.state.db).connect()
-    await cast(Database, app.state.db).fail_stale_jobs(
-        max_age_seconds=settings.background_job_timeout_seconds
-    )
+    await job_registry.recover_stale_jobs()
     yield
     await cast(Database, app.state.db).close()
 
