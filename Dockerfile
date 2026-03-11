@@ -5,7 +5,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY src/web/static/input.css ./src/web/static/input.css
+# Tailwind v4 source detection needs the template and source files present
+# in the build stage, otherwise the generated stylesheet is incomplete.
+COPY src ./src
 RUN npm run css:build
 
 

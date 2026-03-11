@@ -135,3 +135,24 @@ Health probe:
 ```bash
 curl -fsS https://<your-domain>/health
 ```
+
+## GitHub Actions
+
+The repo includes [`railway-deploy.yml`](../.github/workflows/railway-deploy.yml).
+
+Behavior:
+
+- pull requests build the Docker image only
+- pushes to `main` build, then deploy `web` and `cron`
+- manual runs via GitHub Actions also build and deploy both services
+
+Required GitHub secret:
+
+- `RAILWAY_TOKEN`: use a Railway project token scoped to this project/environment
+
+The workflow currently targets:
+
+- project id `852d77af-81b9-40a0-b51a-09048159f911`
+- environment `production`
+
+If you move this repo to a different Railway project, update those workflow env values.
