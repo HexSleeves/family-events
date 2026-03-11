@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from src.db.database import create_database
 from src.db.models import Event, Source
+from src.scheduler import SYSTEM_USER_EMAIL, ensure_system_user
 from src.scrapers.analyzer import validate_public_http_url
 from src.scrapers.router import extract_domain
 from src.web.common import _same_origin
@@ -264,9 +265,48 @@ def test_signup_starts_scrape_tag_job(client, monkeypatch):
     assert response.status_code == 302
     created = asyncio.run(client.app.state.db.get_user_by_email("signup-job@example.com"))
     assert created is not None
-    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=created.id, limit=10))
+    system_user = asyncio.run(client.app.state.db.get_user_by_email(SYSTEM_USER_EMAIL))
+    assert system_user is not None
+    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=system_user.id, limit=10))
     scrape_tag_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
     assert len(scrape_tag_jobs) == 1
+
+
+def test_dashboard_and_profile_show_shared_initial_import_status(client, create_user):
+    user = create_user(email="shared-import@example.com")
+    login(client, email=user.email)
+
+    async def scenario() -> None:
+        system_user = await ensure_system_user(client.app.state.db)
+        await client.app.state.db.create_job(
+            Job(
+                kind="pipeline",
+                job_key="pipeline:scrape-tag",
+                label="Scrape + tag job",
+                owner_user_id=system_user.id,
+                state="running",
+                detail="Running…",
+                result_json='{"phase":"scrape","processed":0,"total":2,"summary":"Scraping sources…"}',
+            )
+        )
+
+    from src.db.models import Job
+
+    asyncio.run(scenario())
+
+    dashboard = client.get("/")
+    profile = client.get("/profile")
+    shared_jobs = client.get("/jobs?scope=shared&kind=pipeline")
+
+    assert dashboard.status_code == 200
+    assert "Initial event import is running" in dashboard.text
+    assert "/jobs?scope=shared" in dashboard.text
+    assert "kind=pipeline" in dashboard.text
+    assert profile.status_code == 200
+    assert "Initial event import is running" in profile.text
+    assert shared_jobs.status_code == 200
+    assert "Shared Pipeline History" in shared_jobs.text
+    assert "Scrape + tag job" in shared_jobs.text
 
 
 def test_signup_duplicate_email_shows_inline_error_for_htmx(client, create_user):

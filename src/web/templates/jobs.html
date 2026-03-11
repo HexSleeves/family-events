@@ -11,6 +11,17 @@
 
   <form method="get" action="/jobs"
     class="glass rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div class="md:col-span-4">
+      <span class="block text-xs font-medium text-[var(--color-muted)] mb-2">Scope</span>
+      <div class="flex flex-wrap gap-2">
+        {% for value, label in [('mine', 'My jobs'), ('shared', 'Shared pipeline')] %}
+        <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border border-[var(--color-edge)]">
+          <input type="radio" name="scope" value="{{ value }}" {{ 'checked' if selected_scope == value }} class="sr-only" />
+          <span class="text-sm font-medium">{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
     <div>
       <label for="job-q" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Search</label>
       <input id="job-q" type="search" name="q" value="{{ q }}" placeholder="Label, detail, error..."
@@ -39,13 +50,17 @@
     <div>
       <label for="job-source" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Source</label>
       <select id="job-source" name="source_id"
-        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
+        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]"
+        {% if selected_scope == 'shared' %}disabled{% endif %}>
         <option value="">All sources</option>
         {% for source in sources %}
         <option value="{{ source.id }}" {% if selected_source_id==source.id %}selected{% endif %}>{{ source.name }}
         </option>
         {% endfor %}
       </select>
+      {% if selected_scope == 'shared' %}
+      <input type="hidden" name="source_id" value="" />
+      {% endif %}
     </div>
     <div class="md:col-span-4 flex items-center gap-3">
       <button type="submit"
@@ -57,7 +72,7 @@
 
   <section id="jobs-list-panel">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-[var(--color-heading)]">Job History</h2>
+      <h2 class="text-lg font-semibold text-[var(--color-heading)]">{{ 'Shared Pipeline History' if selected_scope == 'shared' else 'Job History' }}</h2>
       <span class="text-sm text-[var(--color-muted)]">{{ jobs|length }} shown</span>
     </div>
     {% if job_cards %}

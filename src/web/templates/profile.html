@@ -9,6 +9,36 @@
     <p class="text-sm text-[var(--color-muted)] mt-1">{{ current_user.email }} · Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
   </div>
 
+  {% if initial_import_card %}
+  <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 mb-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="font-semibold text-[var(--color-heading)]">Initial event import is running</h2>
+        <p class="mt-1 text-sm text-[var(--color-muted)]">Starter sources are being scraped and tagged in the background so events show up across the app.</p>
+      </div>
+      <a href="/jobs?scope=shared&kind=pipeline"
+        class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)]">
+        View import status
+      </a>
+    </div>
+    {% set job = initial_import_card.job %}
+    {% set target_id = initial_import_card.target_id %}
+    {% set can_cancel = initial_import_card.can_cancel %}
+    {% set allow_shared_view = initial_import_card.allow_shared_view %}
+    {% set message = initial_import_card.message %}
+    {% set started_at = initial_import_card.started_at %}
+    {% set finished_at = initial_import_card.finished_at %}
+    {% set result = initial_import_card.result %}
+    {% set progress = initial_import_card.progress %}
+    {% set result_summary = initial_import_card.result_summary %}
+    {% set refresh_path = initial_import_card.refresh_path %}
+    {% set refresh_select = initial_import_card.refresh_select %}
+    {% set refresh_target_id = initial_import_card.refresh_target_id %}
+    {% set auto_refresh_history = initial_import_card.auto_refresh_history %}
+    {% include "partials/_job_status.html" %}
+  </section>
+  {% endif %}
+
   <div class="space-y-6">
     <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
       <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">

@@ -38,9 +38,9 @@ from src.web.common import (
 router = APIRouter()
 
 
-async def _start_signup_scrape_tag_job(*, user: User, database_url: str) -> None:
+async def _start_signup_scrape_tag_job(*, database_url: str) -> None:
     from src.db.database import create_database
-    from src.scheduler import run_scrape_then_tag
+    from src.scheduler import ensure_system_user, run_scrape_then_tag
     from src.web.jobs import job_registry
 
     async def runner(job) -> dict[str, int | str]:
@@ -62,11 +62,14 @@ async def _start_signup_scrape_tag_job(*, user: User, database_url: str) -> None
                 ),
             )
 
+    async with create_database(database_url=database_url) as db:
+        system_user = await ensure_system_user(db)
+
     await job_registry.start_unique(
         kind="pipeline",
         job_key="pipeline:scrape-tag",
         label="Scrape + tag job",
-        owner_user_id=user.id,
+        owner_user_id=system_user.id,
         source_id=None,
         runner=runner,
         database_url=database_url,
@@ -219,7 +222,7 @@ async def signup_submit(request: Request):
         source_keys=selected_source_keys,
     )
     if selected_source_keys:
-        await _start_signup_scrape_tag_job(user=user, database_url=db.database_url)
+        await _start_signup_scrape_tag_job(database_url=db.database_url)
     login_session(request, user)
     rotate_csrf_token(request)
     return htmx_redirect_or_redirect(request, "/profile")

@@ -11,6 +11,8 @@ Already completed in the codebase:
 - Public signup and login with CSRF protection, local-dev session handling, and actionable duplicate-account flows
 - Per-user onboarding/profile settings, starter source seeding, and authenticated source management
 - First-class `Scrape + Tag` pipeline flow shared by dashboard actions and cron
+- Signup now triggers a shared system-owned initial `Scrape + Tag` run when starter sources are seeded
+- Dashboard/profile now show an initial-import-in-progress state with a direct link to shared pipeline job history
 - Persisted background jobs with duplicate prevention, stale-job recovery, cancellation, progress payloads, and job history UI
 - Explicit dev vs prod serve commands (`serve-dev` vs `serve`) with production `reload=False`
 - Explicit Postgres migration flow with Alembic and `make db-migrate`
@@ -79,7 +81,7 @@ We should consider the app MVP-ready only when all of these are true:
 - [x] 1. Scheduled scraping runs automatically in production.
 - [x] 2. Tagging runs automatically after scraping.
 - [x] 3. Manual "Scrape + Tag" exists in the UI as the primary operator action.
-- [ ] 4. Background jobs are visible for both manual and scheduled runs.
+- [x] 4. Background jobs are visible for both manual and scheduled runs.
 - [x] 5. Production serving does not use autoreload.
 - [x] 6. Database migrations are explicit and safe.
 - [ ] 7. Timezone behavior is deterministic and documented.
@@ -256,7 +258,7 @@ The jobs system is already useful. For public release it should become the main 
 - [ ] Review whether all long-running actions are persisted as jobs
 - [x] Add job summaries that operators can understand quickly
 - [x] Ensure progress payloads are structured consistently
-- [ ] Add support for system/scheduled jobs in history views
+- [x] Add support for system/scheduled jobs in history views
 - [ ] Expose started/finished durations clearly
 - [ ] Add filters for scheduled/manual/system jobs if needed
 - [x] Ensure stale running jobs are marked failed on startup
@@ -653,11 +655,11 @@ The app is operable by someone other than the current developer.
 - [ ] Add `run_scrape_tag_notify(...)` if needed
 - [x] Add job kind for pipeline runs
 - [x] Reuse same pipeline from CLI, UI, and cron
-- [ ] Scheduled jobs visible in jobs UI
+- [x] Scheduled jobs visible in jobs UI
 
 ## Web UI
 - [x] Dashboard primary action becomes `Scrape + Tag`
-- [ ] Jobs page includes scheduled/system jobs
+- [x] Jobs page includes scheduled/system jobs
 - [x] Improve job result summaries
 - [ ] Finish HTMX consistency sweep
 - [ ] Remove remaining deprecation warnings
@@ -696,7 +698,7 @@ We are ready to launch the MVP when:
 - [ ] Production serve path is correct
 - [x] Scheduled scrape + tag runs reliably
 - [x] Manual scrape + tag exists and is the main path
-- [ ] Scheduled and manual jobs are visible in the UI
+- [x] Scheduled and manual jobs are visible in the UI
 - [ ] Migrations are explicit and tested
 - [ ] Timezone behavior is documented and covered by tests
 - [x] `/health` includes freshness information

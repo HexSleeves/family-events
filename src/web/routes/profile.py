@@ -10,6 +10,7 @@ from src.onboarding import (
     normalize_city_list,
     validate_onboarding_form,
 )
+from src.scheduler import SYSTEM_USER_EMAIL
 from src.web.auth import hash_password, validate_password, verify_password
 from src.web.common import (
     change_theme,
@@ -20,6 +21,7 @@ from src.web.common import (
     template_response,
     toast,
 )
+from src.web.jobs_ui import job_template_context
 
 router = APIRouter()
 
@@ -30,11 +32,33 @@ async def profile_page(request: Request):
     if redirect:
         return redirect
     assert user is not None
-    sources = await get_db(request).get_user_sources(user.id)
+    db = get_db(request)
+    sources = await db.get_user_sources(user.id)
+    events = await db.get_recent_events(days=30)
+    system_user = await db.get_user_by_email(SYSTEM_USER_EMAIL)
+    shared_import_job = await db.get_active_job_by_key("pipeline:scrape-tag")
+    if shared_import_job and (
+        system_user is None or shared_import_job.owner_user_id != system_user.id
+    ):
+        shared_import_job = None
+    initial_import_card = (
+        job_template_context(
+            shared_import_job,
+            target_id="shared-import-job-status",
+            can_cancel=False,
+            allow_shared_view=True,
+        )
+        if not events and shared_import_job
+        else None
+    )
     return template_response(
         request,
         "profile.html",
-        {**await ctx(request, active_page="profile"), "sources": sources},
+        {
+            **await ctx(request, active_page="profile"),
+            "sources": sources,
+            "initial_import_card": initial_import_card,
+        },
     )
 
 

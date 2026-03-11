@@ -12,11 +12,12 @@ from src.db.models import InterestProfile
 from src.notifications.formatter import format_console_message
 from src.ranker.scoring import rank_events
 from src.ranker.weather import WeatherService, summarize_weekend_recommendation
+from src.scheduler import SYSTEM_USER_EMAIL
 from src.tagger.taxonomy import TAGGING_VERSION
 from src.timezones import current_weekend_dates, utc_now
 from src.web.auth import get_current_user
 from src.web.common import ctx, format_ts, get_db, template_response
-from src.web.jobs_ui import render_job_cards
+from src.web.jobs_ui import job_template_context, render_job_cards
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
@@ -82,6 +83,22 @@ async def dashboard(request: Request):
     timestamps = await db.get_pipeline_timestamps()
     user = await get_current_user(request, db)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=8) if user else []
+    system_user = await db.get_user_by_email(SYSTEM_USER_EMAIL)
+    shared_import_job = await db.get_active_job_by_key("pipeline:scrape-tag")
+    if shared_import_job and (
+        system_user is None or shared_import_job.owner_user_id != system_user.id
+    ):
+        shared_import_job = None
+    initial_import_card = (
+        job_template_context(
+            shared_import_job,
+            target_id="shared-import-job-status",
+            can_cancel=False,
+            allow_shared_view=True,
+        )
+        if user and total == 0 and shared_import_job
+        else None
+    )
     recent_job_cards = render_job_cards(
         recent_jobs,
         target_prefix="job-history-",
@@ -135,6 +152,7 @@ async def dashboard(request: Request):
             sources=sources,
             last_scraped_at=timestamps["last_scraped_at"],
             last_tagged_at=timestamps["last_tagged_at"],
+            initial_import_card=initial_import_card,
             top_events=top_events,
             near_city=near_city,
             near_you_events=near_you_events,

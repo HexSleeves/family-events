@@ -134,6 +134,38 @@ MACRO: Event card for horizontal scroll sections
   </div>
   {% endmacro %}
 
+  {% if initial_import_card %}
+  <section class="mb-8 animate-fade-in-up stagger-1" aria-labelledby="initial-import-heading">
+    <div class="glass rounded-2xl border border-[var(--color-edge-subtle)] px-6 py-5 shadow-[var(--shadow-card)]">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 id="initial-import-heading" class="text-lg font-semibold text-[var(--color-heading)]">Initial event import is running</h2>
+          <p class="mt-1 text-sm text-[var(--color-muted)]">We are scraping and tagging your starter sources now so your dashboard fills in with events.</p>
+        </div>
+        <a href="/jobs?scope=shared&kind=pipeline"
+          class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)]">
+          View import status
+        </a>
+      </div>
+      {% set job = initial_import_card.job %}
+      {% set target_id = initial_import_card.target_id %}
+      {% set can_cancel = initial_import_card.can_cancel %}
+      {% set allow_shared_view = initial_import_card.allow_shared_view %}
+      {% set message = initial_import_card.message %}
+      {% set started_at = initial_import_card.started_at %}
+      {% set finished_at = initial_import_card.finished_at %}
+      {% set result = initial_import_card.result %}
+      {% set progress = initial_import_card.progress %}
+      {% set result_summary = initial_import_card.result_summary %}
+      {% set refresh_path = initial_import_card.refresh_path %}
+      {% set refresh_select = initial_import_card.refresh_select %}
+      {% set refresh_target_id = initial_import_card.refresh_target_id %}
+      {% set auto_refresh_history = initial_import_card.auto_refresh_history %}
+      {% include "partials/_job_status.html" %}
+    </div>
+  </section>
+  {% endif %}
+
   {# ═══════════════════════════════════════════════════════════
   TOP PICKS
   ═══════════════════════════════════════════════════════════ #}
