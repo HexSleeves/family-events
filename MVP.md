@@ -4,7 +4,7 @@ This document is the release checklist for taking Family Events from a private/d
 
 The goal is not "perfect architecture." The goal is a stable, understandable, operable product that can safely run in public with scheduled scraping, manual scraping, tagging after scraping, and enough observability to debug issues quickly.
 
-## Current status (2026-03-10)
+## Current status (2026-03-11)
 
 Already completed in the codebase:
 
@@ -21,6 +21,7 @@ Already completed in the codebase:
 - Structured notification dispatch results and explicit unknown-channel failures
 - Shared outbound HTTP client behavior across scrapers, analyzer, weather, and notification providers
 - Authenticated, paginated, rate-limited `/api/events` contract documented in `README.md`
+- Repo-wide formatting/lint coverage for Python, templates, docs, config, and frontend assets via `make check`
 
 Still open before a true public MVP:
 
@@ -583,14 +584,13 @@ No hidden mismatch between runtime architecture and code assumptions.
 
 ## 6.3 Add operational backups and restore notes
 
-SQLite can be fine for MVP, but only if we treat it responsibly.
+Postgres-first MVP is fine, but only if we treat it responsibly operationally.
 
 ### Tasks
 
-- [ ] Move runtime DB path out of repo root if needed
 - [ ] Define backup cadence
 - [ ] Define restore process
-- [ ] Document WAL file handling and deployment expectations
+- [ ] Document Postgres volume/snapshot expectations
 - [ ] Add a simple operator runbook for DB maintenance
 
 ### Deliverable
@@ -625,7 +625,7 @@ The highest-risk release areas have regression coverage.
 ### Tasks
 
 - [x] Define required pre-release commands, at minimum:
-  - [x] `uv run ruff check src tests`
+  - [x] `make check`
   - [x] `uv run pytest`
   - [x] `uv run ty check`
 - [ ] Add smoke-test checklist for deployed environment
@@ -732,11 +732,11 @@ The app is operable by someone other than the current developer.
 
 ## Database
 
-- [ ] Schema version table
-- [ ] Migration runner
+- [x] Schema version table
+- [x] Migration runner
 - [ ] Search/index improvements
 - [ ] Consider denormalized toddler score column
-- [ ] Review runtime DB file placement
+- [ ] Add migration tests
 
 ## Notifications
 
@@ -749,7 +749,7 @@ The app is operable by someone other than the current developer.
 - [x] Structured logging
 - [x] Pipeline freshness in `/health`
 - [ ] Backup and restore procedure
-- [ ] Production service docs
+- [x] Production service docs
 
 ## Tests
 
@@ -765,7 +765,7 @@ The app is operable by someone other than the current developer.
 
 We are ready to launch the MVP when:
 
-- [ ] Production serve path is correct
+- [x] Production serve path is correct
 - [x] Scheduled scrape + tag runs reliably
 - [x] Manual scrape + tag exists and is the main path
 - [x] Scheduled and manual jobs are visible in the UI
@@ -780,14 +780,19 @@ We are ready to launch the MVP when:
 
 ---
 
-# Recommended immediate next step
+# Recommended immediate next steps
 
-Start with a focused release-hardening pass:
+Focus the next MVP pass on the highest remaining launch risk:
 
-1. Fix prod serve mode
-2. Introduce first-class `Scrape + Tag`
-3. Make cron use that same path
-4. Persist scheduled runs in jobs/history
-5. Expand `/health`
+1. Final production/security verification
+   Verify real HTTPS/proxy behavior, production cookie settings, `APP_BASE_URL`, auth rate limits, and unauthenticated route exposure in the deployed environment.
+2. Operator runbook + backups
+   Document deploy, migrate, scheduler verification, failed-job inspection, and Postgres backup/restore steps so another person can run the app safely.
+3. Timezone policy docs + targeted smoke coverage
+   Finish the Central-time policy writeup, then manually verify weekend/calendar/search behavior around midnight and DST in the running app.
+4. Performance benchmark pass
+   Seed a realistic dataset, measure `/`, `/events`, `/weekend`, `/calendars`, and source detail, then capture the slow queries and indexing gaps.
+5. Remaining warning/refactor cleanup
+   Finish `TemplateResponse` warning cleanup, tighten shared route/context helpers, and keep the docs/runtime surface aligned as those changes land.
 
 That gives the highest MVP value quickly and aligns the product with the intended workflow.

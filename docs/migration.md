@@ -152,6 +152,7 @@ When writing or updating docs elsewhere in the repo:
 
 - describe Postgres as the default local/dev database
 - refer to SQLite as compatibility/test fallback only
-- document manual `scrape`, `tag`, `notify` as the supported CLI pipeline
+- document `pipeline` as the normal CLI ingestion flow
+- note that `scrape`, `tag`, and `notify` still exist as standalone operator commands
 - mention `sources` and `jobs` as first-class product concepts
 - avoid calling the generic scraper work a future plan

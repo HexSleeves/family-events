@@ -262,6 +262,7 @@ assume Postgres unless explicitly stated otherwise.
 
 ## Operational caveats
 
-- `src.main pipeline` is still broken because `run_full_pipeline()` does not exist.
 - Search behavior has had backend/schema fixes, but still deserves manual smoke testing.
+- Signup with starter sources now triggers the shared system-owned scrape+tag pipeline automatically.
+- Shared/scheduled pipeline runs are visible from the jobs UI via the shared scope.
 - Library scraping remains the most fragile source family.

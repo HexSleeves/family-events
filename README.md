@@ -42,7 +42,8 @@ The web app also lets users:
 ```bash
 # 1. Clone and install
 cd family-events
-uv sync
+uv sync --dev
+npm install
 
 # 2. Configure
 cp .env.example .env
@@ -53,14 +54,17 @@ make db-up
 make db-migrate
 
 # 4. Start the web app
-uv run python -m src.main serve-dev
+make dev
 # Open http://localhost:8000 and sign up
 
-# 5. Seed data through normal app flows
-# Signup creates predefined sources for the new user
+# 5. Let signup kick off the initial import
+# Signup creates predefined sources and starts a shared scrape+tag job automatically
+# Watch the profile/dashboard banner or open /jobs?scope=shared
+
+# 6. Optional: run the full pipeline manually
 uv run python -m src.main pipeline
 
-# 6. Optional: inspect upcoming events in the terminal
+# 7. Optional: inspect upcoming events in the terminal
 uv run python -m src.main events
 ```
 
@@ -377,12 +381,26 @@ uv run pytest -q
 
 ### Formatting and lint helpers
 
+Install JS dev tooling once before using the repo-wide formatter/linter commands:
+
+```bash
+npm install
+```
+
 ```bash
 make lint
 make format
 make test
 make check
 ```
+
+`make check` now covers:
+
+- Ruff lint + format checks for Python in `src/`, `scripts/`, `tests/`, and `main.py`
+- Djlint formatting/linting for Jinja/HTML templates
+- Prettier for Markdown, JSON, YAML, CSS, JS, INI, and systemd unit files
+- Taplo lint/format checks for TOML
+- lightweight normalization for `Makefile` and Mako templates
 
 ### CSS build
 
