@@ -1,94 +1,110 @@
 <div class="space-y-4">
   <div class="hidden md:grid md:grid-cols-7 md:gap-3" aria-hidden="true">
     {% for wday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-    <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-faint)]">{{ wday }}</div>
+      <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-faint)]">
+        {{ wday }}
+      </div>
     {% endfor %}
   </div>
-
   <div class="hidden md:grid md:grid-cols-7 md:gap-3">
     {% for week in weeks %}
       {% for cell in week %}
-      <section class="min-h-[13rem] rounded-2xl border p-3 transition-colors duration-150 {% if cell.is_today %}border-[var(--color-accent)] bg-[var(--color-accent-light)]/55 shadow-[0_0_0_1px_rgba(124,58,237,0.18)]{% elif cell.in_month %}border-[var(--color-edge-subtle)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]/35{% else %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] opacity-70{% endif %}" aria-label="{{ cell.date.strftime('%A, %B %-d, %Y') }}{% if cell.event_count %}, {{ cell.event_count }} event{{ 's' if cell.event_count != 1 }}{% endif %}">
-        <header class="mb-3 flex items-start justify-between gap-2">
-          <div>
-            <p class="text-[11px] uppercase tracking-wide {% if cell.in_month %}text-[var(--color-faint)]{% else %}text-[var(--color-faint)]{% endif %}">{{ cell.date.strftime('%b') if cell.date.day == 1 or loop.index0 < 7 else '' }}</p>
-            <div class="mt-1 inline-flex items-center gap-2">
-              <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold {% if cell.is_today %}bg-[var(--color-accent)] text-white{% elif cell.is_weekend and cell.in_month %}bg-[var(--color-surface-secondary)] text-[var(--color-heading)]{% else %}text-[var(--color-heading)]{% endif %}">
-                {{ cell.date.day }}
-              </span>
-              {% if cell.is_today %}
-              <span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">Today</span>
-              {% endif %}
-            </div>
-          </div>
-          {% if cell.event_count %}
-          <span class="rounded-full bg-[var(--color-surface-secondary)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">{{ cell.event_count }}</span>
-          {% endif %}
-        </header>
-
-        <div class="space-y-2">
-          {% if cell.events %}
-            {% for event in cell.events[:4] %}
-            <a href="/event/{{ event.id }}" class="block rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] px-2.5 py-2 hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors" aria-label="{{ event.title }} at {{ event.start_time.strftime('%-I:%M %p') }}">
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <p class="text-[12px] font-medium leading-4 text-[var(--color-heading)] line-clamp-2">{{ event.title }}</p>
-                  <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-faint)]">{{ event.start_time.strftime('%-I:%M %p') }}</p>
-                </div>
-                {% if event.attended %}
-                <span class="mt-0.5 shrink-0 text-[11px]" aria-hidden="true">✅</span>
+        <section class="min-h-[13rem] rounded-2xl border p-3 transition-colors duration-150 {% if cell.is_today %}border-[var(--color-accent)] bg-[var(--color-accent-light)]/55 shadow-[0_0_0_1px_rgba(124,58,237,0.18)]{% elif cell.in_month %}border-[var(--color-edge-subtle)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]/35{% else %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] opacity-70{% endif %}"
+                 aria-label="{{ cell.date.strftime("%A, %B %-d, %Y") }}{% if cell.event_count %}, {{ cell.event_count }} event{{ 's' if cell.event_count != 1 }}{% endif %}">
+          <header class="mb-3 flex items-start justify-between gap-2">
+            <div>
+              <p class="text-[11px] uppercase tracking-wide {% if cell.in_month %}text-[var(--color-faint)]{% else %}text-[var(--color-faint)]{% endif %}">
+                {{ cell.date.strftime("%b") if cell.date.day == 1 or loop.index0 < 7 else '' }}
+              </p>
+              <div class="mt-1 inline-flex items-center gap-2">
+                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold {% if cell.is_today %}bg-[var(--color-accent)] text-white{% elif cell.is_weekend and cell.in_month %}bg-[var(--color-surface-secondary)] text-[var(--color-heading)]{% else %}text-[var(--color-heading)]{% endif %}">
+                  {{ cell.date.day }}
+                </span>
+                {% if cell.is_today %}
+                  <span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]">Today</span>
                 {% endif %}
               </div>
-            </a>
-            {% endfor %}
-            {% if cell.event_count > 4 %}
-            <a href="/events?month={{ month_start.strftime('%Y-%m') }}" class="block px-1 text-[11px] font-medium text-[var(--color-accent)] hover:underline">+{{ cell.event_count - 4 }} more events</a>
+            </div>
+            {% if cell.event_count %}
+              <span class="rounded-full bg-[var(--color-surface-secondary)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]">{{ cell.event_count }}</span>
             {% endif %}
-          {% else %}
-            <div class="rounded-xl border border-dashed border-[var(--color-edge)] px-3 py-4 text-center text-[11px] text-[var(--color-faint)]">No events</div>
-          {% endif %}
-        </div>
-      </section>
+          </header>
+          <div class="space-y-2">
+            {% if cell.events %}
+              {% for event in cell.events[:4] %}
+                <a href="/event/{{ event.id }}"
+                   class="block rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] px-2.5 py-2 hover:border-[var(--color-accent)] hover:bg-[var(--color-surface)] transition-colors"
+                   aria-label="{{ event.title }} at {{ event.start_time.strftime("%-I:%M %p") }}">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="text-[12px] font-medium leading-4 text-[var(--color-heading)] line-clamp-2">
+                        {{ event.title }}
+                      </p>
+                      <p class="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-faint)]">
+                        {{ event.start_time.strftime("%-I:%M %p") }}
+                      </p>
+                    </div>
+                    {% if event.attended %}
+                      <span class="mt-0.5 shrink-0 text-[11px]" aria-hidden="true">✅</span>
+                    {% endif %}
+                  </div>
+                </a>
+              {% endfor %}
+              {% if cell.event_count > 4 %}
+                <a href="/events?month={{ month_start.strftime("%Y-%m") }}"
+                   class="block px-1 text-[11px] font-medium text-[var(--color-accent)] hover:underline">+{{ cell.event_count - 4 }} more events</a>
+              {% endif %}
+            {% else %}
+              <div class="rounded-xl border border-dashed border-[var(--color-edge)] px-3 py-4 text-center text-[11px] text-[var(--color-faint)]">
+                No events
+              </div>
+            {% endif %}
+          </div>
+        </section>
       {% endfor %}
     {% endfor %}
   </div>
-
   <div class="space-y-3 md:hidden">
     {% for week in weeks %}
-    <section class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-3">
-      <div class="mb-3 flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-[var(--color-heading)]">Week of {{ week[0].date.strftime('%b %-d') }}</h3>
-        <span class="text-xs text-[var(--color-faint)]">{{ week | sum(attribute='event_count') }} total</span>
-      </div>
-      <div class="space-y-2">
-        {% for cell in week %}
-        <div class="rounded-xl border px-3 py-3 {% if cell.is_today %}border-[var(--color-accent)] bg-[var(--color-accent-light)]/50{% elif cell.in_month %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)]{% else %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] opacity-70{% endif %}">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-semibold text-[var(--color-heading)]">{{ cell.date.strftime('%A %-d') }}</p>
-              <p class="text-xs text-[var(--color-muted)]">{{ cell.event_count }} event{{ '' if cell.event_count == 1 else 's' }}</p>
-            </div>
-            {% if cell.is_today %}
-            <span class="rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Today</span>
-            {% endif %}
-          </div>
-          {% if cell.events %}
-          <div class="mt-3 space-y-2">
-            {% for event in cell.events[:3] %}
-            <a href="/event/{{ event.id }}" class="block rounded-lg bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-body)] border border-[var(--color-edge-subtle)] hover:border-[var(--color-accent)] transition-colors">
-              <span class="font-medium text-[var(--color-heading)]">{{ event.start_time.strftime('%-I:%M %p') }}</span>
-              <span class="text-[var(--color-muted)]"> — {{ event.title }}</span>
-            </a>
-            {% endfor %}
-            {% if cell.event_count > 3 %}
-            <p class="text-xs text-[var(--color-faint)]">+{{ cell.event_count - 3 }} more</p>
-            {% endif %}
-          </div>
-          {% endif %}
+      <section class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-3">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-[var(--color-heading)]">
+            Week of {{ week[0].date.strftime("%b %-d") }}
+          </h3>
+          <span class="text-xs text-[var(--color-faint)]">{{ week | sum(attribute='event_count') }} total</span>
         </div>
-        {% endfor %}
-      </div>
-    </section>
+        <div class="space-y-2">
+          {% for cell in week %}
+            <div class="rounded-xl border px-3 py-3 {% if cell.is_today %}border-[var(--color-accent)] bg-[var(--color-accent-light)]/50{% elif cell.in_month %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)]{% else %}border-[var(--color-edge-subtle)] bg-[var(--color-surface-secondary)] opacity-70{% endif %}">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-[var(--color-heading)]">{{ cell.date.strftime("%A %-d") }}</p>
+                  <p class="text-xs text-[var(--color-muted)]">
+                    {{ cell.event_count }} event{{ '' if cell.event_count == 1 else 's' }}
+                  </p>
+                </div>
+                {% if cell.is_today %}
+                  <span class="rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">Today</span>
+                {% endif %}
+              </div>
+              {% if cell.events %}
+                <div class="mt-3 space-y-2">
+                  {% for event in cell.events[:3] %}
+                    <a href="/event/{{ event.id }}"
+                       class="block rounded-lg bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-body)] border border-[var(--color-edge-subtle)] hover:border-[var(--color-accent)] transition-colors">
+                      <span class="font-medium text-[var(--color-heading)]">{{ event.start_time.strftime("%-I:%M %p") }}</span>
+                      <span class="text-[var(--color-muted)]">— {{ event.title }}</span>
+                    </a>
+                  {% endfor %}
+                  {% if cell.event_count > 3 %}
+                    <p class="text-xs text-[var(--color-faint)]">+{{ cell.event_count - 3 }} more</p>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
     {% endfor %}
   </div>
 </div>

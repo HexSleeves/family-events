@@ -2,126 +2,128 @@
 {% from "components/_macros.html" import icon, section_header, btn, badge_tag, back_link, page_header, tab_switcher, form_field, select_field, empty_state %}
 {% block title %}Browse Events{% endblock %}
 {% block content %}
-
-{% set in_attended = attended == 'yes' %}
-
-<div class="animate-fade-in space-y-6">
-  {# ═══ PAGE HEADER + TAB SWITCHER ═══ #}
-  <section id="events-header" class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
-    aria-labelledby="events-page-heading">
-    <div>
-      {{ page_header(
-        'Attended Events' if in_attended else 'Browse Events',
-        subtitle='Refine by city, score, source, and attendance state.',
-        icon_name='list' if not in_attended else 'check-circle'
-      ) }}
-    </div>
-    {{ tab_switcher([
-      ("/events", "All", total, not in_attended),
+  {% set in_attended = attended == 'yes' %}
+  <div class="animate-fade-in space-y-6">
+    {# ═══ PAGE HEADER + TAB SWITCHER ═══ #}
+    <section id="events-header"
+             class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
+             aria-labelledby="events-page-heading">
+      <div>
+        {{ page_header('Attended Events' if in_attended else 'Browse Events',
+                subtitle='Refine by city, score, source, and attendance state.',
+                icon_name='list' if not in_attended else 'check-circle') }}
+      </div>
+      {{ tab_switcher([
+            ("/events", "All", total, not in_attended) ,
       ("/events?attended=yes", "Attended", "", in_attended)
-    ]) }}
-  </section>
-
-  {# ═══ FILTER BAR — glass + Alpine ═══ #}
-  <form id="events-form" aria-label="Event filters"
-    hx-get="/events"
-    hx-target="#events-results"
-    hx-swap="innerHTML"
-    hx-push-url="true"
-    hx-trigger="submit, change from:.auto-submit"
-    hx-indicator="#events-results-wrapper"
-    class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-4 sm:p-5 space-y-4 transition-all duration-300">
-    {# Search bar #}
-    <div class="relative">
-      <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
-      <input type="text" name="q" value="{{ q }}" placeholder="Search events..."
-        aria-label="Search events"
-        class="w-full pl-10 pr-4 py-2.5 border border-[var(--color-edge)] rounded-full text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-        hx-get="/events"
-        hx-target="#events-results"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-        hx-trigger="keyup changed delay:300ms"
-        hx-include="#events-form"
-        hx-indicator="#events-results-wrapper" />
-    </div>
-
-    <hr class="border-[var(--color-edge-subtle)]" aria-hidden="true" />
-
-    {# Pre-compute options for Jinja2 macro compatibility (no list comprehensions in macro args) #}
-    {% set city_options = [] %}
-    {% for c in cities %}{% if city_options.append((c, c)) %}{% endif %}{% endfor %}
-    {% set source_options = [] %}
-    {% for s in sources %}{% if source_options.append((s, s)) %}{% endif %}{% endfor %}
-    {% set score_options = [] %}
-    {% for v in range(1, 11) %}{% if score_options.append((v, v ~ "+")) %}{% endif %}{% endfor %}
-
-    {# Filters grid #}
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-      {{ select_field("city", "Location",
-        options=city_options,
-        value=city,
-        empty_label="All cities",
-        select_cls="auto-submit h-10") }}
-      {{ select_field("source", "Source",
-        options=source_options,
-        value=source,
-        empty_label="All sources",
-        select_cls="auto-submit h-10") }}
-      {{ select_field("tagged", "Tagged",
-        options=[("yes", "Tagged"), ("no", "Untagged")],
+      ]) }}
+    </section>
+    {# ═══ FILTER BAR — glass + Alpine ═══ #}
+    <form id="events-form"
+          aria-label="Event filters"
+          hx-get="/events"
+          hx-target="#events-results"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-trigger="submit, change from:.auto-submit"
+          hx-indicator="#events-results-wrapper"
+          class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-4 sm:p-5 space-y-4 transition-all duration-300">
+      {# Search bar #}
+      <div class="relative">
+        <i data-lucide="search"
+           class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]"
+           aria-hidden="true"></i>
+        <input type="text"
+               name="q"
+               value="{{ q }}"
+               placeholder="Search events..."
+               aria-label="Search events"
+               class="w-full pl-10 pr-4 py-2.5 border border-[var(--color-edge)] rounded-full text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+               hx-get="/events"
+               hx-target="#events-results"
+               hx-swap="innerHTML"
+               hx-push-url="true"
+               hx-trigger="keyup changed delay:300ms"
+               hx-include="#events-form"
+               hx-indicator="#events-results-wrapper" />
+      </div>
+      <hr class="border-[var(--color-edge-subtle)]" aria-hidden="true" />
+      {# Pre-compute options for Jinja2 macro compatibility (no list comprehensions in macro args) #}
+      {% set city_options = [] %}
+      {% for c in cities %}
+        {% if city_options.append((c, c)) %}{% endif %}
+      {% endfor %}
+      {% set source_options = [] %}
+      {% for s in sources %}
+        {% if source_options.append((s, s)) %}{% endif %}
+      {% endfor %}
+      {% set score_options = [] %}
+      {% for v in range(1, 11) %}
+        {% if score_options.append((v, v ~ "+")) %}{% endif %}
+      {% endfor %}
+      {# Filters grid #}
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {{ select_field("city", "Location",
+                options=city_options,
+                value=city,
+                empty_label="All cities",
+                select_cls="auto-submit h-10") }}
+        {{ select_field("source", "Source",
+                options=source_options,
+                value=source,
+                empty_label="All sources",
+                select_cls="auto-submit h-10") }}
+        {{ select_field("tagged", "Tagged",
+                options=[("yes", "Tagged") , ("no", "Untagged")],
         value=tagged,
         empty_label="All",
         select_cls="auto-submit h-10") }}
-      {{ select_field("attended", "Attended",
-        options=[("yes", "Attended"), ("no", "Not attended")],
+        {{ select_field("attended", "Attended",
+                options=[("yes", "Attended") , ("no", "Not attended")],
         value=attended,
         empty_label="All",
         select_cls="auto-submit h-10") }}
-      {% set score_val = (score_min | string) if score_min is not none else "" %}
-      {{ select_field("score_min", "Min Score",
-        options=score_options,
-        value=score_val,
-        empty_label="Any",
-        select_cls="auto-submit h-10") }}
-      {{ select_field("sort", "Sort",
-        options=[("start_time", "Date ↑"), ("-start_time", "Date ↓"), ("-score", "Score ↓"), ("title", "Title")],
+        {% set score_val = (score_min | string) if score_min is not none else "" %}
+        {{ select_field("score_min", "Min Score",
+                options=score_options,
+                value=score_val,
+                empty_label="Any",
+                select_cls="auto-submit h-10") }}
+        {{ select_field("sort", "Sort",
+                options=[("start_time", "Date ↑") , ("-start_time", "Date ↓"), ("-score", "Score ↓"), ("title", "Title")],
         value=sort,
         empty_label="",
         select_cls="auto-submit h-10") }}
-    </div>
-
-    <div class="flex items-center justify-between gap-3">
-      <p class="text-xs text-[var(--color-faint)] flex items-center gap-1.5">
-        <i data-lucide="zap" class="w-3.5 h-3.5" aria-hidden="true"></i>
-        Filters auto-apply as you type/select.
-      </p>
-      <button type="button"
-        hx-get="/events"
-        hx-target="#main-content"
-        hx-select="#main-content"
-        hx-swap="innerHTML"
-        hx-push-url="true"
-        class="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] hover:underline underline-offset-2 transition-colors touch-target">
-        Reset filters
-      </button>
-    </div>
-  </form>
-
-  {# ═══ RESULTS + SKELETON ═══ #}
-  <div id="events-results-wrapper" class="relative min-h-48" hx-on:refresh-events="htmx.trigger('#events-form', 'submit')">
-    <div class="skeleton-overlay" aria-busy="true">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-        {% for i in range(8) %}
-        <div class="skeleton skeleton-card animate-pulse" style="animation-delay: {{ i * 50 }}ms;"></div>
-        {% endfor %}
       </div>
-    </div>
-
-    <div id="events-results">
-      {% include "partials/_events_table.html" %}
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-xs text-[var(--color-faint)] flex items-center gap-1.5">
+          <i data-lucide="zap" class="w-3.5 h-3.5" aria-hidden="true"></i>
+          Filters auto-apply as you type/select.
+        </p>
+        <button type="button"
+                hx-get="/events"
+                hx-target="#main-content"
+                hx-select="#main-content"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                class="text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-heading)] hover:underline underline-offset-2 transition-colors touch-target">
+          Reset filters
+        </button>
+      </div>
+    </form>
+    {# ═══ RESULTS + SKELETON ═══ #}
+    <div id="events-results-wrapper"
+         class="relative min-h-48"
+         hx-on:refresh-events="htmx.trigger('#events-form', 'submit')">
+      <div class="skeleton-overlay" aria-busy="true">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+          {% for i in range(8) %}
+            <div class="skeleton skeleton-card animate-pulse"
+                 style="animation-delay: {{ i * 50 }}ms"></div>
+          {% endfor %}
+        </div>
+      </div>
+      <div id="events-results">{% include "partials/_events_table.html" %}</div>
     </div>
   </div>
-</div>
-
 {% endblock %}

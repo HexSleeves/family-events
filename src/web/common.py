@@ -8,8 +8,9 @@ import logging
 import secrets
 import time
 from collections import deque
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from typing import AsyncGenerator, cast
+from typing import cast
 from urllib.parse import urlparse
 
 from fastapi import Request

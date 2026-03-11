@@ -103,19 +103,19 @@ There is no SPA framework.
 
 ### Main pages
 
-| Page | Description |
-|------|-------------|
-| `/` | Dashboard with event stats, recent pipeline info, category slices, and action controls |
-| `/events` | Search/filter/sort/paginate events |
-| `/event/{id}` | Full event detail with tags and raw source data |
-| `/weekend` | Ranked recommendations for the upcoming weekend |
-| `/calendar` / `/calendars` | Calendar views |
-| `/calendar.ics` | ICS feed |
-| `/sources` | Source catalog and custom source management |
-| `/source/{id}` | Source detail, recipe, sample events, recent jobs |
-| `/jobs` | Background job history |
-| `/profile` | Onboarding/profile/theme/notification/password settings |
-| `/login` / `/signup` | Auth flows |
+| Page                       | Description                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `/`                        | Dashboard with event stats, recent pipeline info, category slices, and action controls |
+| `/events`                  | Search/filter/sort/paginate events                                                     |
+| `/event/{id}`              | Full event detail with tags and raw source data                                        |
+| `/weekend`                 | Ranked recommendations for the upcoming weekend                                        |
+| `/calendar` / `/calendars` | Calendar views                                                                         |
+| `/calendar.ics`            | ICS feed                                                                               |
+| `/sources`                 | Source catalog and custom source management                                            |
+| `/source/{id}`             | Source detail, recipe, sample events, recent jobs                                      |
+| `/jobs`                    | Background job history                                                                 |
+| `/profile`                 | Onboarding/profile/theme/notification/password settings                                |
+| `/login` / `/signup`       | Auth flows                                                                             |
 
 ### Events page features
 
@@ -130,13 +130,13 @@ There is no SPA framework.
 
 ### Built-in source families
 
-| Source | Type | Region |
-|--------|------|--------|
-| [BREC](https://www.brec.org) | HTML scraping | Baton Rouge |
-| [Eventbrite](https://www.eventbrite.com) | JSON-LD + HTML | Multiple cities |
-| [AllEvents.in](https://allevents.in) | HTML + structured data | Multiple cities |
-| Moncus Park / ACA / Lafayette Science Museum | MEC / venue-specific | Lafayette |
-| LibCal library feeds | RSS / HTML fallback | Lafayette + Baton Rouge |
+| Source                                       | Type                   | Region                  |
+| -------------------------------------------- | ---------------------- | ----------------------- |
+| [BREC](https://www.brec.org)                 | HTML scraping          | Baton Rouge             |
+| [Eventbrite](https://www.eventbrite.com)     | JSON-LD + HTML         | Multiple cities         |
+| [AllEvents.in](https://allevents.in)         | HTML + structured data | Multiple cities         |
+| Moncus Park / ACA / Lafayette Science Museum | MEC / venue-specific   | Lafayette               |
+| LibCal library feeds                         | RSS / HTML fallback    | Lafayette + Baton Rouge |
 
 ### Source management model
 
@@ -207,24 +207,24 @@ Copy `.env.example` to `.env`.
 
 ### Required
 
-| Variable | Description |
-|----------|-------------|
+| Variable         | Description                                                        |
+| ---------------- | ------------------------------------------------------------------ |
 | `OPENAI_API_KEY` | Enables LLM tagging. Without it, the app falls back to heuristics. |
-| `DATABASE_URL` | Defaults to local Docker Postgres. |
-| `SESSION_SECRET` | Required for the web app to start. |
+| `DATABASE_URL`   | Defaults to local Docker Postgres.                                 |
+| `SESSION_SECRET` | Required for the web app to start.                                 |
 
 ### Common optional settings
 
-| Variable | Description |
-|----------|-------------|
-| `WEATHER_API_KEY` | OpenWeatherMap forecast lookup |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | SMS sender config |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot config |
-| `RESEND_API_KEY` / `EMAIL_FROM` | Email sender config |
-| `APP_BASE_URL` | Public origin used for same-origin checks behind a proxy |
-| `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAME_SITE` / `SESSION_COOKIE_DOMAIN` / `SESSION_MAX_AGE_SECONDS` | Session cookie controls |
-| `TAGGER_CONCURRENCY` / `TAGGER_BATCH_SIZE` | LLM tagging throughput tuning |
-| `BACKGROUND_JOB_TIMEOUT_SECONDS` | Job stale-failure threshold |
+| Variable                                                                                                   | Description                                              |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `WEATHER_API_KEY`                                                                                          | OpenWeatherMap forecast lookup                           |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER`                                          | SMS sender config                                        |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`                                                                  | Telegram bot config                                      |
+| `RESEND_API_KEY` / `EMAIL_FROM`                                                                            | Email sender config                                      |
+| `APP_BASE_URL`                                                                                             | Public origin used for same-origin checks behind a proxy |
+| `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAME_SITE` / `SESSION_COOKIE_DOMAIN` / `SESSION_MAX_AGE_SECONDS` | Session cookie controls                                  |
+| `TAGGER_CONCURRENCY` / `TAGGER_BATCH_SIZE`                                                                 | LLM tagging throughput tuning                            |
+| `BACKGROUND_JOB_TIMEOUT_SECONDS`                                                                           | Job stale-failure threshold                              |
 
 See `.env.example` for the current canonical local/dev defaults.
 
@@ -396,19 +396,19 @@ npm run css:watch
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Language | Python 3.12 |
-| Package manager | uv |
-| Web framework | FastAPI + Uvicorn |
-| Templates | Jinja2 |
-| Frontend interactivity | HTMX 2.0.4 |
-| CSS | Tailwind CSS via CLI build |
-| Database | PostgreSQL 16 + asyncpg + SQLAlchemy + Alembic |
-| SQLite fallback | aiosqlite |
-| Scraping | httpx + BeautifulSoup4 |
-| AI tagging | OpenAI API (`gpt-4o-mini` by default) |
-| Scheduling | APScheduler |
+| Layer                  | Technology                                     |
+| ---------------------- | ---------------------------------------------- |
+| Language               | Python 3.12                                    |
+| Package manager        | uv                                             |
+| Web framework          | FastAPI + Uvicorn                              |
+| Templates              | Jinja2                                         |
+| Frontend interactivity | HTMX 2.0.4                                     |
+| CSS                    | Tailwind CSS via CLI build                     |
+| Database               | PostgreSQL 16 + asyncpg + SQLAlchemy + Alembic |
+| SQLite fallback        | aiosqlite                                      |
+| Scraping               | httpx + BeautifulSoup4                         |
+| AI tagging             | OpenAI API (`gpt-4o-mini` by default)          |
+| Scheduling             | APScheduler                                    |
 
 ## More Documentation
 
@@ -418,10 +418,10 @@ npm run css:watch
 - [docs/design-generic-scraper.md](docs/design-generic-scraper.md)
 - [docs/migration.md](docs/migration.md)
 
-
 ## External HTTP behavior
 
 Outbound HTTP calls now use a shared client helper with:
+
 - a standardized user-agent/header baseline
 - centralized connect/read timeout defaults
 - retry/backoff for transient GET failures

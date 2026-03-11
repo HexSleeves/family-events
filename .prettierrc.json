@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/prettierrc",
+  "printWidth": 100,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "plugins": ["prettier-plugin-ini", "prettier-plugin-packagejson"],
+  "overrides": [
+    {
+      "files": ["*.ini", "*.service"],
+      "options": {
+        "parser": "ini"
+      }
+    }
+  ]
+}

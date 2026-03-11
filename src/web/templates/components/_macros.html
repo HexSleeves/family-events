@@ -2,310 +2,308 @@
    Component Macro Library — Family Events
    Reusable Jinja2 macros for consistent, beautiful UI components.
    Import with: {% from "components/_macros.html" import btn, badge_tag, ... %}
-   ══════════════════════════════════════════════════════════════ #}
-
-
+══════════════════════════════════════════════════════════════ #}
 {# ── Icon (Lucide) ──
    Usage: {{ icon("calendar", size="w-4 h-4") }}
    Renders a Lucide icon via the <i> element class convention.
 #}
 {% macro icon(name, size="w-5 h-5", cls="") %}
-<i data-lucide="{{ name }}" class="{{ size }} {{ cls }}" aria-hidden="true"></i>
+  <i data-lucide="{{ name }}"
+     class="{{ size }} {{ cls }}"
+     aria-hidden="true"></i>
 {% endmacro %}
-
-
 {# ── Button ──
    Variants: primary, secondary, ghost, danger, accent
    Sizes: sm, md, lg
    Usage: {{ btn("Save", variant="primary", icon="check") }}
 #}
 {% macro btn(label, variant="primary", size="md", icon_name="", type="button", cls="", disabled=false, hx_post="", hx_get="", hx_target="", hx_swap="", hx_vals="", hx_indicator="", hx_disabled_elt="", hx_confirm="", aria_label="") %}
-{% set size_cls = {
-  "sm": "px-3 py-1.5 text-xs gap-1",
-  "md": "px-4 py-2 text-sm gap-1.5",
-  "lg": "px-5 py-2.5 text-sm gap-2"
-} %}
-{% set variant_cls = {
-  "primary": "bg-[var(--color-brand)] border border-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)]",
-  "secondary": "bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] font-medium hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)]",
-  "ghost": "bg-transparent border border-transparent text-[var(--color-muted)] font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)]",
-  "danger": "bg-[var(--color-danger)] border border-[var(--color-danger)] text-white font-semibold hover:opacity-90 shadow-[var(--shadow-xs)]",
-  "accent": "bg-[var(--color-accent)] border border-[var(--color-accent)] text-white font-medium hover:bg-[var(--color-accent-hover)] shadow-[var(--shadow-xs)]"
-} %}
-<button type="{{ type }}"
-  class="touch-target inline-flex items-center justify-center rounded-lg active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed {{ size_cls[size] }} {{ variant_cls[variant] }} {{ cls }}"
-  {% if disabled %}disabled{% endif %}
-  {% if hx_post %}hx-post="{{ hx_post }}"{% endif %}
-  {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
-  {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
-  {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
-  {% if hx_vals %}hx-vals='{{ hx_vals }}'{% endif %}
-  {% if hx_indicator %}hx-indicator="{{ hx_indicator }}"{% endif %}
-  {% if hx_disabled_elt %}hx-disabled-elt="{{ hx_disabled_elt }}"{% endif %}
-  {% if hx_confirm %}hx-confirm="{{ hx_confirm }}"{% endif %}
-  {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}>
-  {% if icon_name %}{{ icon(icon_name, size="w-4 h-4") }}{% endif %}
-  {{ label }}
-</button>
+  {% set size_cls = {
+    "sm": "px-3 py-1.5 text-xs gap-1",
+    "md": "px-4 py-2 text-sm gap-1.5",
+    "lg": "px-5 py-2.5 text-sm gap-2"
+  } %}
+  {% set variant_cls = {
+    "primary": "bg-[var(--color-brand)] border border-[var(--color-brand)] text-white font-semibold hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)]",
+    "secondary": "bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] font-medium hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)]",
+    "ghost": "bg-transparent border border-transparent text-[var(--color-muted)] font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)]",
+    "danger": "bg-[var(--color-danger)] border border-[var(--color-danger)] text-white font-semibold hover:opacity-90 shadow-[var(--shadow-xs)]",
+    "accent": "bg-[var(--color-accent)] border border-[var(--color-accent)] text-white font-medium hover:bg-[var(--color-accent-hover)] shadow-[var(--shadow-xs)]"
+  } %}
+  <button type="{{ type }}"
+          class="touch-target inline-flex items-center justify-center rounded-lg active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed {{ size_cls[size] }} {{ variant_cls[variant] }} {{ cls }}"
+          {% if disabled %}disabled{% endif %}
+          {% if hx_post %}hx-post="{{ hx_post }}"{% endif %}
+          {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+          {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+          {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
+          {% if hx_vals %}hx-vals='{{ hx_vals }}'{% endif %}
+          {% if hx_indicator %}hx-indicator="{{ hx_indicator }}"{% endif %}
+          {% if hx_disabled_elt %}hx-disabled-elt="{{ hx_disabled_elt }}"{% endif %}
+          {% if hx_confirm %}hx-confirm="{{ hx_confirm }}"{% endif %}
+          {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}>
+    {% if icon_name %}{{ icon(icon_name, size="w-4 h-4") }}{% endif %}
+    {{ label }}
+  </button>
 {% endmacro %}
-
-
 {# ── Badge ──
    Variants: brand, accent, success, warning, danger, info, muted
    Usage: {{ badge_tag("Active", variant="success") }}
 #}
 {% macro badge_tag(text, variant="muted", cls="") %}
-<span class="badge badge-{{ variant }} {{ cls }}">{{ text }}</span>
+  <span class="badge badge-{{ variant }} {{ cls }}">{{ text }}</span>
 {% endmacro %}
-
-
 {# ── Stat Card ──
    Usage: {{ stat_card(42, "Events", icon="calendar", color="accent") }}
 #}
 {% macro stat_card(value, label, icon_name="", color="accent", cls="") %}
-<div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)] card-interactive {{ cls }}">
-  {% if icon_name %}
-  <div class="mx-auto w-8 h-8 rounded-lg bg-[var(--color-{{ color }}-light)] flex items-center justify-center mb-2">
-    {{ icon(icon_name, size="w-4 h-4", cls="text-[var(--color-" ~ color ~ ")]") }}
+  <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)] card-interactive {{ cls }}">
+    {% if icon_name %}
+      <div class="mx-auto w-8 h-8 rounded-lg bg-[var(--color-{{ color }}-light)] flex items-center justify-center mb-2">
+        {{ icon(icon_name, size="w-4 h-4", cls="text-[var(--color-" ~ color ~ ")]") }}
+      </div>
+    {% endif %}
+    <div class="text-2xl font-bold text-[var(--color-{{ color }})]">{{ value }}</div>
+    <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">
+      {{ label }}
+    </div>
   </div>
-  {% endif %}
-  <div class="text-2xl font-bold text-[var(--color-{{ color }})]">{{ value }}</div>
-  <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">{{ label }}</div>
-</div>
 {% endmacro %}
-
-
 {# ── Section Header ──
    Usage: {{ section_header("Top Picks", icon="star", link_href="/events") }}
 #}
 {% macro section_header(title, icon_name="", emoji="", link_href="", link_label="See all", id="") %}
-<div class="flex items-center justify-between mb-4">
-  <h2 {% if id %}id="{{ id }}"{% endif %}
-    class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
-    {% if emoji %}<span aria-hidden="true">{{ emoji }}</span>{% endif %}
-    {% if icon_name %}{{ icon(icon_name, size="w-5 h-5", cls="text-[var(--color-accent)]") }}{% endif %}
-    {{ title }}
-  </h2>
-  {% if link_href %}
-  <a href="{{ link_href }}"
-    class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors inline-flex items-center gap-1">
-    {{ link_label }} {{ icon("arrow-right", size="w-3.5 h-3.5") }}
-  </a>
-  {% endif %}
-</div>
+  <div class="flex items-center justify-between mb-4">
+    <h2 {% if id %}id="{{ id }}"{% endif %}
+        class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
+      {% if emoji %}<span aria-hidden="true">{{ emoji }}</span>{% endif %}
+      {% if icon_name %}
+        {{ icon(icon_name, size="w-5 h-5", cls="text-[var(--color-accent)]") }}
+      {% endif %}
+      {{ title }}
+    </h2>
+    {% if link_href %}
+      <a href="{{ link_href }}"
+         class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors inline-flex items-center gap-1">
+        {{ link_label }} {{ icon("arrow-right", size="w-3.5 h-3.5") }}
+      </a>
+    {% endif %}
+  </div>
 {% endmacro %}
-
-
 {# ── Empty State ──
    Usage: {{ empty_state("calendar", "No events yet", "Run the scrapers to find events.", "Run Scrapers", "/api/scrape") }}
 #}
 {% macro empty_state(icon_name="inbox", title="Nothing here yet", description="", action_label="", action_href="", emoji="") %}
-<div class="text-center py-12 animate-fade-in-up">
-  <div class="max-w-md mx-auto">
-    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-accent-light)] flex items-center justify-center">
-      {% if emoji %}
-      <span class="text-3xl" aria-hidden="true">{{ emoji }}</span>
-      {% else %}
-      {{ icon(icon_name, size="w-7 h-7", cls="text-[var(--color-accent)]") }}
+  <div class="text-center py-12 animate-fade-in-up">
+    <div class="max-w-md mx-auto">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-accent-light)] flex items-center justify-center">
+        {% if emoji %}
+          <span class="text-3xl" aria-hidden="true">{{ emoji }}</span>
+        {% else %}
+          {{ icon(icon_name, size="w-7 h-7", cls="text-[var(--color-accent)]") }}
+        {% endif %}
+      </div>
+      <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-1">{{ title }}</h3>
+      {% if description %}
+        <p class="text-sm text-[var(--color-muted)] leading-relaxed">{{ description }}</p>
+      {% endif %}
+      {% if action_label and action_href %}
+        <a href="{{ action_href }}"
+           class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors">
+          {{ action_label }}
+        </a>
       {% endif %}
     </div>
-    <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-1">{{ title }}</h3>
-    {% if description %}
-    <p class="text-sm text-[var(--color-muted)] leading-relaxed">{{ description }}</p>
-    {% endif %}
-    {% if action_label and action_href %}
-    <a href="{{ action_href }}"
-      class="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:bg-[var(--color-brand-hover)] transition-colors">
-      {{ action_label }}
-    </a>
-    {% endif %}
   </div>
-</div>
 {% endmacro %}
-
-
 {# ── Form Field ──
    Usage: {{ form_field("email", "Email", type="email", placeholder="you@example.com") }}
 #}
 {% macro form_field(name, label, type="text", value="", placeholder="", required=false, error="", id="", cls="", autofocus=false, min="", max="", disabled=false) %}
-{% set field_id = id or "field-" ~ name %}
-<div class="{{ cls }}">
-  <label for="{{ field_id }}" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">{{ label }}</label>
-  <input type="{{ type }}" name="{{ name }}" id="{{ field_id }}" value="{{ value }}"
-    {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
-    {% if required %}required{% endif %}
-    {% if autofocus %}autofocus{% endif %}
-    {% if min %}min="{{ min }}"{% endif %}
-    {% if max %}max="{{ max }}"{% endif %}
-    {% if disabled %}disabled{% endif %}
-    class="w-full px-3.5 py-2.5 border rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all {% if error %}border-[var(--color-danger)]{% else %}border-[var(--color-edge)]{% endif %}" />
-  {% if error %}
-  <p class="mt-1 text-xs text-[var(--color-danger)]">{{ error }}</p>
-  {% endif %}
-</div>
+  {% set field_id = id or "field-" ~ name %}
+  <div class="{{ cls }}">
+    <label for="{{ field_id }}"
+           class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">{{ label }}</label>
+    <input type="{{ type }}"
+           name="{{ name }}"
+           id="{{ field_id }}"
+           value="{{ value }}"
+           {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+           {% if required %}required{% endif %}
+           {% if autofocus %}autofocus{% endif %}
+           {% if min %}min="{{ min }}"{% endif %}
+           {% if max %}max="{{ max }}"{% endif %}
+           {% if disabled %}disabled{% endif %}
+           class="w-full px-3.5 py-2.5 border rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all {% if error %}border-[var(--color-danger)]{% else %}border-[var(--color-edge)]{% endif %}" />
+    {% if error %}<p class="mt-1 text-xs text-[var(--color-danger)]">{{ error }}</p>{% endif %}
+  </div>
 {% endmacro %}
-
-
 {# ── Select Field ──
    Usage: {{ select_field("city", "Location", options=[("br", "Baton Rouge")]) }}
 #}
 {% macro select_field(name, label, options=[], value="", empty_label="All", id="", cls="", select_cls="", required=false, disabled=false) %}
-{% set field_id = id or "field-" ~ name %}
-<div class="{{ cls }}">
-  <label for="{{ field_id }}" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">{{ label }}</label>
-  <select name="{{ name }}" id="{{ field_id }}"
-    {% if required %}required{% endif %}
-    {% if disabled %}disabled{% endif %}
-    class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all {{ select_cls }}">
-    {% if empty_label %}<option value="">{{ empty_label }}</option>{% endif %}
-    {% for opt in options %}
-      {% if opt is string %}
-      <option value="{{ opt }}" {% if value == opt %}selected{% endif %}>{{ opt }}</option>
-      {% else %}
-      <option value="{{ opt[0] }}" {% if value == opt[0]|string %}selected{% endif %}>{{ opt[1] }}</option>
-      {% endif %}
-    {% endfor %}
-  </select>
-</div>
+  {% set field_id = id or "field-" ~ name %}
+  <div class="{{ cls }}">
+    <label for="{{ field_id }}"
+           class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">{{ label }}</label>
+    <select name="{{ name }}"
+            id="{{ field_id }}"
+            {% if required %}required{% endif %}
+            {% if disabled %}disabled{% endif %}
+            class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all {{ select_cls }}">
+      {% if empty_label %}<option value="">{{ empty_label }}</option>{% endif %}
+      {% for opt in options %}
+        {% if opt is string %}
+          <option value="{{ opt }}" {% if value == opt %}selected{% endif %}>{{ opt }}</option>
+        {% else %}
+          <option value="{{ opt[0] }}"
+                  {% if value == opt[0]|string %}selected{% endif %}>{{ opt[1] }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+  </div>
 {% endmacro %}
-
-
 {# ── Card Container ──
    Usage: {% call card(cls="p-6") %}...content...{% endcall %}
 #}
 {% macro card(cls="p-5", hover=false, animate="") %}
-<div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] {{ cls }} {% if hover %}card-interactive{% endif %} {% if animate %}animate-{{ animate }}{% endif %}">
-  {{ caller() }}
-</div>
+  <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] {{ cls }} {% if hover %}card-interactive{% endif %} {% if animate %}animate-{{ animate }}{% endif %}">
+    {{ caller() }}
+  </div>
 {% endmacro %}
-
-
 {# ── Glass Card Container ──
    Usage: {% call glass_card(cls="p-6") %}...content...{% endcall %}
 #}
 {% macro glass_card(cls="p-5") %}
-<div class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] {{ cls }}">
-  {{ caller() }}
-</div>
+  <div class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] {{ cls }}">
+    {{ caller() }}
+  </div>
 {% endmacro %}
-
-
 {# ── Event Card (horizontal scroll / grid) ──
    Full event card component for use in dashboard scroll sections and grids.
 #}
 {% macro event_card(event, size="normal", delay=0) %}
-{% set score = event.tags.toddler_score if event.tags else none %}
-{% set score_class = "score-low" if score is not none and score <= 3 else "score-mid" if score is not none and score <= 6 else "score-high" if score is not none and score <= 8 else "score-top" if score is not none else "score-low" %}
-{% set score_bg = "score-bg-low" if score is not none and score <= 3 else "score-bg-mid" if score is not none and score <= 6 else "score-bg-high" if score is not none and score <= 8 else "score-bg-top" if score is not none else "score-bg-low" %}
-{% set score_label = "poor" if score is not none and score <= 3 else "fair" if score is not none and score <= 6 else "great" if score is not none and score <= 8 else "excellent" if score is not none else "" %}
-{% set card_w = "w-[280px] md:w-[300px]" if size == "featured" else "w-[240px] md:w-[260px]" %}
-
-<a href="/event/{{ event.id }}"
-  class="{{ card_w }} group block rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 animate-fade-in-up{% if delay %} stagger-{{ [delay, 9] | min }}{% endif %}">
-  <div class="relative aspect-[16/10] rounded-t-xl overflow-hidden">
-    {% if event.image_url %}
-    <img src="{{ event.image_url }}" alt="{{ event.title }}"
-      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-    {% else %}
-    <div class="w-full h-full flex items-center justify-center text-3xl bg-gradient-to-br from-[var(--color-accent-light)] to-[var(--color-brand-light)]"
-      role="img" aria-label="{{ event.title }} placeholder">
-      {% if event.tags and event.tags.categories %}
-      {% set cat = event.tags.categories[0] | lower if event.tags.categories else '' %}
-      {% if 'art' in cat or 'craft' in cat %}<span aria-hidden="true">🎨</span>
-      {% elif 'outdoor' in cat or 'adventure' in cat %}<span aria-hidden="true">🌳</span>
-      {% elif 'nature' in cat or 'animal' in cat or 'wildlife' in cat %}<span aria-hidden="true">🦋</span>
-      {% elif 'music' in cat %}<span aria-hidden="true">🎵</span>
-      {% elif 'story' in cat or 'book' in cat %}<span aria-hidden="true">📚</span>
-      {% else %}<span aria-hidden="true">🎈</span>
+  {% set score = event.tags.toddler_score if event.tags else none %}
+  {% set score_class = "score-low" if score is not none and score <= 3 else "score-mid" if score is not none and score <= 6 else "score-high" if score is not none and score <= 8 else "score-top" if score is not none else "score-low" %}
+  {% set score_bg = "score-bg-low" if score is not none and score <= 3 else "score-bg-mid" if score is not none and score <= 6 else "score-bg-high" if score is not none and score <= 8 else "score-bg-top" if score is not none else "score-bg-low" %}
+  {% set score_label = "poor" if score is not none and score <= 3 else "fair" if score is not none and score <= 6 else "great" if score is not none and score <= 8 else "excellent" if score is not none else "" %}
+  {% set card_w = "w-[280px] md:w-[300px]" if size == "featured" else "w-[240px] md:w-[260px]" %}
+  <a href="/event/{{ event.id }}"
+     class="{{ card_w }} group block rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 animate-fade-in-up{% if delay %} stagger-{{ [delay, 9] | min }}{% endif %}">
+    <div class="relative aspect-[16/10] rounded-t-xl overflow-hidden">
+      {% if event.image_url %}
+        <img src="{{ event.image_url }}"
+             alt="{{ event.title }}"
+             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+             loading="lazy" />
+      {% else %}
+        <div class="w-full h-full flex items-center justify-center text-3xl bg-gradient-to-br from-[var(--color-accent-light)] to-[var(--color-brand-light)]"
+             role="img"
+             aria-label="{{ event.title }} placeholder">
+          {% if event.tags and event.tags.categories %}
+            {% set cat = event.tags.categories[0] | lower if event.tags.categories else '' %}
+            {% if 'art' in cat or 'craft' in cat %}
+              <span aria-hidden="true">🎨</span>
+            {% elif 'outdoor' in cat or 'adventure' in cat %}
+              <span aria-hidden="true">🌳</span>
+            {% elif 'nature' in cat or 'animal' in cat or 'wildlife' in cat %}
+              <span aria-hidden="true">🦋</span>
+            {% elif 'music' in cat %}
+              <span aria-hidden="true">🎵</span>
+            {% elif 'story' in cat or 'book' in cat %}
+              <span aria-hidden="true">📚</span>
+            {% else %}
+              <span aria-hidden="true">🎈</span>
+            {% endif %}
+          {% else %}
+            <span aria-hidden="true">🎈</span>
+          {% endif %}
+        </div>
       {% endif %}
-      {% else %}<span aria-hidden="true">🎈</span>
+      {% if score is not none %}
+        <div class="absolute top-2 left-2 badge {{ score_bg }} {{ score_class }} backdrop-blur-sm"
+             aria-label="Score {{ score }} out of 10, {{ score_label }}">
+          <span aria-hidden="true">⭐</span> {{ score }}/10
+        </div>
       {% endif %}
-    </div>
-    {% endif %}
-
-    {% if score is not none %}
-    <div class="absolute top-2 left-2 badge {{ score_bg }} {{ score_class }} backdrop-blur-sm"
-      aria-label="Score {{ score }} out of 10, {{ score_label }}">
-      <span aria-hidden="true">⭐</span> {{ score }}/10
-    </div>
-    {% endif %}
-
-    {% if event.is_free %}
-    <div class="absolute top-2 right-2 badge badge-success">Free</div>
-    {% endif %}
-  </div>
-
-  <div class="p-3">
-    <h3 class="text-sm font-semibold text-[var(--color-heading)] line-clamp-2 leading-snug group-hover:text-[var(--color-brand)] transition-colors">
-      {{ event.title }}
-    </h3>
-    <p class="mt-1.5 text-xs text-[var(--color-muted)] flex items-center gap-1 truncate">
-      {{ icon("map-pin", size="w-3.5 h-3.5", cls="shrink-0 text-[var(--color-faint)]") }}
-      {{ event.location_name or event.location_city or "TBA" }}
-    </p>
-    <p class="mt-1 text-xs text-[var(--color-faint)] flex items-center gap-1">
-      {{ icon("calendar", size="w-3.5 h-3.5", cls="shrink-0") }}
-      {{ event.start_time.strftime('%a %b %d, %I:%M%p') }}
-    </p>
-    {% if event.tags %}
-    <div class="mt-2 flex flex-wrap gap-1">
-      {% if event.tags.audience %}
-      <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
-      {% endif %}
-      {% if event.tags.indoor_outdoor %}
-      <span class="badge badge-info">{{ event.tags.indoor_outdoor }}</span>
-      {% endif %}
-      {% if event.tags.meltdown_risk %}
-      <span class="badge {{ 'badge-success' if event.tags.meltdown_risk == 'low' else 'badge-warning' }}">{{ event.tags.meltdown_risk }} meltdown</span>
+      {% if event.is_free %}
+        <div class="absolute top-2 right-2 badge badge-success">Free</div>
       {% endif %}
     </div>
-    {% endif %}
-  </div>
-</a>
+    <div class="p-3">
+      <h3 class="text-sm font-semibold text-[var(--color-heading)] line-clamp-2 leading-snug group-hover:text-[var(--color-brand)] transition-colors">
+        {{ event.title }}
+      </h3>
+      <p class="mt-1.5 text-xs text-[var(--color-muted)] flex items-center gap-1 truncate">
+        {{ icon("map-pin", size="w-3.5 h-3.5", cls="shrink-0 text-[var(--color-faint)]") }}
+        {{ event.location_name or event.location_city or "TBA" }}
+      </p>
+      <p class="mt-1 text-xs text-[var(--color-faint)] flex items-center gap-1">
+        {{ icon("calendar", size="w-3.5 h-3.5", cls="shrink-0") }}
+        {{ event.start_time.strftime("%a %b %d, %I:%M%p") }}
+      </p>
+      {% if event.tags %}
+        <div class="mt-2 flex flex-wrap gap-1">
+          {% if event.tags.audience %}
+            <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
+          {% endif %}
+          {% if event.tags.indoor_outdoor %}
+            <span class="badge badge-info">{{ event.tags.indoor_outdoor }}</span>
+          {% endif %}
+          {% if event.tags.meltdown_risk %}
+            <span class="badge {{ 'badge-success' if event.tags.meltdown_risk == 'low' else 'badge-warning' }}">{{ event.tags.meltdown_risk }} meltdown</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </a>
 {% endmacro %}
-
-
 {# ── Back Link ──
    Usage: {{ back_link("/events", "Back to events") }}
 #}
 {% macro back_link(href, label="Back") %}
-<a href="{{ href }}"
-  class="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] mb-4 transition-colors">
-  {{ icon("chevron-left", size="w-4 h-4") }}
-  {{ label }}
-</a>
+  <a href="{{ href }}"
+     class="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] mb-4 transition-colors">
+    {{ icon("chevron-left", size="w-4 h-4") }}
+    {{ label }}
+  </a>
 {% endmacro %}
-
-
 {# ── Page Header ──
    Usage: {{ page_header("Browse Events", subtitle="Find family-friendly events near you.") }}
 #}
 {% macro page_header(title, subtitle="", emoji="", icon_name="") %}
-<div class="mb-6">
-  <h1 class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
-    {% if emoji %}<span aria-hidden="true">{{ emoji }}</span>{% endif %}
-    {% if icon_name %}{{ icon(icon_name, size="w-6 h-6", cls="text-[var(--color-accent)]") }}{% endif %}
-    {{ title }}
-  </h1>
-  {% if subtitle %}
-  <p class="mt-1 text-sm text-[var(--color-muted)] pl-[15px]">{{ subtitle }}</p>
-  {% endif %}
-</div>
+  <div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
+      {% if emoji %}<span aria-hidden="true">{{ emoji }}</span>{% endif %}
+      {% if icon_name %}
+        {{ icon(icon_name, size="w-6 h-6", cls="text-[var(--color-accent)]") }}
+      {% endif %}
+      {{ title }}
+    </h1>
+    {% if subtitle %}
+      <p class="mt-1 text-sm text-[var(--color-muted)] pl-[15px]">{{ subtitle }}</p>
+    {% endif %}
+  </div>
 {% endmacro %}
-
-
 {# ── Tab Switcher (pill segmented control) ──
    Usage: {{ tab_switcher([("/events", "All", total, not in_attended), ("/events?attended=yes", "Attended", "", in_attended)]) }}
 #}
 {% macro tab_switcher(tabs) %}
-<div role="tablist" aria-label="View"
-  class="inline-flex items-center rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] p-1 shadow-[var(--shadow-xs)]">
-  {% for url, label, count, is_active in tabs %}
-  <button hx-get="{{ url }}" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML" hx-push-url="true"
-    role="tab" aria-selected="{{ 'true' if is_active else 'false' }}"
-    class="px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 touch-target {% if is_active %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-    {{ label }}{% if count %} ({{ count }}){% endif %}
-  </button>
-  {% endfor %}
-</div>
+  <div role="tablist"
+       aria-label="View"
+       class="inline-flex items-center rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] p-1 shadow-[var(--shadow-xs)]">
+    {% for url, label, count, is_active in tabs %}
+      <button hx-get="{{ url }}"
+              hx-target="#main-content"
+              hx-select="#main-content"
+              hx-swap="innerHTML"
+              hx-push-url="true"
+              role="tab"
+              aria-selected="{{ 'true' if is_active else 'false' }}"
+              class="px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 touch-target {% if is_active %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+        {{ label }}
+        {% if count %}({{ count }}){% endif %}
+      </button>
+    {% endfor %}
+  </div>
 {% endmacro %}

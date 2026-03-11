@@ -26,6 +26,7 @@ def _load_settings():
 
     return settings
 
+
 TABLES = ("users", "sources", "events", "jobs")
 
 

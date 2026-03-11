@@ -1,30 +1,33 @@
 {# Source card for user sources #}
 {% set status_badge = {
-  'active': 'badge-success',
-  'analyzing': 'badge-info',
-  'failed': 'badge-danger',
-  'stale': 'badge-warning',
-  'disabled': 'badge-muted',
-  'pending': 'badge-muted'
+  "active": "badge-success",
+  "analyzing": "badge-info",
+  "failed": "badge-danger",
+  "stale": "badge-warning",
+  "disabled": "badge-muted",
+  "pending": "badge-muted"
 } %}
 {% set status_icon = {
-  'active': 'check-circle',
-  'analyzing': 'loader',
-  'failed': 'x-circle',
-  'stale': 'clock',
-  'disabled': 'pause-circle',
-  'pending': 'circle'
+  "active": "check-circle",
+  "analyzing": "loader",
+  "failed": "x-circle",
+  "stale": "clock",
+  "disabled": "pause-circle",
+  "pending": "circle"
 } %}
 {% set badge_cls = status_badge.get(source.status, 'badge-muted') %}
 {% set icon_name = status_icon.get(source.status, 'circle') %}
-
-<div id="source-card-{{ source.id }}" class="source-card bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 animate-fade-in-up">
+<div id="source-card-{{ source.id }}"
+     class="source-card bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-all duration-200 animate-fade-in-up">
   <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">
       <div class="flex items-center gap-2 mb-1">
-        <a href="/source/{{ source.id }}" class="font-semibold text-[var(--color-heading)] hover:text-[var(--color-brand)] transition-colors">{{ source.name }}</a>
+        <a href="/source/{{ source.id }}"
+           class="font-semibold text-[var(--color-heading)] hover:text-[var(--color-brand)] transition-colors">{{ source.name }}</a>
         <span class="badge {{ badge_cls }} flex items-center gap-1">
-          <i data-lucide="{{ icon_name }}" class="w-3 h-3 {% if source.status == 'analyzing' %}animate-spin{% endif %}" aria-hidden="true"></i>
+          <i data-lucide="{{ icon_name }}"
+             class="w-3 h-3 {% if source.status == 'analyzing' %}animate-spin{% endif %}"
+             aria-hidden="true"></i>
           {{ source.status|capitalize }}
         </span>
       </div>
@@ -32,33 +35,47 @@
         <i data-lucide="link" class="w-3 h-3 shrink-0" aria-hidden="true"></i> {{ source.url }}
       </p>
       {% if source.last_event_count %}
-      <p class="text-xs text-[var(--color-faint)] mt-1 flex items-center gap-1">
-        <i data-lucide="calendar" class="w-3 h-3" aria-hidden="true"></i>
-        {{ source.last_event_count }} events · Last scraped {{ source.last_scraped_at.strftime('%b %d') if source.last_scraped_at else 'never' }}
-      </p>
+        <p class="text-xs text-[var(--color-faint)] mt-1 flex items-center gap-1">
+          <i data-lucide="calendar" class="w-3 h-3" aria-hidden="true"></i>
+          {{ source.last_event_count }} events · Last scraped {{ source.last_scraped_at.strftime("%b %d") if source.last_scraped_at else 'never' }}
+        </p>
       {% endif %}
       {% if source.last_error %}
-      <p class="text-xs text-[var(--color-danger)] mt-1 truncate flex items-center gap-1">
-        <i data-lucide="alert-circle" class="w-3 h-3 shrink-0" aria-hidden="true"></i> {{ source.last_error[:80] }}
-      </p>
+        <p class="text-xs text-[var(--color-danger)] mt-1 truncate flex items-center gap-1">
+          <i data-lucide="alert-circle"
+             class="w-3 h-3 shrink-0"
+             aria-hidden="true"></i> {{ source.last_error[:80] }}
+        </p>
       {% endif %}
     </div>
-
     <div class="flex items-center gap-2 shrink-0">
-      <button hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-job-{{ source.id }}" hx-swap="innerHTML"
-          aria-label="Test source {{ source.name }}"
-          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors inline-flex items-center gap-1">
+      <button hx-post="/api/sources/{{ source.id }}/test"
+              hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+              hx-target="#source-job-{{ source.id }}"
+              hx-swap="innerHTML"
+              aria-label="Test source {{ source.name }}"
+              class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors inline-flex items-center gap-1">
         <i data-lucide="play" class="w-3 h-3" aria-hidden="true"></i> Test
       </button>
-      <button hx-post="/api/sources/{{ source.id }}/toggle" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="outerHTML" hx-select="#source-card-{{ source.id }}"
-          aria-label="{{ 'Disable' if source.enabled else 'Enable' }} source {{ source.name }}"
-          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors inline-flex items-center gap-1">
-        <i data-lucide="{{ 'pause' if source.enabled else 'play-circle' }}" class="w-3 h-3" aria-hidden="true"></i>
+      <button hx-post="/api/sources/{{ source.id }}/toggle"
+              hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+              hx-target="#source-card-{{ source.id }}"
+              hx-swap="outerHTML"
+              hx-select="#source-card-{{ source.id }}"
+              aria-label="{{ 'Disable' if source.enabled else 'Enable' }} source {{ source.name }}"
+              class="touch-target px-3 py-2 rounded-lg border border-[var(--color-edge)] text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors inline-flex items-center gap-1">
+        <i data-lucide="{{ 'pause' if source.enabled else 'play-circle' }}"
+           class="w-3 h-3"
+           aria-hidden="true"></i>
         {{ 'Disable' if source.enabled else 'Enable' }}
       </button>
-      <button hx-delete="/api/sources/{{ source.id }}" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#source-card-{{ source.id }}" hx-swap="delete" hx-confirm="Delete this source?"
-          aria-label="Delete source {{ source.name }}"
-          class="touch-target px-3 py-2 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors inline-flex items-center gap-1">
+      <button hx-delete="/api/sources/{{ source.id }}"
+              hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+              hx-target="#source-card-{{ source.id }}"
+              hx-swap="delete"
+              hx-confirm="Delete this source?"
+              aria-label="Delete source {{ source.name }}"
+              class="touch-target px-3 py-2 rounded-lg border border-[var(--color-danger)]/30 text-xs font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors inline-flex items-center gap-1">
         <i data-lucide="trash-2" class="w-3 h-3" aria-hidden="true"></i> Delete
       </button>
     </div>

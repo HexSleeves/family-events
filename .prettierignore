@@ -1,0 +1,10 @@
+node_modules/
+.venv/
+.pytest_cache/
+.ruff_cache/
+build/
+tmp/
+src/web/templates/
+alembic/script.py.mako
+Makefile
+src/web/static/styles.css

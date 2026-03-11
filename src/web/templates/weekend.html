@@ -2,139 +2,145 @@
 {% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, empty_state, form_field %}
 {% block title %}This Weekend{% endblock %}
 {% block content %}
-
-<div class="animate-fade-in">
-  {# ═══ PAGE TITLE — left accent border ═══ #}
-  {{ page_header("Weekend Plan: " ~ saturday.strftime('%b %d') ~ " – " ~ sunday.strftime('%b %d'), emoji="🎉") }}
-
-  {# ═══ WEATHER BANNER — gradient-mesh + glassmorphism ═══ #}
-  <section aria-labelledby="weather-heading"
-    class="relative overflow-hidden rounded-2xl mb-8 animate-fade-in-up stagger-1">
-    <div class="absolute inset-0 gradient-mesh" aria-hidden="true"></div>
-    <div class="relative glass glass-heavy rounded-2xl p-5 sm:p-6 border border-white/20 shadow-[var(--shadow-card)]">
-      <h2 id="weather-heading" class="sr-only">Weekend Weather</h2>
-
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        {# Day forecasts #}
-        <div class="flex items-center gap-6 sm:gap-8">
-          {# Saturday #}
-          <div class="flex items-center gap-3">
-            <div
-              class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)]/80 backdrop-blur flex items-center justify-center">
-              <span class="text-2xl" aria-hidden="true">{{ weather.saturday.icon }}</span>
+  <div class="animate-fade-in">
+    {# ═══ PAGE TITLE — left accent border ═══ #}
+    {{ page_header("Weekend Plan: " ~ saturday.strftime('%b %d') ~ " – " ~ sunday.strftime('%b %d'), emoji="🎉") }}
+    {# ═══ WEATHER BANNER — gradient-mesh + glassmorphism ═══ #}
+    <section aria-labelledby="weather-heading"
+             class="relative overflow-hidden rounded-2xl mb-8 animate-fade-in-up stagger-1">
+      <div class="absolute inset-0 gradient-mesh" aria-hidden="true"></div>
+      <div class="relative glass glass-heavy rounded-2xl p-5 sm:p-6 border border-white/20 shadow-[var(--shadow-card)]">
+        <h2 id="weather-heading" class="sr-only">Weekend Weather</h2>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {# Day forecasts #}
+          <div class="flex items-center gap-6 sm:gap-8">
+            {# Saturday #}
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)]/80 backdrop-blur flex items-center justify-center">
+                <span class="text-2xl" aria-hidden="true">{{ weather.saturday.icon }}</span>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-[var(--color-heading)]">Saturday</p>
+                <p class="text-lg font-semibold text-[var(--color-accent)]">
+                  {{ weather.saturday.temp_high_f }}°F
+                </p>
+              </div>
             </div>
-            <div>
-              <p class="text-sm font-bold text-[var(--color-heading)]">Saturday</p>
-              <p class="text-lg font-semibold text-[var(--color-accent)]">{{ weather.saturday.temp_high_f }}°F</p>
-            </div>
-          </div>
-
-          <div class="hidden sm:block w-px h-10 bg-[var(--color-edge)]" aria-hidden="true"></div>
-
-          {# Sunday #}
-          <div class="flex items-center gap-3">
-            <div
-              class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)]/80 backdrop-blur flex items-center justify-center">
-              <span class="text-2xl" aria-hidden="true">{{ weather.sunday.icon }}</span>
-            </div>
-            <div>
-              <p class="text-sm font-bold text-[var(--color-heading)]">Sunday</p>
-              <p class="text-lg font-semibold text-[var(--color-accent)]">{{ weather.sunday.temp_high_f }}°F</p>
+            <div class="hidden sm:block w-px h-10 bg-[var(--color-edge)]"
+                 aria-hidden="true"></div>
+            {# Sunday #}
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-[var(--color-accent-light)]/80 backdrop-blur flex items-center justify-center">
+                <span class="text-2xl" aria-hidden="true">{{ weather.sunday.icon }}</span>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-[var(--color-heading)]">Sunday</p>
+                <p class="text-lg font-semibold text-[var(--color-accent)]">{{ weather.sunday.temp_high_f }}°F</p>
+              </div>
             </div>
           </div>
+          {# Weather summary with tone icon #}
+          {% if weather_tone == 'success' %}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent-light)]">
+              <i data-lucide="sun"
+                 class="w-4 h-4 text-[var(--color-accent)]"
+                 aria-hidden="true"></i>
+              <p class="text-sm font-medium text-[var(--color-accent)]">{{ weather_summary }}</p>
+            </div>
+          {% elif weather_tone == 'warning' %}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-light)]">
+              <i data-lucide="alert-triangle"
+                 class="w-4 h-4 text-[var(--color-brand)]"
+                 aria-hidden="true"></i>
+              <p class="text-sm font-medium text-[var(--color-brand)]">{{ weather_summary }}</p>
+            </div>
+          {% else %}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-surface-tertiary)]">
+              <i data-lucide="cloud"
+                 class="w-4 h-4 text-[var(--color-muted)]"
+                 aria-hidden="true"></i>
+              <p class="text-sm font-medium text-[var(--color-muted)]">{{ weather_summary }}</p>
+            </div>
+          {% endif %}
         </div>
-
-        {# Weather summary with tone icon #}
-        {% if weather_tone == 'success' %}
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-accent-light)]">
-          <i data-lucide="sun" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
-          <p class="text-sm font-medium text-[var(--color-accent)]">{{ weather_summary }}</p>
+      </div>
+    </section>
+    {# ═══ WEATHER TIPS — bordered info card with Lucide icon ═══ #}
+    {% if weather_tips %}
+      <section aria-labelledby="tips-heading"
+               class="mb-8 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-4 sm:p-5 animate-fade-in-up stagger-2">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-8 h-8 rounded-lg bg-[var(--color-info-light)] flex items-center justify-center shrink-0">
+            <i data-lucide="info"
+               class="w-4 h-4 text-[var(--color-info)]"
+               aria-hidden="true"></i>
+          </div>
+          <h3 id="tips-heading" class="font-semibold text-[var(--color-heading)]">Weather-aware tips</h3>
         </div>
-        {% elif weather_tone == 'warning' %}
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-brand-light)]">
-          <i data-lucide="alert-triangle" class="w-4 h-4 text-[var(--color-brand)]" aria-hidden="true"></i>
-          <p class="text-sm font-medium text-[var(--color-brand)]">{{ weather_summary }}</p>
+        <ul class="space-y-1.5 text-sm text-[var(--color-muted)] pl-10">
+          {% for tip in weather_tips %}
+            <li class="flex items-start gap-2">
+              <span class="text-[var(--color-accent)] mt-0.5" aria-hidden="true">•</span>
+              <span>{{ tip }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+    {# ═══ RANKED EVENTS ═══ #}
+    {% if ranked %}
+      <section aria-labelledby="picks-heading">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-5 animate-fade-in-up stagger-2">
+          <h2 id="picks-heading"
+              class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
+            <i data-lucide="star"
+               class="w-5 h-5 text-[var(--color-accent)]"
+               aria-hidden="true"></i>
+            Top {{ ranked|length }} Picks for Your Weekend
+          </h2>
+          <p class="text-sm text-[var(--color-muted)]">
+            {{ weekend_event_count }} weekend events found
+            {% if untagged_weekend_event_count %}
+              · {{
+              untagged_weekend_event_count }} still need tagging
+            {% endif %}
+          </p>
         </div>
-        {% else %}
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-surface-tertiary)]">
-          <i data-lucide="cloud" class="w-4 h-4 text-[var(--color-muted)]" aria-hidden="true"></i>
-          <p class="text-sm font-medium text-[var(--color-muted)]">{{ weather_summary }}</p>
+        <div class="space-y-3 mb-8">
+          {% for event, score in ranked[:15] %}
+            {% set medal = '🥇' if loop.index == 1 else '🥈' if loop.index == 2 else '🥉' if loop.index == 3 else '#' ~
+                        loop.index %}
+            {% set card_delay = loop.index %}
+            {% set score_value = '%d' % score %}
+            {% include "partials/_event_card.html" %}
+          {% endfor %}
         </div>
+      </section>
+    {% elif weekend_event_count %}
+      <div class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-6 sm:p-8 text-center animate-fade-in-up stagger-2">
+        <div class="w-20 h-20 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center mb-5 mx-auto">
+          <span class="text-4xl" aria-hidden="true">🏷️</span>
+        </div>
+        <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-2">
+          Weekend events are here, but they still need
+          tagging
+        </h3>
+        <p class="text-[var(--color-muted)] max-w-xl mx-auto">
+          We found {{ weekend_event_count }} event{{ '' if weekend_event_count == 1 else 's' }} for this weekend, but none
+          are tagged yet, so we cannot rank them for your family.
+        </p>
+        {% if untagged_weekend_event_count %}
+          <p class="text-sm text-[var(--color-faint)] mt-2">
+            Run tagging to score and personalize these picks.
+          </p>
         {% endif %}
       </div>
-    </div>
-  </section>
-
-  {# ═══ WEATHER TIPS — bordered info card with Lucide icon ═══ #}
-  {% if weather_tips %}
-  <section aria-labelledby="tips-heading"
-    class="mb-8 rounded-xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-4 sm:p-5 animate-fade-in-up stagger-2">
-    <div class="flex items-center gap-2 mb-3">
-      <div class="w-8 h-8 rounded-lg bg-[var(--color-info-light)] flex items-center justify-center shrink-0">
-        <i data-lucide="info" class="w-4 h-4 text-[var(--color-info)]" aria-hidden="true"></i>
-      </div>
-      <h3 id="tips-heading" class="font-semibold text-[var(--color-heading)]">Weather-aware tips</h3>
-    </div>
-    <ul class="space-y-1.5 text-sm text-[var(--color-muted)] pl-10">
-      {% for tip in weather_tips %}
-      <li class="flex items-start gap-2">
-        <span class="text-[var(--color-accent)] mt-0.5" aria-hidden="true">•</span>
-        <span>{{ tip }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
-
-  {# ═══ RANKED EVENTS ═══ #}
-  {% if ranked %}
-  <section aria-labelledby="picks-heading">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-5 animate-fade-in-up stagger-2">
-      <h2 id="picks-heading"
-        class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
-        <i data-lucide="star" class="w-5 h-5 text-[var(--color-accent)]" aria-hidden="true"></i>
-        Top {{ ranked|length }} Picks for Your Weekend
-      </h2>
-      <p class="text-sm text-[var(--color-muted)]">
-        {{ weekend_event_count }} weekend events found{% if untagged_weekend_event_count %} · {{
-        untagged_weekend_event_count }} still need tagging{% endif %}
-      </p>
-    </div>
-
-    <div class="space-y-3 mb-8">
-      {% for event, score in ranked[:15] %}
-      {% set medal = '🥇' if loop.index == 1 else '🥈' if loop.index == 2 else '🥉' if loop.index == 3 else '#' ~
-      loop.index %}
-      {% set card_delay = loop.index %}
-      {% set score_value = '%d' % score %}
-      {% include "partials/_event_card.html" %}
-      {% endfor %}
-    </div>
-  </section>
-  {% elif weekend_event_count %}
-  <div
-    class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] p-6 sm:p-8 text-center animate-fade-in-up stagger-2">
-    <div class="w-20 h-20 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center mb-5 mx-auto">
-      <span class="text-4xl" aria-hidden="true">🏷️</span>
-    </div>
-    <h3 class="text-lg font-semibold text-[var(--color-heading)] mb-2">Weekend events are here, but they still need
-      tagging</h3>
-    <p class="text-[var(--color-muted)] max-w-xl mx-auto">
-      We found {{ weekend_event_count }} event{{ '' if weekend_event_count == 1 else 's' }} for this weekend, but none
-      are tagged yet, so we cannot rank them for your family.
-    </p>
-    {% if untagged_weekend_event_count %}
-    <p class="text-sm text-[var(--color-faint)] mt-2">Run tagging to score and personalize these picks.</p>
+    {% else %}
+      {{ empty_state("calendar", "No weekend events yet", "Run the scraper to find events for this weekend.", emoji="📅") }}
+    {% endif %}
+    {# ═══ NOTIFICATION PREVIEW ═══ #}
+    {% if message %}
+      {% include "partials/_notification.html" %}
     {% endif %}
   </div>
-  {% else %}
-  {{ empty_state("calendar", "No weekend events yet", "Run the scraper to find events for this weekend.", emoji="📅") }}
-  {% endif %}
-
-  {# ═══ NOTIFICATION PREVIEW ═══ #}
-  {% if message %}
-  {% include "partials/_notification.html" %}
-  {% endif %}
-</div>
-
 {% endblock %}

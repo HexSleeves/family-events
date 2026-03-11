@@ -2,17 +2,19 @@
 <div class="bg-[var(--color-success-light)] rounded-lg p-4 mt-3">
   <p class="text-sm font-medium text-[var(--color-success)] mb-2">Found {{ count }} events</p>
   {% if events %}
-  <div class="space-y-1">
-    {% for event in events[:5] %}
-    <div class="text-sm text-[var(--color-body)]">
-      <span class="text-[var(--color-faint)]">{{ event.start_time.strftime('%b %d') if event.start_time else '?' }}</span>
-      · {{ event.title }}
-      {% if event.location_name %}<span class="text-[var(--color-faint)]">· {{ event.location_name }}</span>{% endif %}
+    <div class="space-y-1">
+      {% for event in events[:5] %}
+        <div class="text-sm text-[var(--color-body)]">
+          <span class="text-[var(--color-faint)]">{{ event.start_time.strftime("%b %d") if event.start_time else '?' }}</span>
+          · {{ event.title }}
+          {% if event.location_name %}
+            <span class="text-[var(--color-faint)]">· {{ event.location_name }}</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+      {% if count > 5 %}
+        <p class="text-xs text-[var(--color-faint)] mt-1">...and {{ count - 5 }} more</p>
+      {% endif %}
     </div>
-    {% endfor %}
-    {% if count > 5 %}
-    <p class="text-xs text-[var(--color-faint)] mt-1">...and {{ count - 5 }} more</p>
-    {% endif %}
-  </div>
   {% endif %}
 </div>

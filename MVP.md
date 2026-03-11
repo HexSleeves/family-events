@@ -103,13 +103,16 @@ Choose and document one clear target for launch:
 - Public multi-user signup
 
 ### Tasks
+
 - [ ] Decide target launch mode
 - [ ] Document expected user count and expected event volume
 - [ ] Document whether custom sources are allowed for all users or admin-only
 - [ ] Document whether notifications are user-facing MVP functionality or admin/testing only
 
 ### Why this matters
+
 Several technical decisions depend on this:
+
 - rate limits
 - source quotas
 - auth assumptions
@@ -125,6 +128,7 @@ Several technical decisions depend on this:
 `src/main.py` currently starts uvicorn with `reload=True`, which is dev behavior and should not be used in production.
 
 ### Tasks
+
 - [x] Add explicit dev/prod serve behavior
 - [x] Make production serve run with `reload=False`
 - [x] Keep local development autoreload in `make dev` or a dedicated dev serve mode
@@ -132,6 +136,7 @@ Several technical decisions depend on this:
 - [ ] Add a small test or verification note to ensure prod mode does not reload
 
 ### Deliverable
+
 Production service starts without autoreload and docs clearly separate dev and prod startup.
 
 ---
@@ -141,6 +146,7 @@ Production service starts without autoreload and docs clearly separate dev and p
 Today cron runs scrape and tag in sequence, but the codebase still treats scrape and tag mostly as separate manual actions.
 
 ### Tasks
+
 - [x] Introduce a first-class pipeline runner for `scrape_then_tag`
 - [x] Make cron use the same pipeline runner as the manual UI action
 - [x] Add a primary dashboard action for `Scrape + Tag`
@@ -151,6 +157,7 @@ Today cron runs scrape and tag in sequence, but the codebase still treats scrape
   - `142 events scraped · 121 tagged · 3 failed`
 
 ### Deliverable
+
 There is one clear path for the normal ingestion workflow: scrape first, then tag.
 
 ---
@@ -160,6 +167,7 @@ There is one clear path for the normal ingestion workflow: scrape first, then ta
 `src/cron.py` works, but it is too thin for public release.
 
 ### Tasks
+
 - [x] Set APScheduler timezone explicitly to `America/Chicago`
 - [x] Replace `print()` logging with structured logging
 - [x] Log start, success, duration, and failure of each scheduled run
@@ -171,6 +179,7 @@ There is one clear path for the normal ingestion workflow: scrape first, then ta
 - [ ] Confirm systemd unit behavior and restart policy are appropriate
 
 ### Deliverable
+
 Scheduled runs are observable, timezone-correct, and share the same execution path as manual runs.
 
 ---
@@ -180,6 +189,7 @@ Scheduled runs are observable, timezone-correct, and share the same execution pa
 Current startup migration behavior in `src/db/database.py` uses best-effort `ALTER TABLE` calls with suppressed exceptions. That is too fragile for public release.
 
 ### Tasks
+
 - [x] Add a schema version table
 - [x] Create an explicit migration runner
 - [ ] Move bootstrap schema creation into a clear migration/bootstrap layer
@@ -190,6 +200,7 @@ Current startup migration behavior in `src/db/database.py` uses best-effort `ALT
 - [x] Document migration procedure for deployment
 
 ### Deliverable
+
 Schema changes are explicit, reviewable, testable, and reproducible.
 
 ---
@@ -199,6 +210,7 @@ Schema changes are explicit, reviewable, testable, and reproducible.
 The app stores UTC in many places, but weekend logic and cron comments assume local Central time. We need one consistent rule.
 
 ### Tasks
+
 - [ ] Define canonical storage policy: store datetimes in UTC
 - [ ] Define display/query policy: convert date-window logic through `America/Chicago`
 - [ ] Audit weekend selection logic in `src/web/app.py` and `src/scheduler.py`
@@ -210,6 +222,7 @@ The app stores UTC in many places, but weekend logic and cron comments assume lo
 - [ ] Document the timezone policy in README or architecture docs
 
 ### Deliverable
+
 Weekend pages, notifications, scheduled runs, and event queries behave predictably in Central time.
 
 ---
@@ -219,6 +232,7 @@ Weekend pages, notifications, scheduled runs, and event queries behave predictab
 `/api/events` currently returns recent events without pagination and without a clearly defined public contract.
 
 ### Tasks
+
 - [x] Decide whether `/api/events` is public, authenticated, or internal-only
 - [ ] If public, add pagination, limits, and rate limiting
 - [x] If internal-only, require auth or remove it
@@ -226,6 +240,7 @@ Weekend pages, notifications, scheduled runs, and event queries behave predictab
 - [ ] Audit other endpoints for accidental public exposure
 
 ### Deliverable
+
 Public-facing APIs are intentional, bounded, and documented.
 
 ---
@@ -235,6 +250,7 @@ Public-facing APIs are intentional, bounded, and documented.
 ## 2.1 Unify manual and scheduled pipeline execution
 
 ### Tasks
+
 - [ ] Refactor pipeline execution into reusable functions/services:
   - [x] scrape sources
   - [x] tag untagged/stale events
@@ -246,6 +262,7 @@ Public-facing APIs are intentional, bounded, and documented.
 - [x] Standardize result payloads for job summaries
 
 ### Deliverable
+
 CLI, web jobs, and cron all reuse the same pipeline orchestration layer.
 
 ---
@@ -255,6 +272,7 @@ CLI, web jobs, and cron all reuse the same pipeline orchestration layer.
 The jobs system is already useful. For public release it should become the main operational source of truth.
 
 ### Tasks
+
 - [ ] Review whether all long-running actions are persisted as jobs
 - [x] Add job summaries that operators can understand quickly
 - [x] Ensure progress payloads are structured consistently
@@ -265,6 +283,7 @@ The jobs system is already useful. For public release it should become the main 
 - [x] Add tests for duplicate job prevention and stale job recovery
 
 ### Deliverable
+
 Operators can answer: what ran, when, how long it took, and whether it succeeded.
 
 ---
@@ -274,6 +293,7 @@ Operators can answer: what ran, when, how long it took, and whether it succeeded
 Current health only checks DB reachability and latest scrape timestamp.
 
 ### Tasks
+
 - [x] Include last successful scrape time
 - [x] Include last successful tag time
 - [x] Include last successful notify time
@@ -283,6 +303,7 @@ Current health only checks DB reachability and latest scrape timestamp.
 - [ ] Add tests for degraded states
 
 ### Deliverable
+
 `/health` tells us whether the app is alive and whether the pipeline is fresh.
 
 ---
@@ -292,6 +313,7 @@ Current health only checks DB reachability and latest scrape timestamp.
 HTTP behavior is scattered between scrapers, weather, and analyzer.
 
 ### Tasks
+
 - [x] Introduce a shared HTTP client factory/helper
 - [x] Standardize headers/user-agent
 - [x] Standardize connect/read/write timeouts
@@ -300,6 +322,7 @@ HTTP behavior is scattered between scrapers, weather, and analyzer.
 - [x] Audit weather, analyzer, and all scrapers to use the shared helper
 
 ### Deliverable
+
 External HTTP calls behave consistently and fail in visible ways.
 
 ---
@@ -309,6 +332,7 @@ External HTTP calls behave consistently and fail in visible ways.
 `NotificationDispatcher` currently returns booleans, which is not enough for public debugging.
 
 ### Tasks
+
 - [x] Define a richer notification result model:
   - [x] channel
   - [x] success/failure
@@ -321,6 +345,7 @@ External HTTP calls behave consistently and fail in visible ways.
 - [x] Add tests for successful and failed deliveries
 
 ### Deliverable
+
 When a notification fails, we can see why without digging through logs only.
 
 ---
@@ -332,6 +357,7 @@ When a notification fails, we can see why without digging through logs only.
 Before public launch, we need to know whether key pages stay responsive with larger data.
 
 ### Tasks
+
 - [ ] Estimate expected event volume per month
 - [ ] Seed a realistic database snapshot for profiling
 - [ ] Benchmark:
@@ -343,6 +369,7 @@ Before public launch, we need to know whether key pages stay responsive with lar
 - [ ] Record current slow queries
 
 ### Deliverable
+
 We know where performance is good enough and where it is not.
 
 ---
@@ -352,6 +379,7 @@ We know where performance is good enough and where it is not.
 Current search uses `LIKE` and JSON extraction, which will degrade.
 
 ### Tasks
+
 - [ ] Evaluate SQLite FTS5 for title/description search
 - [ ] Consider denormalizing toddler score into a dedicated column
 - [ ] Review filter/sort query patterns for indexability
@@ -364,6 +392,7 @@ Current search uses `LIKE` and JSON extraction, which will degrade.
 - [ ] Add tests around search correctness after changes
 
 ### Deliverable
+
 The events page remains fast and accurate at MVP scale.
 
 ---
@@ -373,6 +402,7 @@ The events page remains fast and accurate at MVP scale.
 Tagging is central to product quality and currently depends on batch processing and OpenAI behavior.
 
 ### Tasks
+
 - [ ] Confirm tagger concurrency defaults are safe
 - [ ] Confirm OpenAI timeout/retry behavior is sane
 - [ ] Decide how stale retagging should work operationally
@@ -381,6 +411,7 @@ Tagging is central to product quality and currently depends on batch processing 
 - [ ] Add tests for partial batch failures and recovery
 
 ### Deliverable
+
 Tagging is observable and efficient enough for ongoing operation.
 
 ---
@@ -388,6 +419,7 @@ Tagging is observable and efficient enough for ongoing operation.
 ## 3.4 Review data freshness and stale-source handling
 
 ### Tasks
+
 - [ ] Define what `active`, `stale`, `failed`, and `disabled` mean operationally
 - [ ] Review source status transitions after zero-result scrapes
 - [ ] Decide whether repeated zero-result scrapes should degrade confidence or alert operators
@@ -395,6 +427,7 @@ Tagging is observable and efficient enough for ongoing operation.
 - [ ] Add tests for source status transitions
 
 ### Deliverable
+
 Source health is understandable and stale sources are visible.
 
 ---
@@ -406,6 +439,7 @@ Source health is understandable and stale sources are visible.
 It is still too large and mixes multiple concerns.
 
 ### Tasks
+
 - [x] Extract events routes
 - [x] Extract calendar routes
 - [x] Extract pipeline/job routes
@@ -414,6 +448,7 @@ It is still too large and mixes multiple concerns.
 - [ ] Add route tests as modules are moved
 
 ### Deliverable
+
 Web routes are easier to reason about and safer to change post-launch.
 
 ---
@@ -423,6 +458,7 @@ Web routes are easier to reason about and safer to change post-launch.
 This module currently does schema bootstrapping, row mapping, repositories, job persistence, and dedupe logic.
 
 ### Tasks
+
 - [x] Extract schema/bootstrap/migration code
 - [ ] Extract event repository methods
 - [ ] Extract user repository methods
@@ -432,6 +468,7 @@ This module currently does schema bootstrapping, row mapping, repositories, job 
 - [ ] Keep the public database interface thin and obvious
 
 ### Deliverable
+
 The persistence layer is easier to test and evolve.
 
 ---
@@ -439,12 +476,14 @@ The persistence layer is easier to test and evolve.
 ## 4.3 Add a thin service/orchestration layer
 
 ### Tasks
+
 - [ ] Add pipeline service
 - [ ] Add source service where appropriate
 - [ ] Add notification service result shaping
 - [ ] Keep routes focused on request/response concerns only
 
 ### Deliverable
+
 Business logic is not spread across routes, cron, and CLI entry points.
 
 ---
@@ -456,6 +495,7 @@ Business logic is not spread across routes, cron, and CLI entry points.
 The UI should guide the operator toward the normal workflow.
 
 ### Tasks
+
 - [x] Promote `Scrape + Tag` as the primary ingest action on dashboard
 - [ ] Clarify when standalone `Tag` is useful
 - [ ] Clarify when `Notify` is useful
@@ -463,6 +503,7 @@ The UI should guide the operator toward the normal workflow.
 - [x] Ensure job panels refresh consistently after pipeline actions
 
 ### Deliverable
+
 The intended workflow is obvious without reading the code.
 
 ---
@@ -470,12 +511,14 @@ The intended workflow is obvious without reading the code.
 ## 5.2 Finish remaining HTMX consistency and warning cleanup
 
 ### Tasks
+
 - [ ] Eliminate remaining `TemplateResponse` deprecation warnings
 - [ ] Audit remaining pages/helpers for non-HTMX-first interactions
 - [ ] Remove remaining inline handler leftovers if any exist
 - [x] Ensure error rerenders work consistently with HTMX targets
 
 ### Deliverable
+
 The UI is clean, consistent, and warning-free.
 
 ---
@@ -483,12 +526,14 @@ The UI is clean, consistent, and warning-free.
 ## 5.3 Improve empty/error states for public users
 
 ### Tasks
+
 - [ ] Audit dashboard empty states
 - [ ] Audit weekend page empty states
 - [ ] Audit source failures and job failure presentation
 - [ ] Make public-facing messages actionable and non-technical where appropriate
 
 ### Deliverable
+
 Users understand what to do next when there is no data or a failure occurs.
 
 ---
@@ -500,6 +545,7 @@ Users understand what to do next when there is no data or a failure occurs.
 Security basics are much better now, but a public launch should still get a final pass.
 
 ### Tasks
+
 - [ ] Verify session cookie settings in production environment
 - [ ] Verify HTTPS and reverse proxy forwarding behavior
 - [ ] Verify `APP_BASE_URL` and origin checks in real deployment
@@ -509,6 +555,7 @@ Security basics are much better now, but a public launch should still get a fina
 - [ ] Review secret handling for OpenAI, Resend, Twilio, Telegram
 
 ### Deliverable
+
 Public deployment assumptions are verified, not guessed.
 
 ---
@@ -516,17 +563,20 @@ Public deployment assumptions are verified, not guessed.
 ## 6.2 Decide how much multi-process safety MVP needs
 
 Some state is still in-memory:
+
 - rate limiting store
 - bulk unattend undo store
 - active job registry
 
 ### Tasks
+
 - [ ] Decide whether MVP is strictly single-process on one VM
 - [ ] If yes, document that clearly
 - [ ] If no, move volatile coordination state into SQLite or another shared store
 - [ ] Ensure deployment architecture matches this decision
 
 ### Deliverable
+
 No hidden mismatch between runtime architecture and code assumptions.
 
 ---
@@ -536,6 +586,7 @@ No hidden mismatch between runtime architecture and code assumptions.
 SQLite can be fine for MVP, but only if we treat it responsibly.
 
 ### Tasks
+
 - [ ] Move runtime DB path out of repo root if needed
 - [ ] Define backup cadence
 - [ ] Define restore process
@@ -543,6 +594,7 @@ SQLite can be fine for MVP, but only if we treat it responsibly.
 - [ ] Add a simple operator runbook for DB maintenance
 
 ### Deliverable
+
 Data durability is adequate for an MVP product.
 
 ---
@@ -552,6 +604,7 @@ Data durability is adequate for an MVP product.
 ## 7.1 Expand automated tests where current risk is highest
 
 ### Tasks
+
 - [ ] Add route tests for profile update endpoints
 - [x] Add route tests for scrape/tag/notify job endpoints
 - [x] Add tests for pipeline job execution and duplicate prevention
@@ -562,6 +615,7 @@ Data durability is adequate for an MVP product.
 - [ ] Add source status transition tests
 
 ### Deliverable
+
 The highest-risk release areas have regression coverage.
 
 ---
@@ -569,6 +623,7 @@ The highest-risk release areas have regression coverage.
 ## 7.2 Define release quality gates
 
 ### Tasks
+
 - [x] Define required pre-release commands, at minimum:
   - [x] `uv run ruff check src tests`
   - [x] `uv run pytest`
@@ -578,6 +633,7 @@ The highest-risk release areas have regression coverage.
 - [ ] Decide whether every release requires a seeded-data UI review
 
 ### Deliverable
+
 Release readiness is a repeatable process, not a vibe.
 
 ---
@@ -589,6 +645,7 @@ Release readiness is a repeatable process, not a vibe.
 The README and deployment docs need to match reality before launch.
 
 ### Tasks
+
 - [x] Update README to reflect actual architecture and current behavior
 - [x] Document background jobs in the web UI
 - [x] Document cron/scheduled pipeline behavior
@@ -598,6 +655,7 @@ The README and deployment docs need to match reality before launch.
 - [x] Document environment variables clearly
 
 ### Deliverable
+
 A new maintainer can deploy and operate the app from the docs.
 
 ---
@@ -605,6 +663,7 @@ A new maintainer can deploy and operate the app from the docs.
 ## 8.2 Add an operator runbook
 
 ### Tasks
+
 - [ ] How to deploy
 - [ ] How to run migrations
 - [ ] How to verify scheduler is alive
@@ -615,6 +674,7 @@ A new maintainer can deploy and operate the app from the docs.
 - [ ] How to back up/restore the DB
 
 ### Deliverable
+
 The app is operable by someone other than the current developer.
 
 ---
@@ -622,6 +682,7 @@ The app is operable by someone other than the current developer.
 # Suggested implementation order
 
 ## Sprint 1 — Release blockers
+
 - [x] Fix prod serve mode
 - [x] Add explicit scheduler timezone
 - [x] Create first-class `scrape_then_tag` pipeline path
@@ -629,18 +690,21 @@ The app is operable by someone other than the current developer.
 - [x] Expand `/health` with freshness signals
 
 ## Sprint 2 — Safety and correctness
+
 - [ ] Add explicit migrations
 - [ ] Audit timezone handling
 - [ ] Bound `/api/events` and other public endpoints
 - [ ] Improve notification result persistence
 
 ## Sprint 3 — Performance and cleanup
+
 - [ ] Benchmark realistic data volume
 - [ ] Improve search/indexing
 - [ ] Centralize HTTP client behavior
 - [ ] Clean remaining `TemplateResponse` warnings
 
 ## Sprint 4 — Refactor and docs
+
 - [ ] Split `web/app.py`
 - [ ] Split `db/database.py`
 - [ ] Update README, deployment docs, and operator runbook
@@ -651,6 +715,7 @@ The app is operable by someone other than the current developer.
 # Concrete backlog by area
 
 ## Pipeline and scheduling
+
 - [x] Add `run_scrape_then_tag(...)`
 - [ ] Add `run_scrape_tag_notify(...)` if needed
 - [x] Add job kind for pipeline runs
@@ -658,6 +723,7 @@ The app is operable by someone other than the current developer.
 - [x] Scheduled jobs visible in jobs UI
 
 ## Web UI
+
 - [x] Dashboard primary action becomes `Scrape + Tag`
 - [x] Jobs page includes scheduled/system jobs
 - [x] Improve job result summaries
@@ -665,6 +731,7 @@ The app is operable by someone other than the current developer.
 - [ ] Remove remaining deprecation warnings
 
 ## Database
+
 - [ ] Schema version table
 - [ ] Migration runner
 - [ ] Search/index improvements
@@ -672,17 +739,20 @@ The app is operable by someone other than the current developer.
 - [ ] Review runtime DB file placement
 
 ## Notifications
+
 - [x] Persist notification outcomes
 - [x] Make unknown channel a hard failure path
 - [ ] Surface results in jobs/history
 
 ## Operations
+
 - [x] Structured logging
 - [x] Pipeline freshness in `/health`
 - [ ] Backup and restore procedure
 - [ ] Production service docs
 
 ## Tests
+
 - [x] Pipeline job tests
 - [x] Scheduler tests or scheduler-adjacent orchestration tests
 - [ ] Migration tests

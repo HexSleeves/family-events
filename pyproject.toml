@@ -5,29 +5,29 @@ description = "Family event discovery system for Lafayette & Baton Rouge, LA"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiosqlite>=0.22.1",
-    "alembic>=1.16.5",
-    "apscheduler>=3.11.2",
-    "asyncpg>=0.30.0",
-    "bcrypt>=5.0.0",
-    "beautifulsoup4>=4.14.3",
-    "fastapi>=0.135.0",
-    "httpx>=0.28.1",
-    "itsdangerous>=2.2.0",
-    "jinja2>=3.1.6",
-    "lxml>=6.0.2",
-    "openai>=2.26.0",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.13.1",
-    "python-dateutil>=2.9.0.post0",
-    "python-multipart>=0.0.22",
-    "sqlalchemy>=2.0.43",
-    "greenlet>=3.2.4",
-    "uvicorn>=0.41.0",
+  "aiosqlite>=0.22.1",
+  "alembic>=1.16.5",
+  "apscheduler>=3.11.2",
+  "asyncpg>=0.30.0",
+  "bcrypt>=5.0.0",
+  "beautifulsoup4>=4.14.3",
+  "fastapi>=0.135.0",
+  "httpx>=0.28.1",
+  "itsdangerous>=2.2.0",
+  "jinja2>=3.1.6",
+  "lxml>=6.0.2",
+  "openai>=2.26.0",
+  "pydantic>=2.12.5",
+  "pydantic-settings>=2.13.1",
+  "python-dateutil>=2.9.0.post0",
+  "python-multipart>=0.0.22",
+  "sqlalchemy>=2.0.43",
+  "greenlet>=3.2.4",
+  "uvicorn>=0.41.0",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.4.2", "ruff>=0.15", "ty>=0.0.18"]
+dev = ["djlint>=1.36.4", "pytest>=8.4.2", "ruff>=0.15", "ty>=0.0.18"]
 
 # --------------------------------------------------------------------------
 # Ruff
@@ -37,30 +37,30 @@ line-length = 100
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # Pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "SIM", # flake8-simplify
-    "RUF", # Ruff-specific rules
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # Pyflakes
+  "I",   # isort
+  "N",   # pep8-naming
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "SIM", # flake8-simplify
+  "RUF", # Ruff-specific rules
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
-    "UP007", # use X | Y for unions (we use this already but some old code)
+  "E501",  # line too long (handled by formatter)
+  "B008",  # do not perform function calls in argument defaults
+  "UP007", # use X | Y for unions (we use this already but some old code)
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
 [tool.ruff.format]
-quote-style               = "double"
-indent-style              = "space"
+quote-style = "double"
+indent-style = "space"
 skip-magic-trailing-comma = false
-line-ending               = "auto"
+line-ending = "auto"
 
 # --------------------------------------------------------------------------
 # ty
@@ -71,8 +71,8 @@ python-version = "3.12"
 [tool.ty.rules]
 # Start lenient, tighten over time
 possibly-unresolved-reference = "warn"
-unresolved-import             = "warn"
-unresolved-attribute          = "ignore" # too noisy with dynamic libs (bs4, aiosqlite)
-invalid-argument-type         = "warn"
-missing-argument              = "warn"
-invalid-return-type           = "warn"
+unresolved-import = "warn"
+unresolved-attribute = "ignore"        # too noisy with dynamic libs (bs4, aiosqlite)
+invalid-argument-type = "warn"
+missing-argument = "warn"
+invalid-return-type = "warn"

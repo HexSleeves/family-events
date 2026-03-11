@@ -1,78 +1,83 @@
 {# Compact event card — used in weekend ranked list and other contexts #}
 {% set score = event.tags.toddler_score if event.tags else none %}
 {% set score_class = "score-low" if score is not none and score <= 3
-                else "score-mid" if score is not none and score <= 6
-                else "score-high" if score is not none and score <= 8
-                else "score-top" if score is not none
-                else "" %}
+  else "score-mid" if score is not none and score <= 6
+  else "score-high" if score is not none and score <= 8
+  else "score-top" if score is not none
+else "" %}
 {% set score_bg = "score-bg-low" if score is not none and score <= 3
-              else "score-bg-mid" if score is not none and score <= 6
-              else "score-bg-high" if score is not none and score <= 8
-              else "score-bg-top" if score is not none
-              else "" %}
-
+  else "score-bg-mid" if score is not none and score <= 6
+  else "score-bg-high" if score is not none and score <= 8
+  else "score-bg-top" if score is not none
+else "" %}
 <a href="{{ link or '/event/' ~ event.id }}"
    class="group flex gap-4 p-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5 transition-all duration-200 animate-fade-in-up{% if card_delay is defined %} stagger-{{ [card_delay, 9] | min }}{% endif %}">
-
   {# Thumbnail #}
   <div class="shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden">
     {% if event.image_url %}
-    <img src="{{ event.image_url }}" alt="" class="w-full h-full object-cover" loading="lazy" />
+      <img src="{{ event.image_url }}"
+           alt=""
+           class="w-full h-full object-cover"
+           loading="lazy" />
     {% else %}
-    <div class="w-full h-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-brand)] flex items-center justify-center" role="img" aria-label="{{ event.title }} placeholder">
-      <span class="text-xl text-white/90" aria-hidden="true">
-        {% if event.tags and event.tags.categories %}{{ {'play': '🎨', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}{% else %}🌟{% endif %}
-      </span>
-    </div>
+      <div class="w-full h-full bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-brand)] flex items-center justify-center"
+           role="img"
+           aria-label="{{ event.title }} placeholder">
+        <span class="text-xl text-white/90" aria-hidden="true">
+          {% if event.tags and event.tags.categories %}
+            {{ {'play': '🎨', 'nature': '🌳', 'arts': '🎨', 'sports': '⚽', 'animals': '🐾', 'music': '🎵', 'learning': '📚'}.get(event.tags.categories[0], '🌟') }}
+          {% else %}
+            🌟
+          {% endif %}
+        </span>
+      </div>
     {% endif %}
   </div>
-
   {# Content #}
   <div class="flex-1 min-w-0">
     <div class="flex items-start justify-between gap-2">
       <div class="min-w-0 flex items-center gap-1.5">
         {% if medal is defined and medal %}
-        <span class="text-lg shrink-0" aria-hidden="true">{{ medal }}</span>
+          <span class="text-lg shrink-0" aria-hidden="true">{{ medal }}</span>
         {% endif %}
         <h3 class="font-semibold text-[var(--color-heading)] line-clamp-1 group-hover:text-[var(--color-brand)] transition-colors">
           {{ event.title }}
         </h3>
       </div>
-
       {# Score badge #}
       {% if score is not none %}
-      <div class="shrink-0 w-10 h-10 rounded-full {{ score_bg }} flex items-center justify-center" aria-label="Score {{ score }} out of 10" role="img">
-        <span class="text-sm font-bold {{ score_class }}" aria-hidden="true">{{ score }}</span>
-      </div>
+        <div class="shrink-0 w-10 h-10 rounded-full {{ score_bg }} flex items-center justify-center"
+             aria-label="Score {{ score }} out of 10"
+             role="img">
+          <span class="text-sm font-bold {{ score_class }}" aria-hidden="true">{{ score }}</span>
+        </div>
       {% endif %}
     </div>
-
     <p class="text-sm text-[var(--color-muted)] mt-0.5">
       <span aria-hidden="true">📍</span> {{ event.location_name or event.location_city }}
-      · {{ event.start_time.strftime('%a %b %d, %I:%M%p') }}
+      · {{ event.start_time.strftime("%a %b %d, %I:%M%p") }}
     </p>
-
     {# Tags row #}
     <div class="flex items-center gap-2 mt-2 flex-wrap">
       {% if event.is_free %}
-      <span class="badge badge-success">Free</span>
+        <span class="badge badge-success">Free</span>
       {% elif event.price_min %}
-      <span class="badge badge-muted">${{ '%.0f' % event.price_min }}</span>
+        <span class="badge badge-muted">${{ '%.0f' % event.price_min }}</span>
       {% endif %}
       {% if event.tags %}
-      <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
-      <span class="badge badge-muted">{{ event.tags.indoor_outdoor }}</span>
-      {% if event.tags.meltdown_risk == 'low' %}
-      <span class="badge badge-success">calm</span>
-      {% elif event.tags.meltdown_risk == 'high' %}
-      <span class="badge badge-warning">high risk</span>
-      {% endif %}
-      {% for cat in (event.tags.categories or [])[:2] %}
-      <span class="badge badge-info">{{ cat }}</span>
-      {% endfor %}
+        <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
+        <span class="badge badge-muted">{{ event.tags.indoor_outdoor }}</span>
+        {% if event.tags.meltdown_risk == 'low' %}
+          <span class="badge badge-success">calm</span>
+        {% elif event.tags.meltdown_risk == 'high' %}
+          <span class="badge badge-warning">high risk</span>
+        {% endif %}
+        {% for cat in (event.tags.categories or [])[:2] %}
+          <span class="badge badge-info">{{ cat }}</span>
+        {% endfor %}
       {% endif %}
       {% if score_value is defined and score_value %}
-      <span class="ml-auto text-lg font-bold text-[var(--color-brand)]">{{ score_value }} <span class="text-xs font-normal text-[var(--color-faint)]">pts</span></span>
+        <span class="ml-auto text-lg font-bold text-[var(--color-brand)]">{{ score_value }} <span class="text-xs font-normal text-[var(--color-faint)]">pts</span></span>
       {% endif %}
     </div>
   </div>

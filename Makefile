@@ -1,4 +1,6 @@
-.PHONY: help install lint format typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate
+.PHONY: help install lint format format-check typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate
+
+DJLINT_FLAGS=--profile=jinja --indent 2 --max-line-length 100 --ignore H006,H023,H029,H031,J004,J018,T003,T028
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -22,20 +24,30 @@ upgrade: ## Upgrade all dependencies
 # Code Quality
 # ──────────────────────────────────────────────
 
-lint: ## Lint with ruff
-	uv run ruff check src/ main.py tests/
+lint: ## Lint Python, templates, and TOML
+	uv run ruff check src/ scripts/ main.py tests/
+	uv run djlint $(DJLINT_FLAGS) --lint src/web/templates/
+	npm run lint:toml
 
-format: ## Format with ruff
-	uv run ruff format src/ main.py tests/
+format: ## Format Python, templates, docs, config, and frontend assets
+	uv run ruff format src/ scripts/ main.py tests/
+	status=0; uv run djlint $(DJLINT_FLAGS) --reformat --quiet src/web/templates/ || status=$$?; [ $$status -le 1 ]
+	npm run format:text
+	npm run format:toml
+	uv run python scripts/format_misc.py
 
 format-check: ## Check formatting without writing changes
-	uv run ruff format --check src/ main.py tests/
+	uv run ruff format --check src/ scripts/ main.py tests/
+	uv run djlint $(DJLINT_FLAGS) --check src/web/templates/
+	npm run format:text:check
+	npm run format:toml:check
+	uv run python scripts/format_misc.py --check
 
 typecheck: ## Type check with ty
-	uv run ty check src/ main.py
+	uv run ty check src/ scripts/ main.py
 
 fix: ## Auto-fix linting issues with ruff
-	uv run ruff check --fix src/ main.py tests/
+	uv run ruff check --fix src/ scripts/ main.py tests/
 
 check: lint format-check typecheck ## Run all checks (lint, format, typecheck)
 
