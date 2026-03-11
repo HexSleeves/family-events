@@ -35,11 +35,13 @@ async def health_check(request: Request) -> JSONResponse:
     except Exception as exc:
         logger.exception("health_check_db_failed: %s", exc)
 
-    event_count = int(stats.get("event_count", 0) or 0)
+    event_count_raw = stats.get("event_count")
+    event_count = event_count_raw if isinstance(event_count_raw, int) else 0
     latest_scrape_at = stats.get("latest_scraped_at")
     latest_tagged_at = stats.get("latest_tagged_at")
     latest_notified_at = stats.get("latest_notified_at")
-    stuck_running_jobs = int(stats.get("stuck_running_jobs", 0) or 0)
+    stuck_running_jobs_raw = stats.get("stuck_running_jobs")
+    stuck_running_jobs = stuck_running_jobs_raw if isinstance(stuck_running_jobs_raw, int) else 0
 
     status = "ok" if db_ok and stuck_running_jobs == 0 else "degraded"
     payload = {
@@ -52,9 +54,15 @@ async def health_check(request: Request) -> JSONResponse:
                 "event_count": event_count,
             },
             "pipeline": {
-                "latest_scraped_at": format_ts(latest_scrape_at if isinstance(latest_scrape_at, datetime) else None),
-                "latest_tagged_at": format_ts(latest_tagged_at if isinstance(latest_tagged_at, datetime) else None),
-                "latest_notified_at": format_ts(latest_notified_at if isinstance(latest_notified_at, datetime) else None),
+                "latest_scraped_at": format_ts(
+                    latest_scrape_at if isinstance(latest_scrape_at, datetime) else None
+                ),
+                "latest_tagged_at": format_ts(
+                    latest_tagged_at if isinstance(latest_tagged_at, datetime) else None
+                ),
+                "latest_notified_at": format_ts(
+                    latest_notified_at if isinstance(latest_notified_at, datetime) else None
+                ),
                 "stuck_running_jobs": stuck_running_jobs,
             },
         },

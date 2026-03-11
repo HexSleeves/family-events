@@ -263,7 +263,9 @@ class EventTagger:
             "Lafayette",
             "Baton Rouge",
         }
-        bathroom_accessible = self._contains_any(text, BATHROOM_TERMS) or indoor_outdoor != "outdoor"
+        bathroom_accessible = (
+            self._contains_any(text, BATHROOM_TERMS) or indoor_outdoor != "outdoor"
+        )
         food_available = self._contains_any(text, FOOD_TERMS)
         nap_compatible = not (13 <= event.start_time.hour <= 15)
         weather_dependent = indoor_outdoor == "outdoor"

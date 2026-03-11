@@ -51,7 +51,9 @@ def test_run_scheduled_scrape_then_tag_persists_job(tmp_path, monkeypatch):
                 raw_data={},
             )
 
-            monkeypatch.setattr(scheduler_module, "_build_scraper", lambda _source: DummyScraper([event]))
+            monkeypatch.setattr(
+                scheduler_module, "_build_scraper", lambda _source: DummyScraper([event])
+            )
 
             async def fake_run_tag(db, *, progress_callback=None, include_stale=True):
                 events = await db.get_recent_events(days=30)

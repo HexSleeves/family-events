@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from typing import Any
 
@@ -15,7 +15,9 @@ from src.web.common import ctx, get_db, is_htmx_request, template_response
 router = APIRouter()
 
 
-def _resolve_month_range(month: str) -> tuple[datetime.date, datetime.date, datetime.date, datetime.date]:
+def _resolve_month_range(
+    month: str,
+) -> tuple[date, date, date, date]:
     today = local_today()
     if month:
         try:

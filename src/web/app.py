@@ -17,7 +17,7 @@ from src.config import settings
 from src.db.database import Database, create_database
 from src.web.common import ctx, template_response
 from src.web.jobs import job_registry
-from src.web.middleware import RequestLoggingMiddleware
+from src.web.middleware import LocalSessionCookieMiddleware, RequestLoggingMiddleware
 from src.web.routes.auth import router as auth_router
 from src.web.routes.calendar import router as calendar_router
 from src.web.routes.events import router as events_router
@@ -57,6 +57,7 @@ app.add_middleware(
     https_only=settings.session_cookie_secure,
     domain=settings.session_cookie_domain or None,
 )
+app.add_middleware(cast(Any, LocalSessionCookieMiddleware))
 app.state.db = db
 app.state.templates = templates
 app.state.rate_limit_store = _rate_limit_store

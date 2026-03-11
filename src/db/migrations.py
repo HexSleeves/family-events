@@ -53,10 +53,14 @@ async def current_postgres_revision(connection: AsyncConnection) -> str | None:
     if table_result.scalar_one_or_none() is None:
         return None
 
-    revision_result = await connection.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+    revision_result = await connection.execute(
+        text("SELECT version_num FROM alembic_version LIMIT 1")
+    )
     return revision_result.scalar_one_or_none()
 
 
 async def ensure_postgres_schema_current(connection: AsyncConnection) -> None:
     """Fail fast if the connected Postgres schema is not at the Alembic head."""
-    validate_postgres_revision(await current_postgres_revision(connection), expected_postgres_revision())
+    validate_postgres_revision(
+        await current_postgres_revision(connection), expected_postgres_revision()
+    )

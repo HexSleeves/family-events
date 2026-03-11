@@ -28,7 +28,9 @@ def _weather() -> dict[str, DayForecast]:
     }
 
 
-def _event(title: str, *, city: str, tags: EventTags, hour: int = 10, price_min: float | None = None) -> Event:
+def _event(
+    title: str, *, city: str, tags: EventTags, hour: int = 10, price_min: float | None = None
+) -> Event:
     return Event(
         title=title,
         description="Test event",
@@ -87,7 +89,6 @@ def test_ranker_prefers_toddler_focused_event_over_adult_event():
 
     assert ranked[0][0].title == "Story Time"
     assert ranked[0][1] > ranked[1][1]
-
 
 
 def test_score_breakdown_applies_budget_penalty_instead_of_zeroing():

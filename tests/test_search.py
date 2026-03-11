@@ -69,7 +69,7 @@ def test_events_page_renders_query_in_global_search_inputs(client) -> None:
     response = client.get("/events", params={"q": "Tennis"})
 
     assert response.status_code == 200
-    assert response.text.count('data-global-event-search') >= 2
+    assert response.text.count("data-global-event-search") >= 2
     assert response.text.count('value="Tennis"') >= 2
 
 

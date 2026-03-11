@@ -55,7 +55,9 @@ class AllEventsScraper(BaseScraper):
                 if data.get("@type") == "Event":
                     items = [data]
                 elif "itemListElement" in data:
-                    items = [el.get("item", el) for el in data["itemListElement"] if isinstance(el, dict)]
+                    items = [
+                        el.get("item", el) for el in data["itemListElement"] if isinstance(el, dict)
+                    ]
 
             for item in items:
                 if item.get("@type") != "Event":
@@ -80,7 +82,11 @@ class AllEventsScraper(BaseScraper):
         if isinstance(location, dict):
             loc_name = location.get("name", "")
             address_obj = location.get("address", {})
-            loc_address = address_obj.get("streetAddress", "") if isinstance(address_obj, dict) else str(address_obj)
+            loc_address = (
+                address_obj.get("streetAddress", "")
+                if isinstance(address_obj, dict)
+                else str(address_obj)
+            )
         else:
             loc_name = str(location)
             loc_address = ""

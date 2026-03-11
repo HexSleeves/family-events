@@ -5,9 +5,13 @@ import re
 import socket
 from datetime import UTC, datetime
 
+from fastapi.testclient import TestClient
+
+from src.db.database import create_database
 from src.db.models import Event, Source
 from src.scrapers.analyzer import validate_public_http_url
 from src.scrapers.router import extract_domain
+from src.web.common import _same_origin
 
 
 def extract_csrf_token(html: str) -> str:
@@ -70,6 +74,12 @@ def test_mutating_endpoint_rejects_cross_origin(client, create_user):
 
     assert response.status_code == 403
     assert "origin policy" in response.headers.get("hx-trigger", "")
+
+
+def test_same_origin_accepts_loopback_aliases():
+    assert _same_origin("http://127.0.0.1:8000", "http://localhost:8000")
+    assert _same_origin("http://localhost:8000", "http://[::1]:8000")
+    assert not _same_origin("http://127.0.0.1:8000", "https://127.0.0.1:8000")
 
 
 def test_logout_requires_valid_csrf(client, create_user):
@@ -196,6 +206,154 @@ def test_signup_creates_onboarded_user_and_predefined_sources(client):
     assert len(sources) == 2
 
 
+def test_signup_starts_scrape_tag_job(client, monkeypatch):
+    import src.web.jobs as jobs_module
+    from src.db.database import create_database
+    from src.web.jobs import JobRegistry
+
+    registry = JobRegistry()
+    database_url = client.app.state.db.database_url
+    monkeypatch.setattr(jobs_module, "Database", lambda: create_database(database_url=database_url))
+    monkeypatch.setattr(jobs_module, "job_registry", registry)
+
+    async def fake_run_scrape_then_tag(*args, **kwargs):
+        progress_callback = kwargs.get("progress_callback")
+        if progress_callback is not None:
+            await progress_callback({"summary": "Running…"})
+        await asyncio.sleep(0.2)
+        return {
+            "scraped": 1,
+            "tagged": 1,
+            "failed": 0,
+            "summary": "1 events scraped · 1 tagged · 0 failed",
+        }
+
+    monkeypatch.setattr("src.scheduler.run_scrape_then_tag", fake_run_scrape_then_tag)
+
+    page = client.get("/signup")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(
+        "/signup",
+        data={
+            "csrf_token": csrf_token,
+            "email": "signup-job@example.com",
+            "display_name": "New Parent",
+            "password": "Password123",
+            "confirm_password": "Password123",
+            "home_city": "Baton Rouge",
+            "preferred_cities": "Baton Rouge, Lafayette",
+            "child_name": "Em",
+            "temperament": "curious but sensitive to noise",
+            "child_age_years": "3",
+            "child_age_months": "6",
+            "loves": "animals, music",
+            "likes": "story_time",
+            "dislikes": "loud_crowds",
+            "favorite_categories": "animals, play",
+            "avoid_categories": "sports",
+            "nap_time": "13:00-15:00",
+            "bedtime": "19:30",
+            "budget": "25",
+            "max_drive": "35",
+            "predefined_sources": ["baton-rouge-brec"],
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    created = asyncio.run(client.app.state.db.get_user_by_email("signup-job@example.com"))
+    assert created is not None
+    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=created.id, limit=10))
+    scrape_tag_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
+    assert len(scrape_tag_jobs) == 1
+
+
+def test_signup_duplicate_email_shows_inline_error_for_htmx(client, create_user):
+    create_user(email="new@example.com")
+    page = client.get("/signup")
+    csrf_token = extract_csrf_token(page.text)
+
+    response = client.post(
+        "/signup",
+        data={
+            "csrf_token": csrf_token,
+            "email": "new@example.com",
+            "display_name": "New Parent",
+            "password": "Password123",
+            "confirm_password": "Password123",
+            "home_city": "Baton Rouge",
+            "preferred_cities": "Baton Rouge",
+            "child_name": "Em",
+            "temperament": "curious but sensitive to noise",
+            "child_age_years": "3",
+            "child_age_months": "6",
+            "loves": "animals, music",
+            "likes": "story_time",
+            "dislikes": "loud_crowds",
+            "favorite_categories": "animals, play",
+            "avoid_categories": "sports",
+            "nap_time": "13:00-15:00",
+            "bedtime": "19:30",
+            "budget": "25",
+            "max_drive": "35",
+        },
+        headers={"HX-Request": "true"},
+    )
+
+    assert response.status_code == 200
+    assert "An account with this email already exists. Log in instead." in response.text
+    assert 'href="/login?email=new%40example.com"' in response.text
+    login_page = client.get("/login?email=new@example.com")
+    assert 'value="new@example.com"' in login_page.text
+
+
+def test_signup_succeeds_on_local_http_loopback(tmp_path, monkeypatch):
+    from src.web import app as appmod
+
+    test_db = create_database(str(tmp_path / "local-http.db"))
+    monkeypatch.setattr(appmod, "db", test_db)
+    appmod.app.state.db = test_db
+    appmod._rate_limit_store.clear()
+    appmod._bulk_unattend_undo_store.clear()
+    appmod.settings.app_base_url = "http://localhost:8000"
+
+    with TestClient(appmod.app, base_url="http://127.0.0.1:8000") as local_client:
+        page = local_client.get("/signup")
+        assert "secure" not in page.headers.get("set-cookie", "").lower()
+        csrf_token = extract_csrf_token(page.text)
+
+        response = local_client.post(
+            "/signup",
+            data={
+                "csrf_token": csrf_token,
+                "email": "local@example.com",
+                "display_name": "Local Parent",
+                "password": "Password123",
+                "confirm_password": "Password123",
+                "home_city": "Lafayette",
+                "preferred_cities": "Lafayette",
+                "child_name": "Em",
+                "temperament": "curious but sensitive to noise",
+                "child_age_years": "3",
+                "child_age_months": "0",
+                "loves": "animals, music",
+                "likes": "story_time",
+                "dislikes": "loud_crowds",
+                "favorite_categories": "animals, play",
+                "avoid_categories": "sports",
+                "nap_time": "13:00-15:00",
+                "bedtime": "19:30",
+                "budget": "25",
+                "max_drive": "35",
+            },
+            headers={"Origin": "http://localhost:8000"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+
+
 def test_toggle_source_returns_refresh_trigger(client, create_user):
     user = create_user(email="toggle@example.com")
 
@@ -238,7 +396,9 @@ def test_delete_source_returns_refresh_trigger(client, create_user):
     page = client.get("/sources")
     csrf_token = extract_csrf_token(page.text)
 
-    response = client.request("DELETE", f"/api/sources/{source.id}", data={"csrf_token": csrf_token})
+    response = client.request(
+        "DELETE", f"/api/sources/{source.id}", data={"csrf_token": csrf_token}
+    )
 
     assert response.status_code == 200
     assert response.text == ""
@@ -351,7 +511,12 @@ def test_duplicate_pipeline_request_reuses_existing_job_card(client, create_user
         if progress_callback is not None:
             await progress_callback({"summary": "Running…"})
         await asyncio.sleep(0.2)
-        return {"scraped": 1, "tagged": 1, "failed": 0, "summary": "1 events scraped · 1 tagged · 0 failed"}
+        return {
+            "scraped": 1,
+            "tagged": 1,
+            "failed": 0,
+            "summary": "1 events scraped · 1 tagged · 0 failed",
+        }
 
     monkeypatch.setattr("src.scheduler.run_scrape_then_tag", fake_scrape_then_tag)
 

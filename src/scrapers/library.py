@@ -53,7 +53,9 @@ class LibraryScraper(BaseScraper):
         desc_el = item.find("description")
         description = desc_el.get_text(strip=True) if desc_el else ""
         if "<" in description:
-            description = BeautifulSoup(description, "html.parser").get_text(separator=" ", strip=True)
+            description = BeautifulSoup(description, "html.parser").get_text(
+                separator=" ", strip=True
+            )
 
         pub_date = item.find("pubDate")
         start_time = datetime.now()
@@ -109,7 +111,9 @@ class LibraryScraper(BaseScraper):
             description = desc_el.get_text(strip=True) if desc_el else ""
             start_time = self._parse_libcal_datetime(date_text, time_text)
             match = re.search(r"/event/(\d+)", href)
-            source_id = match.group(1) if match else hashlib.md5(f"{title}{date_text}".encode()).hexdigest()
+            source_id = (
+                match.group(1) if match else hashlib.md5(f"{title}{date_text}".encode()).hexdigest()
+            )
 
             events.append(
                 Event(

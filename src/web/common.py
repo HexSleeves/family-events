@@ -9,6 +9,7 @@ import time
 from collections import deque
 from datetime import UTC, datetime
 from typing import cast
+from urllib.parse import urlparse
 
 from fastapi import Request
 from fastapi.datastructures import FormData
@@ -83,7 +84,9 @@ def template_response(
     status_code: int = 200,
     headers: dict[str, str] | None = None,
 ) -> HTMLResponse:
-    response = get_templates(request).TemplateResponse(template_name, context, status_code=status_code)
+    response = get_templates(request).TemplateResponse(
+        template_name, context, status_code=status_code
+    )
     for key, value in (headers or {}).items():
         response.headers[key] = value
     return response
@@ -105,7 +108,9 @@ def toast(
     return HTMLResponse(content=body, status_code=status_code, headers=merged_headers)
 
 
-def change_theme(theme: str, *, body: str = "", headers: dict[str, str] | None = None) -> HTMLResponse:
+def change_theme(
+    theme: str, *, body: str = "", headers: dict[str, str] | None = None
+) -> HTMLResponse:
     """Return an HTML response that triggers a theme change plus toast."""
     label = {"light": "Light", "dark": "Dark", "auto": "System"}.get(theme, theme)
     merged_headers = _merge_hx_trigger(
@@ -183,6 +188,20 @@ def expected_origin(request: Request) -> str:
     return base_url
 
 
+def _normalized_origin_parts(origin: str) -> tuple[str, str, int | None] | None:
+    parsed = urlparse(origin)
+    if not parsed.scheme or not parsed.hostname:
+        return None
+    host = parsed.hostname.strip("[]").lower()
+    if host in {"localhost", "127.0.0.1", "::1"}:
+        host = "loopback"
+    return parsed.scheme.lower(), host, parsed.port
+
+
+def _same_origin(left: str, right: str) -> bool:
+    return _normalized_origin_parts(left) == _normalized_origin_parts(right)
+
+
 def require_safe_origin(request: Request) -> HTMLResponse | None:
     """Block unsafe cross-origin mutations."""
     expected = expected_origin(request)
@@ -190,7 +209,7 @@ def require_safe_origin(request: Request) -> HTMLResponse | None:
         value = request.headers.get(header)
         if not value:
             continue
-        if value.startswith(expected):
+        if _same_origin(value, expected):
             return None
         return toast("Request blocked by origin policy", "error", status_code=403)
     return None

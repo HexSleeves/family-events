@@ -75,7 +75,9 @@ class EventbriteScraper(BaseScraper):
         loc_name = location.get("name", "") if isinstance(location, dict) else ""
         address_obj = location.get("address", {}) if isinstance(location, dict) else {}
         loc_address = (
-            address_obj.get("streetAddress", "") if isinstance(address_obj, dict) else str(address_obj)
+            address_obj.get("streetAddress", "")
+            if isinstance(address_obj, dict)
+            else str(address_obj)
         )
 
         offers = ld.get("offers", {})
@@ -134,7 +136,9 @@ class EventbriteScraper(BaseScraper):
         venue = item.get("primary_venue", {}) or {}
         loc_name = venue.get("name", "")
         address = venue.get("address", {})
-        loc_address = address.get("localized_address_display", "") if isinstance(address, dict) else ""
+        loc_address = (
+            address.get("localized_address_display", "") if isinstance(address, dict) else ""
+        )
         sid = str(item.get("id", hashlib.md5((url or title).encode()).hexdigest()))
 
         return Event(

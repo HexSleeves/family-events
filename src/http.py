@@ -118,7 +118,9 @@ def build_async_client(
         service=service,
         max_retries=settings.external_http_max_retries if max_retries is None else max_retries,
         backoff_seconds=(
-            settings.external_http_retry_backoff_seconds if backoff_seconds is None else backoff_seconds
+            settings.external_http_retry_backoff_seconds
+            if backoff_seconds is None
+            else backoff_seconds
         ),
     )
     return httpx.AsyncClient(

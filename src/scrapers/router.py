@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 from src.db.models import Source
@@ -13,9 +14,11 @@ from .eventbrite import EventbriteScraper
 from .lafayette import LafayetteScraper
 from .library import LibraryScraper
 
-BUILTIN_DOMAIN_MESSAGE = "We already have a predefined source for this site. Add it from the catalog instead."
+BUILTIN_DOMAIN_MESSAGE = (
+    "We already have a predefined source for this site. Add it from the catalog instead."
+)
 
-BUILTIN_DOMAINS: dict[str, type[BaseScraper]] = {
+BUILTIN_DOMAINS: dict[str, Callable[[Source], BaseScraper]] = {
     "brec.org": BrecScraper,
     "eventbrite.com": EventbriteScraper,
     "allevents.in": AllEventsScraper,

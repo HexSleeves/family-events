@@ -57,8 +57,13 @@ async def friday_notification() -> None:
                     try:
                         await run_notify(db, user=user)
                     except Exception:
-                        logger.exception("cron_friday_notification_user_failed email=%s", user.email)
-        logger.info("cron_friday_notification_succeeded duration_seconds=%.2f", time.perf_counter() - started)
+                        logger.exception(
+                            "cron_friday_notification_user_failed email=%s", user.email
+                        )
+        logger.info(
+            "cron_friday_notification_succeeded duration_seconds=%.2f",
+            time.perf_counter() - started,
+        )
     except Exception:
         logger.exception(
             "cron_friday_notification_failed duration_seconds=%.2f",
@@ -86,7 +91,9 @@ async def main() -> None:
     scheduler.start()
     logger.info("scheduler_started timezone=%s", CRON_TZ.key)
     for job in scheduler.get_jobs():
-        logger.info("scheduler_job_registered name=%s next_run_time=%s", job.name, job.next_run_time)
+        logger.info(
+            "scheduler_job_registered name=%s next_run_time=%s", job.name, job.next_run_time
+        )
 
     try:
         while True:

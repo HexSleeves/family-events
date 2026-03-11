@@ -276,7 +276,7 @@ async def run_notify(
     if not tagged_events:
         msg = f"No events found for this weekend ({saturday} - {sunday}). Try running scrape + tag first."
         print(msg)
-        result = {
+        result: dict[str, object] = {
             "summary": msg,
             "message": msg,
             "results": [],
@@ -299,7 +299,7 @@ async def run_notify(
     )
     print(f"Notification results: {results}")
 
-    result = {
+    result: dict[str, object] = {
         "summary": f"{sum(1 for item in results if item['success'])}/{len(results)} deliveries succeeded",
         "message": message,
         "results": results,
@@ -357,7 +357,9 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
                 result=progress,
             ),
         )
-        await update_scheduled_job(db, job_id, state="succeeded", detail="Completed", result=result, error="")
+        await update_scheduled_job(
+            db, job_id, state="succeeded", detail="Completed", result=result, error=""
+        )
         return result
     except Exception as exc:
         await update_scheduled_job(db, job_id, state="failed", detail="Failed", error=str(exc))

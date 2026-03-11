@@ -41,7 +41,9 @@ def local_date_range_utc(start: date, end_exclusive: date) -> tuple[datetime, da
     return local_date_start_utc(start), local_date_start_utc(end_exclusive)
 
 
-def current_weekend_dates(*, now: datetime | None = None, roll_after_saturday_noon: bool = False) -> tuple[date, date]:
+def current_weekend_dates(
+    *, now: datetime | None = None, roll_after_saturday_noon: bool = False
+) -> tuple[date, date]:
     """Return the target Saturday/Sunday in the application timezone."""
     local = local_now(now=now)
     today = local.date()

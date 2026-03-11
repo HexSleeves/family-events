@@ -29,6 +29,16 @@ content %}
         <li>{{ err }}</li>
         {% endfor %}
       </ul>
+      {% if existing_account_login_url %}
+      <div class="mt-3">
+        <a
+          href="{{ existing_account_login_url }}"
+          class="inline-flex items-center rounded-lg border border-[var(--color-danger)] px-3 py-2 font-medium hover:bg-[var(--color-danger)] hover:text-white transition-colors"
+        >
+          Go to login
+        </a>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
 

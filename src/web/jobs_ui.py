@@ -143,6 +143,7 @@ async def start_background_job(
     request: Request,
     *,
     user: User,
+    database_url: str | None,
     kind: str,
     key: str,
     label: str,
@@ -159,6 +160,7 @@ async def start_background_job(
         owner_user_id=user.id,
         source_id=source_id,
         runner=runner,
+        database_url=database_url,
     )
     if created:
         message = f"{label} started in the background"

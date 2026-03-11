@@ -98,7 +98,6 @@ def test_rule_based_tagger_flags_adult_event_low_score():
     assert tags.exclusion_signals
 
 
-
 def test_rule_based_tagger_rewards_toddler_event_high_score():
     event = Event(
         title="Toddler Story Time and Sensory Play",

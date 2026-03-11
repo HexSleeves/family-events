@@ -19,12 +19,10 @@ class NotificationResult(TypedDict):
 
 class NotificationDispatcher:
     def __init__(self) -> None:
-        self.notifiers = {
-            "console": ConsoleNotifier(),
-            "sms": SMSNotifier(),
-            "telegram": TelegramNotifier(),
-            "email": EmailNotifier(),
-        }
+        self.console = ConsoleNotifier()
+        self.sms = SMSNotifier()
+        self.telegram = TelegramNotifier()
+        self.email = EmailNotifier()
 
     def _result(
         self,
@@ -56,8 +54,23 @@ class NotificationDispatcher:
 
         results: list[NotificationResult] = []
         for channel in channels:
-            notifier = self.notifiers.get(channel)
-            if not notifier:
+            if channel == "email":
+                recipient = email_to
+                success = await self.email.send(message, to_email=email_to)
+                error = "" if success else "Email delivery failed"
+            elif channel == "sms":
+                recipient = sms_to
+                success = await self.sms.send(message, to_number=sms_to)
+                error = "" if success else "SMS delivery failed"
+            elif channel == "telegram":
+                recipient = "telegram"
+                success = await self.telegram.send(message)
+                error = "" if success else "Telegram delivery failed"
+            elif channel == "console":
+                recipient = "console"
+                success = await self.console.send(message)
+                error = "" if success else "Console delivery failed"
+            else:
                 results.append(
                     self._result(
                         channel=channel,
@@ -66,23 +79,6 @@ class NotificationDispatcher:
                     )
                 )
                 continue
-
-            if channel == "email":
-                recipient = email_to
-                success = await notifier.send(message, to_email=email_to)
-                error = "" if success else "Email delivery failed"
-            elif channel == "sms":
-                recipient = sms_to
-                success = await notifier.send(message, to_number=sms_to)
-                error = "" if success else "SMS delivery failed"
-            elif channel == "telegram":
-                recipient = "telegram"
-                success = await notifier.send(message)
-                error = "" if success else "Telegram delivery failed"
-            else:
-                recipient = "console"
-                success = await notifier.send(message)
-                error = "" if success else "Console delivery failed"
 
             results.append(
                 self._result(

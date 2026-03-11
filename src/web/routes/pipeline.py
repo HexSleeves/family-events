@@ -31,7 +31,12 @@ async def api_scrape_tag(request: Request):
         async with create_database(database_url=database_url) as job_db:
             await job.update(
                 detail="Preparing scrape + tag run…",
-                result={"phase": "scrape", "processed": 0, "total": 2, "summary": "Scraping sources…"},
+                result={
+                    "phase": "scrape",
+                    "processed": 0,
+                    "total": 2,
+                    "summary": "Scraping sources…",
+                },
             )
             return await run_scrape_then_tag(
                 job_db,
@@ -44,6 +49,7 @@ async def api_scrape_tag(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="pipeline",
         key="pipeline:scrape-tag",
         label="Scrape + tag job",
@@ -73,6 +79,7 @@ async def api_scrape(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="scrape",
         key="pipeline:scrape",
         label="Scrape job",
@@ -112,6 +119,7 @@ async def api_tag(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="tag",
         key="pipeline:tag",
         label="Tag job",
@@ -140,6 +148,7 @@ async def api_dedupe(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="dedupe",
         key="pipeline:dedupe",
         label="Dedupe job",
@@ -162,13 +171,14 @@ async def api_notify(request: Request):
 
     database_url = db.database_url
 
-    async def runner(_job) -> str:
+    async def runner(_job) -> dict[str, object]:
         async with create_database(database_url=database_url) as job_db:
             return await run_notify(job_db, user=user)
 
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="notify",
         key=f"pipeline:notify:{user.id}",
         label="Notification job",
@@ -215,6 +225,7 @@ async def api_tag_stale(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="tag",
         key="pipeline:tag:stale",
         label="Retag stale events",

@@ -173,11 +173,15 @@ async def event_detail(request: Request, event_id: str):
 
 
 def _render_event_attendance(request: Request, event, *, target_id: str) -> str:
-    return get_templates(request).get_template("partials/_event_attendance.html").render(
-        request=request,
-        event=event,
-        csrf_token=ensure_csrf_token(request),
-        target_id=target_id,
+    return (
+        get_templates(request)
+        .get_template("partials/_event_attendance.html")
+        .render(
+            request=request,
+            event=event,
+            csrf_token=ensure_csrf_token(request),
+            target_id=target_id,
+        )
     )
 
 
@@ -196,7 +200,9 @@ async def api_attend(request: Request, event_id: str):
     if event is None:
         raise ValueError("Event disappeared after attend")
     target_id = request.query_params.get("target_id", "event-attendance")
-    return toast("Marked attended", body=_render_event_attendance(request, event, target_id=target_id))
+    return toast(
+        "Marked attended", body=_render_event_attendance(request, event, target_id=target_id)
+    )
 
 
 @router.post("/api/unattend/{event_id}", response_class=HTMLResponse)

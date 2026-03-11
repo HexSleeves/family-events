@@ -107,7 +107,7 @@ class WeatherService:
 
     @staticmethod
     def _weather_emoji(desc: str, precip: float) -> str:
-        if precip > 60:
+        if precip > 70:
             return "\U0001f327\ufe0f"  # 🌧️
         if precip > 30:
             return "\U0001f326\ufe0f"  # 🌦️

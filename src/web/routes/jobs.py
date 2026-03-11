@@ -59,10 +59,14 @@ async def api_cancel_job(request: Request, job_id: str, target_id: str = "job-st
     if not job:
         return toast("Job not found", "error", status_code=404)
 
-    body = get_templates(request).get_template("partials/_job_status.html").render(
-        request=request,
-        csrf_token=ensure_csrf_token(request),
-        **job_template_context(job, target_id=target_id),
+    body = (
+        get_templates(request)
+        .get_template("partials/_job_status.html")
+        .render(
+            request=request,
+            csrf_token=ensure_csrf_token(request),
+            **job_template_context(job, target_id=target_id),
+        )
     )
     if job.state == "running":
         return toast("Job is still running", "warning", body=body)

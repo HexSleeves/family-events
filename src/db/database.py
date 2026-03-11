@@ -192,7 +192,6 @@ def _row_to_job(row: aiosqlite.Row) -> Job:
     return Job.model_validate(d)
 
 
-
 def _event_to_params(event: Event) -> dict[str, Any]:
     """Convert an Event model to a dict of SQLite bind parameters."""
     return {
@@ -280,7 +279,9 @@ class SqliteDatabase:
 
     async def health_stats(self) -> dict[str, Any]:
         """Return basic health/freshness stats for the service."""
-        cutoff = (datetime.now(tz=UTC) - timedelta(seconds=settings.background_job_timeout_seconds)).isoformat()
+        cutoff = (
+            datetime.now(tz=UTC) - timedelta(seconds=settings.background_job_timeout_seconds)
+        ).isoformat()
         async with self.db.execute(
             """
             SELECT
@@ -313,11 +314,21 @@ class SqliteDatabase:
         latest_tagged_at = event_row["latest_tagged_at"] if event_row else None
         latest_notified_at = notify_row["latest_notified_at"] if notify_row else None
         return {
-            "event_count": int(event_row["event_count"]) if event_row and event_row["event_count"] is not None else 0,
-            "latest_scraped_at": datetime.fromisoformat(str(latest_scraped_at)) if latest_scraped_at else None,
-            "latest_tagged_at": datetime.fromisoformat(str(latest_tagged_at)) if latest_tagged_at else None,
-            "latest_notified_at": datetime.fromisoformat(str(latest_notified_at)) if latest_notified_at else None,
-            "stuck_running_jobs": int(stuck_row["stuck_running_jobs"]) if stuck_row and stuck_row["stuck_running_jobs"] is not None else 0,
+            "event_count": int(event_row["event_count"])
+            if event_row and event_row["event_count"] is not None
+            else 0,
+            "latest_scraped_at": datetime.fromisoformat(str(latest_scraped_at))
+            if latest_scraped_at
+            else None,
+            "latest_tagged_at": datetime.fromisoformat(str(latest_tagged_at))
+            if latest_tagged_at
+            else None,
+            "latest_notified_at": datetime.fromisoformat(str(latest_notified_at))
+            if latest_notified_at
+            else None,
+            "stuck_running_jobs": int(stuck_row["stuck_running_jobs"])
+            if stuck_row and stuck_row["stuck_running_jobs"] is not None
+            else 0,
         }
 
     # ------------------------------------------------------------------
@@ -772,7 +783,9 @@ class SqliteDatabase:
 
     async def get_event(self, event_id: str) -> Event | None:
         """Get a single event by id."""
-        async with self.db.execute("SELECT * FROM events WHERE id = :id", {"id": event_id}) as cursor:
+        async with self.db.execute(
+            "SELECT * FROM events WHERE id = :id", {"id": event_id}
+        ) as cursor:
             row = await cursor.fetchone()
             return _row_to_event(row) if row else None
 

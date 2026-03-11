@@ -40,7 +40,6 @@ def _uuid_param(value: str | None) -> uuid.UUID | str | None:
         return value
 
 
-
 def _normalize_uuid(value: Any) -> str | None:
     if value is None:
         return None
@@ -123,7 +122,9 @@ class PostgresDatabase:
             )
             event_row = event_result.mappings().first()
             notify_result = await session.execute(
-                text("SELECT MAX(finished_at) AS latest_notified_at FROM jobs WHERE kind = 'notify' AND state = 'succeeded'")
+                text(
+                    "SELECT MAX(finished_at) AS latest_notified_at FROM jobs WHERE kind = 'notify' AND state = 'succeeded'"
+                )
             )
             notify_row = notify_result.mappings().first()
             stuck_result = await session.execute(
@@ -134,11 +135,15 @@ class PostgresDatabase:
             )
             stuck_row = stuck_result.mappings().first()
             return {
-                "event_count": int(event_row["event_count"]) if event_row and event_row["event_count"] is not None else 0,
+                "event_count": int(event_row["event_count"])
+                if event_row and event_row["event_count"] is not None
+                else 0,
                 "latest_scraped_at": event_row["latest_scraped_at"] if event_row else None,
                 "latest_tagged_at": event_row["latest_tagged_at"] if event_row else None,
                 "latest_notified_at": notify_row["latest_notified_at"] if notify_row else None,
-                "stuck_running_jobs": int(stuck_row["stuck_running_jobs"]) if stuck_row and stuck_row["stuck_running_jobs"] is not None else 0,
+                "stuck_running_jobs": int(stuck_row["stuck_running_jobs"])
+                if stuck_row and stuck_row["stuck_running_jobs"] is not None
+                else 0,
             }
 
     async def upsert_event(self, event: Event) -> str:
@@ -152,7 +157,9 @@ class PostgresDatabase:
                 event.id = _normalize_uuid(existing["id"]) or event.id
 
             if not existing:
-                canonical_id, _dedupe_reason = await self._find_duplicate_event_id(event, session=session)
+                canonical_id, _dedupe_reason = await self._find_duplicate_event_id(
+                    event, session=session
+                )
                 if canonical_id:
                     await session.execute(
                         text(
@@ -237,7 +244,9 @@ class PostgresDatabase:
                 {"source": event.source, "source_id": event.source_id},
             )
             row = result.mappings().first()
-            return _normalize_uuid(row["id"]) if row else event.id
+            if not row:
+                return event.id
+            return _normalize_uuid(row["id"]) or event.id
 
     def _event_params(self, event: Event) -> dict[str, Any]:
         return {
@@ -321,7 +330,9 @@ class PostgresDatabase:
         start, end = weekend_window_utc(saturday, sunday)
         async with self.session() as session:
             result = await session.execute(
-                text("SELECT * FROM events WHERE start_time >= :start AND start_time < :end ORDER BY start_time"),
+                text(
+                    "SELECT * FROM events WHERE start_time >= :start AND start_time < :end ORDER BY start_time"
+                ),
                 {"start": start, "end": end},
             )
             return [_row_to_event(row) for row in result.mappings().all()]
@@ -380,7 +391,9 @@ class PostgresDatabase:
     async def get_pipeline_timestamps(self) -> dict[str, datetime | None]:
         async with self.session() as session:
             result = await session.execute(
-                text("SELECT MAX(scraped_at) AS last_scraped_at, MAX(tagged_at) AS last_tagged_at FROM events")
+                text(
+                    "SELECT MAX(scraped_at) AS last_scraped_at, MAX(tagged_at) AS last_tagged_at FROM events"
+                )
             )
             row = result.mappings().first()
             return {
@@ -390,7 +403,9 @@ class PostgresDatabase:
 
     async def get_event(self, event_id: str) -> Event | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM events WHERE id = :id"), {"id": _uuid_param(event_id)})
+            result = await session.execute(
+                text("SELECT * FROM events WHERE id = :id"), {"id": _uuid_param(event_id)}
+            )
             row = result.mappings().first()
             return _row_to_event(row) if row else None
 
@@ -398,7 +413,9 @@ class PostgresDatabase:
         now, future = time_window(days)
         async with self.session() as session:
             result = await session.execute(
-                text("SELECT * FROM events WHERE start_time >= :now AND start_time <= :future ORDER BY start_time"),
+                text(
+                    "SELECT * FROM events WHERE start_time >= :now AND start_time <= :future ORDER BY start_time"
+                ),
                 {"now": now, "future": future},
             )
             return [_row_to_event(row) for row in result.mappings().all()]
@@ -456,7 +473,9 @@ class PostgresDatabase:
         elif attended == "no":
             conditions.append("attended = false")
         if score_min is not None:
-            conditions.append("tags IS NOT NULL AND CAST(tags->>'toddler_score' AS INTEGER) >= :score_min")
+            conditions.append(
+                "tags IS NOT NULL AND CAST(tags->>'toddler_score' AS INTEGER) >= :score_min"
+            )
             params["score_min"] = score_min
         where = " AND ".join(conditions)
         valid_sorts = {
@@ -475,7 +494,9 @@ class PostgresDatabase:
         offset = (page - 1) * per_page
         params |= {"limit": per_page, "offset": offset}
         async with self.session() as session:
-            count_result = await session.execute(text(f"SELECT COUNT(*) FROM events WHERE {where}"), params)
+            count_result = await session.execute(
+                text(f"SELECT COUNT(*) FROM events WHERE {where}"), params
+            )
             total_row = count_result.first()
             total = int(total_row[0] if total_row else 0)
             result = await session.execute(
@@ -489,9 +510,13 @@ class PostgresDatabase:
     async def get_filter_options(self) -> dict[str, list[str]]:
         async with self.session() as session:
             city_rows = (
-                await session.execute(text("SELECT DISTINCT location_city FROM events ORDER BY location_city"))
+                await session.execute(
+                    text("SELECT DISTINCT location_city FROM events ORDER BY location_city")
+                )
             ).all()
-            source_rows = (await session.execute(text("SELECT DISTINCT source FROM events ORDER BY source"))).all()
+            source_rows = (
+                await session.execute(text("SELECT DISTINCT source FROM events ORDER BY source"))
+            ).all()
             return {
                 "cities": [str(row[0]) for row in city_rows],
                 "sources": [str(row[0]) for row in source_rows],
@@ -524,13 +549,17 @@ class PostgresDatabase:
 
     async def get_source(self, source_id: str) -> Source | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)})
+            result = await session.execute(
+                text("SELECT * FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)}
+            )
             row = result.mappings().first()
             return _row_to_source(row) if row else None
 
     async def get_source_by_url(self, url: str) -> Source | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM sources WHERE url = :url"), {"url": url})
+            result = await session.execute(
+                text("SELECT * FROM sources WHERE url = :url"), {"url": url}
+            )
             row = result.mappings().first()
             return _row_to_source(row) if row else None
 
@@ -548,11 +577,20 @@ class PostgresDatabase:
             )
             return [_row_to_source(row) for row in result.mappings().all()]
 
-    async def update_source_recipe(self, source_id: str, recipe_json: str, status: str = "active") -> None:
+    async def update_source_recipe(
+        self, source_id: str, recipe_json: str, status: str = "active"
+    ) -> None:
         async with self.session() as session:
             await session.execute(
-                text("UPDATE sources SET recipe_json = :recipe_json, status = :status, updated_at = :now WHERE id = :id"),
-                {"recipe_json": recipe_json, "status": status, "now": utc_now(), "id": _uuid_param(source_id)},
+                text(
+                    "UPDATE sources SET recipe_json = :recipe_json, status = :status, updated_at = :now WHERE id = :id"
+                ),
+                {
+                    "recipe_json": recipe_json,
+                    "status": status,
+                    "now": utc_now(),
+                    "id": _uuid_param(source_id),
+                },
             )
             await session.commit()
 
@@ -580,7 +618,9 @@ class PostgresDatabase:
             sets.append("last_error = :error")
             params["error"] = error
         async with self.session() as session:
-            await session.execute(text(f"UPDATE sources SET {', '.join(sets)} WHERE id = :id"), params)
+            await session.execute(
+                text(f"UPDATE sources SET {', '.join(sets)} WHERE id = :id"), params
+            )
             await session.commit()
 
     async def toggle_source(self, source_id: str) -> bool:
@@ -609,7 +649,9 @@ class PostgresDatabase:
                     text("DELETE FROM events WHERE source = :source"),
                     {"source": f"custom:{source_id}"},
                 )
-            await session.execute(text("DELETE FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)})
+            await session.execute(
+                text("DELETE FROM sources WHERE id = :id"), {"id": _uuid_param(source_id)}
+            )
             await session.commit()
 
     async def mark_attended(self, event_id: str) -> None:
@@ -632,7 +674,10 @@ class PostgresDatabase:
         async with self.session() as session:
             await session.execute(
                 stmt,
-                {"attended": attended, "event_ids": [_uuid_param(event_id) for event_id in event_ids]},
+                {
+                    "attended": attended,
+                    "event_ids": [_uuid_param(event_id) for event_id in event_ids],
+                },
             )
             await session.commit()
 
@@ -679,7 +724,9 @@ class PostgresDatabase:
 
     async def get_job(self, job_id: str) -> Job | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM jobs WHERE id = :id"), {"id": _uuid_param(job_id)})
+            result = await session.execute(
+                text("SELECT * FROM jobs WHERE id = :id"), {"id": _uuid_param(job_id)}
+            )
             row = result.mappings().first()
             return _row_to_job(row) if row else None
 
@@ -800,7 +847,9 @@ class PostgresDatabase:
 
     async def get_user(self, user_id: str) -> User | None:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM users WHERE id = :id"), {"id": _uuid_param(user_id)})
+            result = await session.execute(
+                text("SELECT * FROM users WHERE id = :id"), {"id": _uuid_param(user_id)}
+            )
             row = result.mappings().first()
             return _row_to_user(row) if row else None
 
@@ -825,12 +874,16 @@ class PostgresDatabase:
                 params[key] = json.dumps(value)
             elif key == "interest_profile":
                 sets.append(f"{key} = CAST(:{key} AS jsonb)")
-                params[key] = json.dumps(value.model_dump() if hasattr(value, "model_dump") else value)
+                params[key] = json.dumps(
+                    value.model_dump() if hasattr(value, "model_dump") else value
+                )
             else:
                 sets.append(f"{key} = :{key}")
                 params[key] = value
         async with self.session() as session:
-            await session.execute(text(f"UPDATE users SET {', '.join(sets)} WHERE id = :id"), params)
+            await session.execute(
+                text(f"UPDATE users SET {', '.join(sets)} WHERE id = :id"), params
+            )
             await session.commit()
 
     async def get_all_users(self) -> list[User]:
@@ -859,15 +912,15 @@ class PostgresDatabase:
 
     async def dedupe_existing_events(self) -> dict[str, int]:
         async with self.session() as session:
-            result = await session.execute(text("SELECT * FROM events ORDER BY start_time, scraped_at"))
+            result = await session.execute(
+                text("SELECT * FROM events ORDER BY start_time, scraped_at")
+            )
             events = [_row_to_event(row) for row in result.mappings().all()]
             total = len(events)
             merged = 0
             buckets: dict[str, list[Event]] = {}
             for event in events:
-                bucket_key = (
-                    f"{event.location_city.lower().strip()}|{event.start_time.date().isoformat()}|{event.start_time.hour // 2}"
-                )
+                bucket_key = f"{event.location_city.lower().strip()}|{event.start_time.date().isoformat()}|{event.start_time.hour // 2}"
                 buckets.setdefault(bucket_key, []).append(event)
             for bucket_events in buckets.values():
                 if len(bucket_events) < 2:
@@ -876,7 +929,10 @@ class PostgresDatabase:
                 for event in bucket_events:
                     duplicate_of: Event | None = None
                     for c in canonical:
-                        if event_fingerprint(event) == event_fingerprint(c) or title_similarity(event.title, c.title) >= 0.75:
+                        if (
+                            event_fingerprint(event) == event_fingerprint(c)
+                            or title_similarity(event.title, c.title) >= 0.75
+                        ):
                             duplicate_of = c
                             break
                     if not duplicate_of:
@@ -911,7 +967,9 @@ class PostgresDatabase:
                         ),
                         self._event_params(event) | {"canonical_id": duplicate_of.id},
                     )
-                    await session.execute(text("DELETE FROM events WHERE id = :id"), {"id": event.id})
+                    await session.execute(
+                        text("DELETE FROM events WHERE id = :id"), {"id": event.id}
+                    )
                     merged += 1
             await session.commit()
             return {"total_scanned": total, "merged": merged, "remaining": total - merged}

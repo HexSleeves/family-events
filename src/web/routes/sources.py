@@ -35,10 +35,14 @@ router = APIRouter()
 
 
 def _render_source_card(request: Request, source: Source) -> str:
-    return get_templates(request).get_template("partials/_source_card.html").render(
-        request=request,
-        source=source,
-        csrf_token=ensure_csrf_token(request),
+    return (
+        get_templates(request)
+        .get_template("partials/_source_card.html")
+        .render(
+            request=request,
+            source=source,
+            csrf_token=ensure_csrf_token(request),
+        )
     )
 
 
@@ -179,6 +183,7 @@ async def api_add_source(request: Request):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="source-analyze",
         key=f"source:analyze:{source.id}",
         label=f"Analyzing {source.name}",
@@ -237,6 +242,7 @@ async def api_reanalyze(request: Request, source_id: str):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="source-analyze",
         key=f"source:analyze:{source_id}",
         label=f"Analyzing {source.name}",
@@ -300,6 +306,7 @@ async def api_test_source(request: Request, source_id: str):
     return await start_background_job(
         request,
         user=user,
+        database_url=database_url,
         kind="source-test",
         key=f"source:test:{source_id}",
         label=f"Testing {source.name}",

@@ -124,13 +124,17 @@ async def api_update_notifications(request: Request):
         return toast(
             "Add a notification email to enable email delivery",
             "error",
-            body=_render_profile_status(request, "Add a notification email to enable email delivery", "error"),
+            body=_render_profile_status(
+                request, "Add a notification email to enable email delivery", "error"
+            ),
         )
     if "sms" in channels and not sms_to:
         return toast(
             "Add a phone number to enable SMS delivery",
             "error",
-            body=_render_profile_status(request, "Add a phone number to enable SMS delivery", "error"),
+            body=_render_profile_status(
+                request, "Add a phone number to enable SMS delivery", "error"
+            ),
         )
     await db.update_user(
         user.id,

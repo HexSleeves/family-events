@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
@@ -28,7 +30,6 @@ from src.web.common import (
     get_current_user_or_redirect,
     get_db,
     htmx_redirect_or_redirect,
-    is_htmx_request,
     require_csrf,
     require_login_and_csrf,
     template_response,
@@ -37,12 +38,55 @@ from src.web.common import (
 router = APIRouter()
 
 
+async def _start_signup_scrape_tag_job(*, user: User, database_url: str) -> None:
+    from src.db.database import create_database
+    from src.scheduler import run_scrape_then_tag
+    from src.web.jobs import job_registry
+
+    async def runner(job) -> dict[str, int | str]:
+        async with create_database(database_url=database_url) as job_db:
+            await job.update(
+                detail="Preparing scrape + tag run…",
+                result={
+                    "phase": "scrape",
+                    "processed": 0,
+                    "total": 2,
+                    "summary": "Scraping sources…",
+                },
+            )
+            return await run_scrape_then_tag(
+                job_db,
+                include_stale=False,
+                progress_callback=lambda progress: job.update(
+                    detail=progress.get("summary", "Running…"), result=progress
+                ),
+            )
+
+    await job_registry.start_unique(
+        kind="pipeline",
+        job_key="pipeline:scrape-tag",
+        label="Scrape + tag job",
+        owner_user_id=user.id,
+        source_id=None,
+        runner=runner,
+        database_url=database_url,
+    )
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     user, _redirect = await get_current_user_or_redirect(request, "/profile")
     if user:
         return htmx_redirect_or_redirect(request, "/profile")
-    return template_response(request, "login.html", await ctx(request, active_page="auth"))
+    return template_response(
+        request,
+        "login.html",
+        await ctx(
+            request,
+            active_page="auth",
+            email=str(request.query_params.get("email", "")).strip().lower(),
+        ),
+    )
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -66,12 +110,15 @@ async def login_submit(request: Request):
 
     user = await db.get_user_by_email(email)
     if not user or not verify_password(password, user.password_hash):
-        status_code = 422 if is_htmx_request(request) else 200
         return template_response(
             request,
             "login.html",
-            {**await ctx(request, active_page="auth"), "error": "Invalid email or password.", "email": email},
-            status_code=status_code,
+            {
+                **await ctx(request, active_page="auth"),
+                "error": "Invalid email or password.",
+                "email": email,
+            },
+            status_code=200,
         )
 
     login_session(request, user)
@@ -113,6 +160,7 @@ async def signup_submit(request: Request):
         fallback_home_city=home_city,
     )
     child_name = str(form.get("child_name", "")).strip()
+    existing_account_login_url = ""
 
     errors: list[str] = []
     if not email or "@" not in email:
@@ -124,10 +172,10 @@ async def signup_submit(request: Request):
     if password != confirm:
         errors.append("Passwords don't match.")
     if not errors and await db.get_user_by_email(email):
-        errors.append("An account with this email already exists.")
+        errors.append("An account with this email already exists. Log in instead.")
+        existing_account_login_url = f"/login?email={quote(email)}"
 
     if errors:
-        status_code = 422 if is_htmx_request(request) else 200
         return template_response(
             request,
             "signup.html",
@@ -140,8 +188,9 @@ async def signup_submit(request: Request):
                 "preferred_cities": ", ".join(preferred_cities),
                 "child_name": child_name,
                 "temperament": str(form.get("temperament", "")).strip(),
+                "existing_account_login_url": existing_account_login_url,
             },
-            status_code=status_code,
+            status_code=200,
         )
 
     interest_profile = build_interest_profile_from_form(
@@ -160,11 +209,17 @@ async def signup_submit(request: Request):
         interest_profile=interest_profile,
     )
     await db.create_user(user)
+    predefined_source_keys = [
+        value for value in form.getlist("predefined_sources") if isinstance(value, str)
+    ]
+    selected_source_keys = predefined_source_keys or recommended_source_keys_for_city(home_city)
     await ensure_predefined_sources(
         db,
         user=user,
-        source_keys=form.getlist("predefined_sources") or recommended_source_keys_for_city(home_city),
+        source_keys=selected_source_keys,
     )
+    if selected_source_keys:
+        await _start_signup_scrape_tag_job(user=user, database_url=db.database_url)
     login_session(request, user)
     rotate_csrf_token(request)
     return htmx_redirect_or_redirect(request, "/profile")

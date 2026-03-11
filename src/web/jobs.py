@@ -20,11 +20,21 @@ logger = logging.getLogger("uvicorn.error")
 Database = create_database
 
 
+def _open_database(*, database_url: str | None = None):
+    if database_url is None:
+        return Database()
+    try:
+        return Database(database_url=database_url)
+    except TypeError:
+        return Database()
+
+
 @dataclass(slots=True)
 class BackgroundJobContext:
     """Helper passed to background runners for progress updates."""
 
     job_id: str
+    database_url: str | None = None
 
     async def update(self, *, detail: str | None = None, result: Any | None = None) -> None:
         fields: dict[str, Any] = {}
@@ -34,7 +44,7 @@ class BackgroundJobContext:
             fields["result_json"] = json.dumps(result)
         if not fields:
             return
-        async with Database() as db:
+        async with _open_database(database_url=self.database_url) as db:
             await db.update_job(self.job_id, **fields)
 
 
@@ -55,9 +65,9 @@ class JobRegistry:
         self._lock = asyncio.Lock()
         self._max_active = 200
 
-    async def recover_stale_jobs(self) -> int:
+    async def recover_stale_jobs(self, *, database_url: str | None = None) -> int:
         """Fail stale persisted jobs so they no longer block duplicate prevention."""
-        async with Database() as db:
+        async with _open_database(database_url=database_url) as db:
             updated = await db.fail_stale_jobs(
                 max_age_seconds=settings.background_job_timeout_seconds
             )
@@ -74,11 +84,12 @@ class JobRegistry:
         owner_user_id: str,
         source_id: str | None,
         runner: Callable[[BackgroundJobContext], Awaitable[Any]],
+        database_url: str | None = None,
     ) -> tuple[Job, bool]:
         async with self._lock:
             active_id = self._active_ids_by_key.get(job_key)
             if active_id and active_id in self._active_by_id:
-                async with Database() as db:
+                async with _open_database(database_url=database_url) as db:
                     existing = await db.get_job(active_id)
                 if existing and existing.state == "running":
                     existing.detail = existing.detail or "Running…"
@@ -86,8 +97,8 @@ class JobRegistry:
                 self._active_ids_by_key.pop(job_key, None)
                 self._active_by_id.pop(active_id, None)
 
-            await self.recover_stale_jobs()
-            async with Database() as db:
+            await self.recover_stale_jobs(database_url=database_url)
+            async with _open_database(database_url=database_url) as db:
                 persisted = await db.get_active_job_by_key(job_key)
                 if persisted:
                     return persisted, False
@@ -103,7 +114,7 @@ class JobRegistry:
                 )
                 await db.create_job(job)
 
-            task = asyncio.create_task(self._run(job.id, job_key, runner))
+            task = asyncio.create_task(self._run(job.id, job_key, runner, database_url))
             self._active_by_id[job.id] = ActiveJob(id=job.id, job_key=job_key, task=task)
             self._active_ids_by_key[job_key] = job.id
             self._trim_locked()
@@ -114,17 +125,18 @@ class JobRegistry:
         job_id: str,
         job_key: str,
         runner: Callable[[BackgroundJobContext], Awaitable[Any]],
+        database_url: str | None,
     ) -> None:
         started_at = datetime.now(tz=UTC)
-        context = BackgroundJobContext(job_id=job_id)
-        async with Database() as db:
+        context = BackgroundJobContext(job_id=job_id, database_url=database_url)
+        async with _open_database(database_url=database_url) as db:
             await db.update_job(job_id, detail="Running…", started_at=started_at)
         try:
             result = await asyncio.wait_for(
                 runner(context),
                 timeout=settings.background_job_timeout_seconds,
             )
-            async with Database() as db:
+            async with _open_database(database_url=database_url) as db:
                 await db.update_job(
                     job_id,
                     state="succeeded",
@@ -134,19 +146,18 @@ class JobRegistry:
                     error="",
                 )
         except TimeoutError:
-            async with Database() as db:
+            async with _open_database(database_url=database_url) as db:
                 await db.update_job(
                     job_id,
                     state="failed",
                     detail="Timed out",
                     error=(
-                        "Job exceeded max runtime "
-                        f"({settings.background_job_timeout_seconds}s)"
+                        f"Job exceeded max runtime ({settings.background_job_timeout_seconds}s)"
                     ),
                     finished_at=datetime.now(tz=UTC),
                 )
         except Exception as exc:
-            async with Database() as db:
+            async with _open_database(database_url=database_url) as db:
                 await db.update_job(
                     job_id,
                     state="failed",
@@ -169,10 +180,12 @@ class JobRegistry:
             if self._active_ids_by_key.get(oldest.job_key) == oldest_id:
                 self._active_ids_by_key.pop(oldest.job_key, None)
 
-    async def cancel(self, *, job_id: str, owner_user_id: str) -> Job | None:
+    async def cancel(
+        self, *, job_id: str, owner_user_id: str, database_url: str | None = None
+    ) -> Job | None:
         """Cancel an active job owned by the given user, if possible."""
         async with self._lock:
-            async with Database() as db:
+            async with _open_database(database_url=database_url) as db:
                 job = await db.get_job(job_id)
                 if not job or job.owner_user_id != owner_user_id:
                     return None

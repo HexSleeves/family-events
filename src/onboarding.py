@@ -21,7 +21,9 @@ def normalize_city_list(text: str, *, fallback_home_city: str) -> list[str]:
     return deduped
 
 
-def build_interest_profile_from_form(form, *, home_city: str, preferred_cities: list[str]) -> InterestProfile:
+def build_interest_profile_from_form(
+    form, *, home_city: str, preferred_cities: list[str]
+) -> InterestProfile:
     loves = [item.strip() for item in str(form.get("loves", "")).split(",") if item.strip()]
     likes = [item.strip() for item in str(form.get("likes", "")).split(",") if item.strip()]
     dislikes = [item.strip() for item in str(form.get("dislikes", "")).split(",") if item.strip()]
@@ -68,9 +70,7 @@ def validate_onboarding_form(form) -> list[str]:
             bedtime=str(form.get("bedtime", "19:30")).strip(),
         )
     except ValidationError as exc:
-        errors.extend(
-            str(error["msg"]).removeprefix("Value error, ") for error in exc.errors()
-        )
+        errors.extend(str(error["msg"]).removeprefix("Value error, ") for error in exc.errors())
     return errors
 
 

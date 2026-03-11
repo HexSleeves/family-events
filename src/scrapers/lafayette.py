@@ -14,6 +14,7 @@ import contextlib
 import hashlib
 import re
 from datetime import datetime
+from typing import TypedDict
 
 from bs4 import BeautifulSoup, Tag
 
@@ -21,7 +22,15 @@ from src.db.models import Event, Source
 
 from .base import BaseScraper
 
-MEC_SOURCES = [
+
+class MecSource(TypedDict):
+    name: str
+    url: str
+    base: str
+    sub: str
+
+
+MEC_SOURCES: list[MecSource] = [
     {
         "name": "Moncus Park",
         "url": "https://moncuspark.org/events/",
@@ -47,16 +56,17 @@ class LafayetteScraper(BaseScraper):
     def __init__(self, source: Source) -> None:
         self.source = source
         self.source_name = f"builtin:mec:{source.id}"
-        self.mec_source = next((item for item in MEC_SOURCES if item["url"] == source.url), None)
-        if self.mec_source is None:
+        source_def = next((item for item in MEC_SOURCES if item["url"] == source.url), None)
+        if source_def is None:
             raise ValueError(f"Unsupported MEC source: {source.url}")
+        self.mec_source: MecSource = source_def
 
     async def scrape(self) -> list[Event]:
         events = await self._scrape_mec(self.mec_source)
         self.log(f"{self.mec_source['name']}: {len(events)} events")
         return events
 
-    async def _scrape_mec(self, src: dict) -> list[Event]:
+    async def _scrape_mec(self, src: MecSource) -> list[Event]:
         async with self._client() as client:
             resp = await client.get(src["url"])
             resp.raise_for_status()
@@ -84,7 +94,7 @@ class LafayetteScraper(BaseScraper):
                 unique.append(ev)
         return unique
 
-    def _parse_mec_article(self, art: Tag, src: dict) -> Event | None:
+    def _parse_mec_article(self, art: Tag, src: MecSource) -> Event | None:
         title_el = art.select_one(".mec-event-title a, h4 a, h3 a, h2 a")
         if not title_el:
             return None
@@ -143,7 +153,7 @@ class LafayetteScraper(BaseScraper):
             },
         )
 
-    def _extract_event_links(self, soup: BeautifulSoup, src: dict) -> list[Event]:
+    def _extract_event_links(self, soup: BeautifulSoup, src: MecSource) -> list[Event]:
         """Fallback: gather events from <a> links to event detail pages."""
         events: list[Event] = []
         seen: set[str] = set()
