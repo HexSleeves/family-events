@@ -1,4 +1,4 @@
-.PHONY: help install lint format format-check typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate
+.PHONY: help install lint format format-check typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate railway-up-web railway-up-cron railway-logs-web railway-logs-cron
 
 DJLINT_FLAGS=--profile=jinja --indent 2 --max-line-length 100 --ignore H006,H023,H029,H031,J004,J018,T003,T028
 
@@ -116,6 +116,18 @@ deploy: check ## Run all checks then restart the service
 	sudo systemctl restart family-events-cron
 	@sleep 2
 	@journalctl -u family-events -n 5 --no-pager
+
+railway-up-web: ## Deploy the web service to Railway
+	railway up --service web
+
+railway-up-cron: ## Deploy the cron service to Railway
+	railway up --service cron
+
+railway-logs-web: ## Tail Railway logs for the web service
+	railway logs --service web
+
+railway-logs-cron: ## Tail Railway logs for the cron service
+	railway logs --service cron
 
 # ──────────────────────────────────────────────
 # Cleanup

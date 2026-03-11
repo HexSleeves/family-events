@@ -1,0 +1,16 @@
+.env
+.env.*
+.git
+.github
+.pytest_cache
+.ruff_cache
+.venv
+.vscode
+__pycache__
+alembic/__pycache__
+build
+dist
+docs
+node_modules
+tests
+tmp
