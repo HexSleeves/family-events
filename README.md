@@ -435,6 +435,7 @@ npm run css:watch
 - [docs/frontend.md](docs/frontend.md)
 - [docs/design-generic-scraper.md](docs/design-generic-scraper.md)
 - [docs/migration.md](docs/migration.md)
+- [docs/runbook.md](docs/runbook.md)
 
 ## External HTTP behavior
 

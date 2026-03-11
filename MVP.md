@@ -22,12 +22,13 @@ Already completed in the codebase:
 - Shared outbound HTTP client behavior across scrapers, analyzer, weather, and notification providers
 - Authenticated, paginated, rate-limited `/api/events` contract documented in `README.md`
 - Repo-wide formatting/lint coverage for Python, templates, docs, config, and frontend assets via `make check`
+- Operator runbook covering deploys, migrations, scheduler checks, failed-job/source inspection, secret rotation, and Postgres backup/restore
 
 Still open before a true public MVP:
 
 - Benchmarking and search/index work for realistic scale
 - Final production deployment/security verification
-- Backup/restore runbook and broader operator documentation
+- Final decision on single-host/single-process deployment assumptions
 - Remaining warning cleanup and some maintainability refactors
 
 ---
@@ -588,10 +589,10 @@ Postgres-first MVP is fine, but only if we treat it responsibly operationally.
 
 ### Tasks
 
-- [ ] Define backup cadence
-- [ ] Define restore process
-- [ ] Document Postgres volume/snapshot expectations
-- [ ] Add a simple operator runbook for DB maintenance
+- [x] Define backup cadence
+- [x] Define restore process
+- [x] Document Postgres volume/snapshot expectations
+- [x] Add a simple operator runbook for DB maintenance
 
 ### Deliverable
 
@@ -628,8 +629,8 @@ The highest-risk release areas have regression coverage.
   - [x] `make check`
   - [x] `uv run pytest`
   - [x] `uv run ty check`
-- [ ] Add smoke-test checklist for deployed environment
-- [ ] Add browser/manual verification checklist for key flows
+- [x] Add smoke-test checklist for deployed environment
+- [x] Add browser/manual verification checklist for key flows
 - [ ] Decide whether every release requires a seeded-data UI review
 
 ### Deliverable
@@ -651,7 +652,7 @@ The README and deployment docs need to match reality before launch.
 - [x] Document cron/scheduled pipeline behavior
 - [x] Document dev vs prod server startup
 - [x] Document migration flow
-- [ ] Document backup/recovery notes
+- [x] Document backup/recovery notes
 - [x] Document environment variables clearly
 
 ### Deliverable
@@ -664,14 +665,14 @@ A new maintainer can deploy and operate the app from the docs.
 
 ### Tasks
 
-- [ ] How to deploy
-- [ ] How to run migrations
-- [ ] How to verify scheduler is alive
-- [ ] How to manually trigger scrape/tag/notify
-- [ ] How to inspect failed jobs
-- [ ] How to inspect failed sources
-- [ ] How to rotate secrets
-- [ ] How to back up/restore the DB
+- [x] How to deploy
+- [x] How to run migrations
+- [x] How to verify scheduler is alive
+- [x] How to manually trigger scrape/tag/notify
+- [x] How to inspect failed jobs
+- [x] How to inspect failed sources
+- [x] How to rotate secrets
+- [x] How to back up/restore the DB
 
 ### Deliverable
 
@@ -748,7 +749,7 @@ The app is operable by someone other than the current developer.
 
 - [x] Structured logging
 - [x] Pipeline freshness in `/health`
-- [ ] Backup and restore procedure
+- [x] Backup and restore procedure
 - [x] Production service docs
 
 ## Tests
@@ -786,12 +787,12 @@ Focus the next MVP pass on the highest remaining launch risk:
 
 1. Final production/security verification
    Verify real HTTPS/proxy behavior, production cookie settings, `APP_BASE_URL`, auth rate limits, and unauthenticated route exposure in the deployed environment.
-2. Operator runbook + backups
-   Document deploy, migrate, scheduler verification, failed-job inspection, and Postgres backup/restore steps so another person can run the app safely.
-3. Timezone policy docs + targeted smoke coverage
+2. Timezone policy docs + targeted smoke coverage
    Finish the Central-time policy writeup, then manually verify weekend/calendar/search behavior around midnight and DST in the running app.
-4. Performance benchmark pass
+3. Performance benchmark pass
    Seed a realistic dataset, measure `/`, `/events`, `/weekend`, `/calendars`, and source detail, then capture the slow queries and indexing gaps.
+4. Single-host deployment decision
+   Decide whether the MVP is formally one web process plus one scheduler on one VM, and either document that as the supported posture or move volatile coordination state into shared storage.
 5. Remaining warning/refactor cleanup
    Finish `TemplateResponse` warning cleanup, tighten shared route/context helpers, and keep the docs/runtime surface aligned as those changes land.
 
