@@ -1,78 +1,67 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, form_field, select_field, empty_state %}
 {% block title %}Jobs{% endblock %}
 {% block content %}
+
 <div class="max-w-6xl mx-auto animate-fade-in">
-  <div class="flex items-center justify-between gap-4 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold text-[var(--color-heading)]"><span aria-hidden="true">🛠️</span> Jobs</h1>
-      <p class="text-sm text-[var(--color-muted)] mt-1">Track background pipeline and source work.</p>
-    </div>
-  </div>
+  {{ page_header("Jobs", "Track background pipeline and source work.", icon_name="wrench") }}
 
   <form method="get" action="/jobs"
-    class="glass rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-    <div class="md:col-span-4">
-      <span class="block text-xs font-medium text-[var(--color-muted)] mb-2">Scope</span>
-      <div class="flex flex-wrap gap-2">
-        {% for value, label in [('mine', 'My jobs'), ('shared', 'Shared pipeline')] %}
-        <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border border-[var(--color-edge)]">
-          <input type="radio" name="scope" value="{{ value }}" {{ 'checked' if selected_scope == value }} class="sr-only" />
-          <span class="text-sm font-medium">{{ label }}</span>
-        </label>
-        {% endfor %}
+    class="glass rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6"
+    x-data="{ scope: '{{ selected_scope }}' }">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div class="md:col-span-4">
+        <span class="block text-xs font-medium text-[var(--color-muted)] mb-2">Scope</span>
+        <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Job scope">
+          {% for value, label in [('mine', 'My jobs'), ('shared', 'Shared pipeline')] %}
+          <label
+            :class="scope === '{{ value }}' ? 'bg-[var(--color-brand)] border-[var(--color-brand)] text-white shadow-[var(--shadow-xs)]' : 'border-[var(--color-edge)] text-[var(--color-muted)] hover:border-[var(--color-brand)]/50 hover:text-[var(--color-heading)]'"
+            class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-full border transition-all duration-200 touch-target">
+            <input type="radio" name="scope" value="{{ value }}"
+              {{ 'checked' if selected_scope == value }}
+              class="sr-only"
+              x-model="scope" />
+            <span class="text-sm font-medium">{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
       </div>
-    </div>
-    <div>
-      <label for="job-q" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Search</label>
-      <input id="job-q" type="search" name="q" value="{{ q }}" placeholder="Label, detail, error..."
-        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)]" />
-    </div>
-    <div>
-      <label for="job-state" class="block text-xs font-medium text-[var(--color-muted)] mb-1">State</label>
-      <select id="job-state" name="state"
-        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
-        <option value="">All states</option>
-        {% for value in ['running', 'succeeded', 'failed', 'cancelled'] %}
-        <option value="{{ value }}" {% if selected_state==value %}selected{% endif %}>{{ value }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="job-kind" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Kind</label>
-      <select id="job-kind" name="kind"
-        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]">
-        <option value="">All kinds</option>
-        {% for value in job_kinds %}
-        <option value="{{ value }}" {% if selected_kind==value %}selected{% endif %}>{{ value }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="job-source" class="block text-xs font-medium text-[var(--color-muted)] mb-1">Source</label>
-      <select id="job-source" name="source_id"
-        class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]"
-        {% if selected_scope == 'shared' %}disabled{% endif %}>
-        <option value="">All sources</option>
-        {% for source in sources %}
-        <option value="{{ source.id }}" {% if selected_source_id==source.id %}selected{% endif %}>{{ source.name }}
-        </option>
-        {% endfor %}
-      </select>
-      {% if selected_scope == 'shared' %}
-      <input type="hidden" name="source_id" value="" />
-      {% endif %}
-    </div>
-    <div class="md:col-span-4 flex items-center gap-3">
-      <button type="submit"
-        class="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90">Apply
-        filters</button>
-      <a href="/jobs" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)]">Reset</a>
+      {{ form_field("q", "Search", type="search", value=q, placeholder="Label, detail, error...", id="job-q") }}
+      {{ select_field("state", "State", options=[("running", "running"), ("succeeded", "succeeded"), ("failed", "failed"), ("cancelled", "cancelled")], value=selected_state, empty_label="All states", id="job-state") }}
+      {{ select_field("kind", "Kind", options=[(k, k) for k in job_kinds], value=selected_kind, empty_label="All kinds", id="job-kind") }}
+      <div>
+        <label for="job-source" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Source</label>
+        <select name="source_id" id="job-source"
+          :disabled="scope === 'shared'"
+          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <option value="">All sources</option>
+          {% for source in sources %}
+          <option value="{{ source.id }}" {% if selected_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
+          {% endfor %}
+        </select>
+        <template x-if="scope === 'shared'">
+          <input type="hidden" name="source_id" value="" />
+        </template>
+      </div>
+      <div class="md:col-span-4 flex items-center gap-3">
+        <button type="submit"
+          class="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90 inline-flex items-center gap-1.5 touch-target">
+          <i data-lucide="filter" class="w-4 h-4" aria-hidden="true"></i>
+          Apply filters
+        </button>
+        <a href="/jobs" class="text-sm text-[var(--color-muted)] hover:text-[var(--color-heading)] transition-colors">
+          Reset
+        </a>
+      </div>
     </div>
   </form>
 
   <section id="jobs-list-panel">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-[var(--color-heading)]">{{ 'Shared Pipeline History' if selected_scope == 'shared' else 'Job History' }}</h2>
+      <h2 class="text-lg font-semibold text-[var(--color-heading)] flex items-center gap-2">
+        <i data-lucide="list" class="w-5 h-5 text-[var(--color-accent)]" aria-hidden="true"></i>
+        {{ 'Shared Pipeline History' if selected_scope == 'shared' else 'Job History' }}
+      </h2>
       <span class="text-sm text-[var(--color-muted)]">{{ jobs|length }} shown</span>
     </div>
     {% if job_cards %}
@@ -80,6 +69,8 @@
       {% for card in job_cards %}
       {% set job = card.job %}
       {% set target_id = card.target_id %}
+      {% set can_cancel = card.can_cancel %}
+      {% set allow_shared_view = card.allow_shared_view %}
       {% set message = card.message %}
       {% set started_at = card.started_at %}
       {% set finished_at = card.finished_at %}
@@ -94,9 +85,9 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="glass rounded-xl p-6 border border-[var(--color-edge-subtle)] text-sm text-[var(--color-muted)]">No jobs
-      match these filters yet.</div>
+    {{ empty_state("wrench", "No jobs match these filters", "Try adjusting your filters or scope to see job history.", "Reset filters", "/jobs") }}
     {% endif %}
   </section>
 </div>
+
 {% endblock %}

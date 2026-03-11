@@ -1,342 +1,184 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, section_header, event_card, stat_card, btn, empty_state %}
 {% block title %}Discover{% endblock %}
 {% block content %}
 
-{# ═══════════════════════════════════════════════════════════
-MACRO: Event card for horizontal scroll sections
-═══════════════════════════════════════════════════════════ #}
-{% macro event_card(event, size="normal", delay=0) %}
-{% set score = event.tags.toddler_score if event.tags else none %}
-{% set score_class = "score-low" if score is not none and score <= 3 else "score-mid" if score is not none and score <=6
-  else "score-high" if score is not none and score <=8 else "score-top" if score is not none else "score-low" %} {% set
-  score_bg="score-bg-low" if score is not none and score <=3 else "score-bg-mid" if score is not none and score <=6
-  else "score-bg-high" if score is not none and score <=8 else "score-bg-top" if score is not none else "score-bg-low"
-  %} {% set score_label="poor" if score is not none and score <=3 else "fair" if score is not none and score <=6
-  else "great" if score is not none and score <=8 else "excellent" if score is not none else "" %} {% set
-  card_w="w-[280px] md:w-[300px]" if size=="featured" else "w-[240px] md:w-[260px]" %} <a href="/event/{{ event.id }}"
-  class="{{ card_w }} group block rounded-xl bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-1 transition-all duration-200 animate-fade-in-up{% if delay %} stagger-{{ [delay, 9] | min }}{% endif %}">
-
-  {# ── Image / Placeholder ── #}
-  <div class="relative aspect-[16/10] rounded-t-xl overflow-hidden">
-    {% if event.image_url %}
-    <img src="{{ event.image_url }}" alt="{{ event.title }}"
-      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-    {% else %}
-    <div
-      class="w-full h-full flex items-center justify-center text-3xl bg-gradient-to-br from-[var(--color-accent-light)] to-[var(--color-brand-light)]"
-      role="img" aria-label="{{ event.title }} — event placeholder">
-      {% if event.tags and event.tags.categories %}
-      {% set cat = event.tags.categories[0] | lower if event.tags.categories else '' %}
-      {% if 'art' in cat or 'craft' in cat %}<span aria-hidden="true">🎨</span>
-      {% elif 'outdoor' in cat or 'adventure' in cat %}<span aria-hidden="true">🌳</span>
-      {% elif 'nature' in cat or 'animal' in cat or 'wildlife' in cat %}<span aria-hidden="true">🦋</span>
-      {% elif 'music' in cat %}<span aria-hidden="true">🎵</span>
-      {% elif 'story' in cat or 'book' in cat %}<span aria-hidden="true">📚</span>
-      {% else %}<span aria-hidden="true">🎈</span>
-      {% endif %}
-      {% else %}<span aria-hidden="true">🎈</span>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {# Score badge — top left #}
-    {% if score is not none %}
-    <div class="absolute top-2 left-2 badge {{ score_bg }} {{ score_class }} backdrop-blur-sm"
-      aria-label="Score {{ score }} out of 10, {{ score_label }}">
-      <span aria-hidden="true">⭐</span> {{ score }}/10
-    </div>
-    {% endif %}
-
-    {# Free badge — top right #}
-    {% if event.is_free %}
-    <div class="absolute top-2 right-2 badge badge-success">
-      Free
-    </div>
-    {% endif %}
-  </div>
-
-  {# ── Card body ── #}
-  <div class="p-3">
-    <h3
-      class="text-sm font-semibold text-[var(--color-heading)] line-clamp-2 leading-snug group-hover:text-[var(--color-brand)] transition-colors">
-      {{ event.title }}
-    </h3>
-
-    <p class="mt-1.5 text-xs text-[var(--color-muted)] flex items-center gap-1 truncate">
-      <svg class="w-3.5 h-3.5 shrink-0 text-[var(--color-faint)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-      {{ event.location_name or event.location_city or "TBA" }}
-    </p>
-
-    <p class="mt-1 text-xs text-[var(--color-faint)] flex items-center gap-1">
-      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-      {{ event.start_time.strftime('%a %b %d, %I:%M%p') }}
-    </p>
-
-    {# Tags row #}
-    {% if event.tags %}
-    <div class="mt-2 flex flex-wrap gap-1">
-      {% if event.tags.audience %}
-      <span class="badge badge-muted">{{ event.tags.audience.replace('_', ' ') }}</span>
-      {% endif %}
-      {% if event.tags.indoor_outdoor %}
-      <span class="badge badge-info">{{ event.tags.indoor_outdoor }}</span>
-      {% endif %}
-      {% if event.tags.meltdown_risk %}
-      <span class="badge {{ 'badge-success' if event.tags.meltdown_risk == 'low' else 'badge-warning' }}">{{
-        event.tags.meltdown_risk }} meltdown</span>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div>
-  </a>
-  {% endmacro %}
-
-
-  {# ═══════════════════════════════════════════════════════════
-  HERO / GREETING
-  ═══════════════════════════════════════════════════════════ #}
-  <section class="mb-10 animate-fade-in-up" aria-labelledby="hero-heading">
-    <div
-      class="glass rounded-2xl px-6 py-8 sm:py-10 bg-gradient-to-r from-sky-50 to-amber-50 dark:from-sky-950/20 dark:to-amber-950/20">
+{# ═══ HERO / GREETING ═══ #}
+<section class="mb-10 animate-fade-in-up" aria-labelledby="hero-heading">
+  <div class="gradient-mesh glass rounded-2xl px-6 py-8 sm:py-10 relative overflow-hidden">
+    <div class="relative z-10">
       <h1 id="hero-heading" class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">
         Discover family events <span aria-hidden="true">🎈</span>
       </h1>
       <p class="mt-2 text-[var(--color-muted)] text-sm sm:text-base max-w-xl">
-        Curated child-friendly things to do based on your city and your child’s profile
+        Curated child-friendly things to do based on your city and your child's profile
       </p>
     </div>
-  </section>
-
-
-  {# ═══════════════════════════════════════════════════════════
-  HELPER: Section heading with left accent border
-  ═══════════════════════════════════════════════════════════ #}
-  {% macro section_heading(id, emoji, title, link_href=none, link_label="See all") %}
-  <div class="flex items-center justify-between mb-4">
-    <h2 id="{{ id }}"
-      class="text-lg sm:text-xl font-bold text-[var(--color-heading)] flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
-      <span aria-hidden="true">{{ emoji }}</span> {{ title }}
-    </h2>
-    {% if link_href %}
-    <a href="{{ link_href }}"
-      class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">
-      {{ link_label }} <span aria-hidden="true">→</span>
-    </a>
-    {% endif %}
   </div>
-  {% endmacro %}
+</section>
 
-  {% if initial_import_card %}
-  <section class="mb-8 animate-fade-in-up stagger-1" aria-labelledby="initial-import-heading">
-    <div class="glass rounded-2xl border border-[var(--color-edge-subtle)] px-6 py-5 shadow-[var(--shadow-card)]">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 id="initial-import-heading" class="text-lg font-semibold text-[var(--color-heading)]">Initial event import is running</h2>
-          <p class="mt-1 text-sm text-[var(--color-muted)]">We are scraping and tagging your starter sources now so your dashboard fills in with events.</p>
-        </div>
-        <a href="/jobs?scope=shared&kind=pipeline"
-          class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)]">
-          View import status
-        </a>
+{# ═══ INITIAL IMPORT CARD ═══ #}
+{% if initial_import_card %}
+<section class="mb-8 animate-fade-in-up stagger-1" aria-labelledby="initial-import-heading">
+  <div class="glass rounded-2xl border border-[var(--color-edge-subtle)] px-6 py-5 shadow-[var(--shadow-card)]">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 id="initial-import-heading" class="text-lg font-semibold text-[var(--color-heading)] flex items-center gap-2">
+          {{ icon("loader", size="w-5 h-5", cls="text-[var(--color-accent)] animate-spin") }}
+          Initial event import is running
+        </h2>
+        <p class="mt-1 text-sm text-[var(--color-muted)]">We are scraping and tagging your starter sources now so your dashboard fills in with events.</p>
       </div>
-      {% set job = initial_import_card.job %}
-      {% set target_id = initial_import_card.target_id %}
-      {% set can_cancel = initial_import_card.can_cancel %}
-      {% set allow_shared_view = initial_import_card.allow_shared_view %}
-      {% set message = initial_import_card.message %}
-      {% set started_at = initial_import_card.started_at %}
-      {% set finished_at = initial_import_card.finished_at %}
-      {% set result = initial_import_card.result %}
-      {% set progress = initial_import_card.progress %}
-      {% set result_summary = initial_import_card.result_summary %}
-      {% set refresh_path = initial_import_card.refresh_path %}
-      {% set refresh_select = initial_import_card.refresh_select %}
-      {% set refresh_target_id = initial_import_card.refresh_target_id %}
-      {% set auto_refresh_history = initial_import_card.auto_refresh_history %}
-      {% include "partials/_job_status.html" %}
+      <a href="/jobs?scope=shared&kind=pipeline"
+        class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)] transition-colors">
+        View import status
+      </a>
     </div>
-  </section>
-  {% endif %}
+    {% set job = initial_import_card.job %}
+    {% set target_id = initial_import_card.target_id %}
+    {% set can_cancel = initial_import_card.can_cancel %}
+    {% set allow_shared_view = initial_import_card.allow_shared_view %}
+    {% set message = initial_import_card.message %}
+    {% set started_at = initial_import_card.started_at %}
+    {% set finished_at = initial_import_card.finished_at %}
+    {% set result = initial_import_card.result %}
+    {% set progress = initial_import_card.progress %}
+    {% set result_summary = initial_import_card.result_summary %}
+    {% set refresh_path = initial_import_card.refresh_path %}
+    {% set refresh_select = initial_import_card.refresh_select %}
+    {% set refresh_target_id = initial_import_card.refresh_target_id %}
+    {% set auto_refresh_history = initial_import_card.auto_refresh_history %}
+    {% include "partials/_job_status.html" %}
+  </div>
+</section>
+{% endif %}
 
-  {# ═══════════════════════════════════════════════════════════
-  TOP PICKS
-  ═══════════════════════════════════════════════════════════ #}
-  {% if top_events %}
-  <section class="mb-10 animate-fade-in-up stagger-1" aria-labelledby="section-top-picks">
-    {{ section_heading("section-top-picks", "⭐", "Top Picks", "/events?sort=-score") }}
-
-    <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
-      {% for event in top_events %}
-      <div role="listitem">
-        {{ event_card(event, size="featured", delay=loop.index0 + 2) }}
-      </div>
-      {% endfor %}
+{# ═══ TOP PICKS ═══ #}
+{% if top_events %}
+<section class="mb-10 animate-fade-in-up stagger-1" aria-labelledby="section-top-picks">
+  {{ section_header("Top Picks", icon_name="star", link_href="/events?sort=-score", id="section-top-picks") }}
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
+    {% for event in top_events %}
+    <div role="listitem">
+      {{ event_card(event, size="featured", delay=loop.index0 + 2) }}
     </div>
-  </section>
-  {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
-
-  {# ═══════════════════════════════════════════════════════════
-  CATEGORY: Near You
-  ═══════════════════════════════════════════════════════════ #}
-  {% if near_you_events %}
-  <section class="mb-10 animate-fade-in-up stagger-3" aria-labelledby="section-near-you">
-    {{ section_heading("section-near-you", "📍", "Near You (" ~ near_city ~ ")", "/events?city=" ~ near_city ~
-    "&sort=-score") }}
-
-    <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
-      {% for event in near_you_events %}
-      <div role="listitem">
-        {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
-      </div>
-      {% endfor %}
+{# ═══ NEAR YOU ═══ #}
+{% if near_you_events %}
+<section class="mb-10 animate-fade-in-up stagger-3" aria-labelledby="section-near-you">
+  {{ section_header("Near You (" ~ near_city ~ ")", icon_name="map-pin", link_href="/events?city=" ~ near_city ~ "&sort=-score", id="section-near-you") }}
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
+    {% for event in near_you_events %}
+    <div role="listitem">
+      {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
     </div>
-  </section>
-  {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
-
-  {# ═══════════════════════════════════════════════════════════
-  CATEGORY: Arts & Crafts
-  ═══════════════════════════════════════════════════════════ #}
-  {% if arts_events %}
-  <section class="mb-10 animate-fade-in-up stagger-4" aria-labelledby="section-arts-crafts">
-    {{ section_heading("section-arts-crafts", "🎨", "Arts & Crafts", "/events?q=arts+crafts") }}
-
-    <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
-      {% for event in arts_events %}
-      <div role="listitem">
-        {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
-      </div>
-      {% endfor %}
+{# ═══ ARTS & CRAFTS ═══ #}
+{% if arts_events %}
+<section class="mb-10 animate-fade-in-up stagger-4" aria-labelledby="section-arts-crafts">
+  {{ section_header("Arts & Crafts", icon_name="palette", link_href="/events?q=arts+crafts", id="section-arts-crafts") }}
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
+    {% for event in arts_events %}
+    <div role="listitem">
+      {{ event_card(event, size="normal", delay=loop.index0 + 4) }}
     </div>
-  </section>
-  {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
-
-  {# ═══════════════════════════════════════════════════════════
-  CATEGORY: Outdoor Adventures
-  ═══════════════════════════════════════════════════════════ #}
-  {% if outdoor_events %}
-  <section class="mb-10 animate-fade-in-up stagger-5" aria-labelledby="section-outdoor">
-    {{ section_heading("section-outdoor", "🌳", "Outdoor Adventures", "/events?q=outdoor") }}
-
-    <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
-      {% for event in outdoor_events %}
-      <div role="listitem">
-        {{ event_card(event, size="normal", delay=loop.index0 + 6) }}
-      </div>
-      {% endfor %}
+{# ═══ OUTDOOR ADVENTURES ═══ #}
+{% if outdoor_events %}
+<section class="mb-10 animate-fade-in-up stagger-5" aria-labelledby="section-outdoor">
+  {{ section_header("Outdoor Adventures", icon_name="trees", link_href="/events?q=outdoor", id="section-outdoor") }}
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
+    {% for event in outdoor_events %}
+    <div role="listitem">
+      {{ event_card(event, size="normal", delay=loop.index0 + 6) }}
     </div>
-  </section>
-  {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
-
-  {# ═══════════════════════════════════════════════════════════
-  CATEGORY: Nature & Wildlife
-  ═══════════════════════════════════════════════════════════ #}
-  {% if nature_events %}
-  <section class="mb-10 animate-fade-in-up stagger-7" aria-labelledby="section-nature">
-    {{ section_heading("section-nature", "🦋", "Nature & Wildlife", "/events?q=nature+wildlife") }}
-
-    <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
-      {% for event in nature_events %}
-      <div role="listitem">
-        {{ event_card(event, size="normal", delay=loop.index0 + 8) }}
-      </div>
-      {% endfor %}
+{# ═══ NATURE & WILDLIFE ═══ #}
+{% if nature_events %}
+<section class="mb-10 animate-fade-in-up stagger-7" aria-labelledby="section-nature">
+  {{ section_header("Nature & Wildlife", icon_name="leaf", link_href="/events?q=nature+wildlife", id="section-nature") }}
+  <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
+    {% for event in nature_events %}
+    <div role="listitem">
+      {{ event_card(event, size="normal", delay=loop.index0 + 8) }}
     </div>
-  </section>
-  {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
+{# ═══ EMPTY STATE ═══ #}
+{% if not top_events and not near_you_events and not arts_events and not outdoor_events and not nature_events %}
+{{ empty_state(emoji="🎈", title="No events yet", description="Run the scrapers and tagger to start discovering toddler-friendly events in your area.") }}
+{% endif %}
 
-  {# ═══════════════════════════════════════════════════════════
-  EMPTY STATE
-  ═══════════════════════════════════════════════════════════ #}
-  {% if not top_events and not near_you_events and not arts_events and not outdoor_events and not nature_events %}
-  <section class="text-center py-16 animate-fade-in-up stagger-2" aria-labelledby="empty-heading">
-    <div class="max-w-md mx-auto">
-      <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-accent-light)] flex items-center justify-center">
-        <span class="text-4xl" aria-hidden="true">🎈</span>
-      </div>
-      <h2 id="empty-heading" class="text-xl font-bold text-[var(--color-heading)] mb-2">No events yet</h2>
-      <p class="text-[var(--color-muted)] text-sm leading-relaxed">
-        Run the scrapers and tagger to start discovering toddler-friendly events in your area.
-      </p>
-    </div>
-  </section>
-  {% endif %}
+{# ═══ ADMIN SECTION ═══ #}
+{% if current_user %}
+<section class="mt-4 mb-2 animate-fade-in-up stagger-9" aria-labelledby="admin-heading"
+  x-data="collapsible(true)">
+  <hr class="border-[var(--color-edge-subtle)] mb-8" />
 
-
-  {# ═══════════════════════════════════════════════════════════
-  ADMIN QUICK ACTIONS (only for logged-in users)
-  ═══════════════════════════════════════════════════════════ #}
-  {% if current_user %}
-  <section class="mt-4 mb-2 animate-fade-in-up stagger-9" aria-labelledby="admin-heading">
-    <hr class="border-[var(--color-edge-subtle)] mb-8" />
-
+  <button @click="toggle()" class="w-full flex items-center justify-between mb-6 group cursor-pointer">
     <h2 id="admin-heading"
-      class="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-wider mb-6 flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
+      class="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-wider flex items-center gap-2 border-l-[3px] border-[var(--color-accent)] pl-3">
+      {{ icon("settings", size="w-4 h-4") }}
       Admin
     </h2>
+    <i data-lucide="chevron-down" aria-hidden="true"
+      class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200"
+      :class="open ? 'rotate-180' : ''"></i>
+  </button>
 
-    {# ── Stats grid ── #}
+  <div x-show="open" x-cloak
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 -translate-y-2"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0 -translate-y-2">
+
+    {# Stats grid #}
     <div class="glass rounded-xl p-4 sm:p-5 mb-6 border border-[var(--color-edge-subtle)]">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {% set stats = [
-        (total, 'Events', 'text-[var(--color-accent)]'),
-        (tagged, 'Tagged', 'text-[var(--color-success)]'),
-        (untagged, 'Untagged', 'text-[var(--color-warning)]'),
-        (stale_tagged, 'Stale tags', 'text-[var(--color-danger)]'),
-        (sources, 'Sources', 'text-[var(--color-info)]')
-        ] %}
-
-        {% for value, label, value_class in stats %}
-        <div
-          class="rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge-subtle)] p-4 text-center shadow-[var(--shadow-xs)]">
-          <div class="text-2xl font-bold {{ value_class }}">{{ value }}</div>
-          <div class="text-[10px] text-[var(--color-faint)] uppercase tracking-wider mt-0.5">{{ label }}</div>
-        </div>
-        {% endfor %}
+        {{ stat_card(total, "Events", icon_name="calendar-days", color="accent") }}
+        {{ stat_card(tagged, "Tagged", icon_name="tag", color="success") }}
+        {{ stat_card(untagged, "Untagged", icon_name="alert-circle", color="warning") }}
+        {{ stat_card(stale_tagged, "Stale tags", icon_name="clock", color="danger") }}
+        {{ stat_card(sources, "Sources", icon_name="radio", color="info") }}
       </div>
 
       <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-faint)]">
-        <p>
-          <svg class="w-3.5 h-3.5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Last scraped: <span class="text-[var(--color-body)] font-medium">{{ last_scraped_at.strftime('%b %d, %I:%M
-            %p') if last_scraped_at else 'Never' }}</span>
+        <p class="flex items-center gap-1">
+          {{ icon("clock", size="w-3.5 h-3.5") }}
+          Last scraped: <span class="text-[var(--color-body)] font-medium">{{ last_scraped_at.strftime('%b %d, %I:%M %p') if last_scraped_at else 'Never' }}</span>
         </p>
-        <p>
-          <svg class="w-3.5 h-3.5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-          </svg>
-          Last tagged: <span class="text-[var(--color-body)] font-medium">{{ last_tagged_at.strftime('%b %d, %I:%M %p')
-            if last_tagged_at else 'Never' }}</span>
+        <p class="flex items-center gap-1">
+          {{ icon("tag", size="w-3.5 h-3.5") }}
+          Last tagged: <span class="text-[var(--color-body)] font-medium">{{ last_tagged_at.strftime('%b %d, %I:%M %p') if last_tagged_at else 'Never' }}</span>
         </p>
       </div>
     </div>
 
+    {# Recent jobs #}
     {% if recent_job_cards %}
     <section id="section-jobs" class="mb-6" aria-labelledby="section-jobs-heading">
-      {{ section_heading("section-jobs-heading", "🛠️", "Recent Jobs", "/jobs") }}
+      {{ section_header("Recent Jobs", icon_name="wrench", link_href="/jobs", id="section-jobs-heading") }}
       <div class="space-y-3">
         {% for card in recent_job_cards %}
           {% set job = card.job %}
@@ -361,75 +203,42 @@ MACRO: Event card for horizontal scroll sections
 
     <p class="mb-3 text-sm text-[var(--color-muted)]">Primary workflow: run <span class="font-medium text-[var(--color-body)]">Scrape + Tag</span> after source changes or when refreshing event inventory.</p>
 
-    {# ── Action buttons ── #}
+    {# Action buttons #}
     <div class="flex flex-wrap gap-2">
-      <button hx-post="/api/scrape-tag" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this" aria-label="Run scrape and tag pipeline"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-brand)] border border-[var(--color-brand)] text-sm font-semibold text-white hover:opacity-95 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Scrape + Tag
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
-      <button hx-post="/api/scrape" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this" aria-label="Run scrapers to fetch new events"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Run Scrapers
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
-      <button hx-post="/api/tag" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this" aria-label="Tag untagged events with AI"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-        </svg>
-        Tag Untagged
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
-      <button hx-post="/api/tag/stale" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this"
-        aria-label="Retag stale events using the latest tagging rules"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Retag Stale Events
-        {% if stale_tagged %}<span class="badge badge-warning">{{ stale_tagged }}</span>{% endif %}
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
-      <button hx-post="/api/notify" hx-vals='{"csrf_token":"{{ csrf_token }}"}' hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this"
-        aria-label="Send push notification to subscribers"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-        Send Notification
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
-      <button hx-post="/api/dedupe" hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-        hx-confirm="Run dedupe on all events? This merges likely duplicates." hx-target="#dashboard-job-status"
-        hx-swap="innerHTML" hx-indicator="this" hx-disabled-elt="this"
-        aria-label="Deduplicate events by merging likely duplicates"
-        class="touch-target inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-edge)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-wait shadow-[var(--shadow-xs)]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-        Dedupe Events
-        <span class="htmx-indicator"><span class="spinner-brand"></span></span>
-      </button>
+      {{ btn("Scrape + Tag", variant="primary", icon_name="refresh-cw",
+             hx_post="/api/scrape-tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             aria_label="Run scrape and tag pipeline") }}
+      {{ btn("Run Scrapers", variant="secondary", icon_name="refresh-cw",
+             hx_post="/api/scrape", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             aria_label="Run scrapers to fetch new events") }}
+      {{ btn("Tag Untagged", variant="secondary", icon_name="tag",
+             hx_post="/api/tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             aria_label="Tag untagged events with AI") }}
+      {{ btn("Retag Stale", variant="secondary", icon_name="clock",
+             hx_post="/api/tag/stale", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             aria_label="Retag stale events") }}
+      {{ btn("Send Notification", variant="secondary", icon_name="mail",
+             hx_post="/api/notify", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             aria_label="Send push notification to subscribers") }}
+      {{ btn("Dedupe Events", variant="secondary", icon_name="trash-2",
+             hx_post="/api/dedupe", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+             hx_target="#dashboard-job-status", hx_swap="innerHTML",
+             hx_indicator="this", hx_disabled_elt="this",
+             hx_confirm="Run dedupe on all events? This merges likely duplicates.",
+             aria_label="Deduplicate events") }}
     </div>
-  </section>
-  {% endif %}
+  </div>
+</section>
+{% endif %}
 
-  {% endblock %}
+{% endblock %}

@@ -1,76 +1,110 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, form_field, select_field, empty_state %}
 {% block title %}Sources{% endblock %}
 {% block content %}
 
 <div class="animate-fade-in">
-  <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-6"><span aria-hidden="true">📡</span> Event Sources</h1>
+  {{ page_header("Event Sources", icon_name="radio") }}
 
   {% if current_user %}
   <div id="sources-job-status" class="mb-4"></div>
-  <div id="sources-list" class="space-y-3">
+  <div id="sources-list" class="space-y-6">
 
-  <section class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6">
-    <h2 class="font-semibold text-[var(--color-heading)] mb-3">Predefined Sources for {{ current_user.home_city or 'your
-      city' }}</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {% for item in predefined_sources %}
-      <form hx-post="/api/sources/predefined" hx-target="#sources-job-status" hx-swap="innerHTML"
-        class="bg-[var(--color-surface)] rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <input type="hidden" name="source_key" value="{{ item.key }}" />
-        <div class="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ item.name }}</h3>
-            <p class="text-xs text-[var(--color-muted)]">{{ item.city }} · {{ item.category }}</p>
+    {# Predefined sources #}
+    <section class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
+      <h2 class="font-semibold text-[var(--color-heading)] mb-3 flex items-center gap-2">
+        <i data-lucide="radio" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+        Predefined Sources for {{ current_user.home_city or 'your city' }}
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {% for item in predefined_sources %}
+        <form hx-post="/api/sources/predefined" hx-target="#sources-job-status" hx-swap="innerHTML"
+          class="glass bg-[var(--color-surface)]/50 rounded-xl p-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="source_key" value="{{ item.key }}" />
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+              <h3 class="font-semibold text-[var(--color-heading)] text-sm">{{ item.name }}</h3>
+              <p class="text-xs text-[var(--color-muted)] flex items-center gap-1 mt-0.5">
+                <i data-lucide="map-pin" class="w-3 h-3 shrink-0" aria-hidden="true"></i>
+                {{ item.city }} · {{ item.category }}
+              </p>
+            </div>
+            <button type="submit"
+              class="shrink-0 px-3 py-1.5 rounded-lg bg-[var(--color-brand)] text-white text-xs font-semibold inline-flex items-center gap-1 hover:opacity-90 transition-opacity touch-target">
+              <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i>
+              Add
+            </button>
           </div>
-          <button type="submit"
-            class="px-3 py-1.5 rounded-lg bg-[var(--color-brand)] text-white text-xs font-semibold">Add</button>
+          <p class="text-xs text-[var(--color-muted)]">{{ item.description }}</p>
+        </form>
+        {% else %}
+        <div class="col-span-full text-sm text-[var(--color-muted)] flex items-center gap-2 py-2">
+          <i data-lucide="info" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+          No predefined sources for this city yet. Add a custom source below.
         </div>
-        <p class="text-xs text-[var(--color-muted)]">{{ item.description }}</p>
-      </form>
-      {% else %}
-      <div class="text-sm text-[var(--color-muted)] col-span-full">No predefined sources for this city yet. Add a custom
-        source below.</div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <form hx-post="/api/sources" hx-target="#sources-job-status" hx-swap="innerHTML" hx-indicator="#add-spinner"
-    class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-6">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-    <h3 class="font-semibold text-[var(--color-heading)] mb-3">Add Custom Source</h3>
-    <div class="flex flex-col sm:flex-row gap-3">
-      <div class="flex-1"><input type="url" name="url" required placeholder="https://example.com/events"
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]" />
+        {% endfor %}
       </div>
-      <div class="w-full sm:w-48"><input type="text" name="name" placeholder="Name (optional)"
-          class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)]" />
-      </div>
-      <button type="submit"
-        class="px-5 py-2.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-sm flex items-center gap-2">Add
-        Source <span id="add-spinner" class="htmx-indicator spinner"></span></button>
-    </div>
-  </form>
-  {% endif %}
+    </section>
 
-  {% if sources %}
-  <h2 class="text-lg font-semibold text-[var(--color-heading)] mb-3">Your Sources</h2>
+    {# Add custom source form #}
+    <form hx-post="/api/sources" hx-target="#sources-job-status" hx-swap="innerHTML" hx-indicator="#add-spinner"
+      id="add-custom-source"
+      class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)]">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <h3 class="font-semibold text-[var(--color-heading)] mb-3 flex items-center gap-2">
+        <i data-lucide="link" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+        Add Custom Source
+      </h3>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1 relative">
+          <i data-lucide="globe" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
+          <input type="url" name="url" required placeholder="https://example.com/events"
+            class="w-full pl-10 pr-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+        </div>
+        <div class="w-full sm:w-48 relative">
+          <i data-lucide="tag" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
+          <input type="text" name="name" placeholder="Name (optional)"
+            class="w-full pl-10 pr-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+        </div>
+        <button type="submit"
+          class="px-5 py-2.5 rounded-lg bg-[var(--color-accent)] text-white font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity touch-target">
+          <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
+          Add Source
+          <span id="add-spinner" class="htmx-indicator spinner"></span>
+        </button>
+      </div>
+    </form>
+
+    {# Your sources #}
+    {% if sources %}
+    {{ section_header("Your Sources", icon_name="radio") }}
     {% for source in sources %}
     {% include "partials/_source_card.html" %}
     {% endfor %}
-  {% endif %}
+    {% else %}
+    {{ empty_state("radio", "No sources yet", "Add a predefined source above or add your own custom event feed.", "Add Custom Source", "#add-custom-source") }}
+    {% endif %}
   </div>
 
   {% if recent_job_cards %}
-  <section id="sources-jobs-panel" class="mb-8">
+  <section id="sources-jobs-panel" class="mt-8">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-[var(--color-heading)]">Recent Source Jobs</h2><a href="/jobs"
-        class="text-sm font-medium text-[var(--color-brand)]">View all →</a>
+      <h2 class="text-lg font-semibold text-[var(--color-heading)] flex items-center gap-2">
+        <i data-lucide="history" class="w-5 h-5 text-[var(--color-accent)]" aria-hidden="true"></i>
+        Recent Source Jobs
+      </h2>
+      <a href="/jobs"
+        class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] inline-flex items-center gap-1 transition-colors">
+        View all <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
+      </a>
     </div>
     <div class="space-y-3">
       {% for card in recent_job_cards %}
       {% set job = card.job %}
       {% set target_id = card.target_id %}
+      {% set can_cancel = card.can_cancel %}
+      {% set allow_shared_view = card.allow_shared_view %}
       {% set message = card.message %}
       {% set started_at = card.started_at %}
       {% set finished_at = card.finished_at %}
@@ -85,6 +119,7 @@
       {% endfor %}
     </div>
   </section>
+  {% endif %}
   {% endif %}
 </div>
 

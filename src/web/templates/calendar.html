@@ -1,60 +1,46 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, section_header, stat_card, page_header %}
 {% block title %}Calendars{% endblock %}
 {% block content %}
 
 <div class="animate-fade-in space-y-6">
+  {# ═══ HERO HEADER ═══ #}
   <section
-    class="relative overflow-hidden rounded-3xl border border-[var(--color-edge-subtle)] bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.16),_transparent_38%),linear-gradient(135deg,var(--color-surface),var(--color-surface-secondary))] p-6 sm:p-8 shadow-[var(--shadow-card)]">
-    <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-      <div class="max-w-3xl space-y-3">
-        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)]">Calendars</p>
-        <div>
-          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--color-heading)]">A real planning view for
-            family events.</h1>
-          <p class="mt-3 max-w-2xl text-sm sm:text-base text-[var(--color-muted)]">The old page behaved like a plain
-            month dump. This redesign turns it into a useful calendar workspace with month-level signals, a cleaner
-            grid, and a quick upcoming list for actual planning.</p>
+    class="relative overflow-hidden rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] animate-fade-in-up">
+    <div class="absolute inset-0 gradient-mesh opacity-60" aria-hidden="true"></div>
+    <div class="relative p-6 sm:p-8">
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div class="max-w-3xl space-y-3">
+          <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)] flex items-center gap-1.5">
+            {{ icon("calendar", size="w-3.5 h-3.5") }} Calendars
+          </p>
+          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--color-heading)]">
+            A real planning view for family events.
+          </h1>
+          <p class="max-w-2xl text-sm sm:text-base text-[var(--color-muted)]">
+            Navigate months, see busy days, and plan your family's schedule with a clean visual calendar.
+          </p>
+          <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-[var(--color-muted)]">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
+              {{ icon("calendar-days", size="w-3.5 h-3.5") }} {{ month_label }}
+            </span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
+              {{ icon("map-pin", size="w-3.5 h-3.5") }} {{ city_count }} cit{{ 'y' if city_count == 1 else 'ies' }}
+            </span>
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
+              {{ icon("radio", size="w-3.5 h-3.5") }} {{ source_count }} source{{ '' if source_count == 1 else 's' }}
+            </span>
+          </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-[var(--color-muted)]">
-          <span
-            class="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
-            <span aria-hidden="true">🗓️</span> {{ month_label }}
-          </span>
-          <span
-            class="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
-            <span aria-hidden="true">📍</span> {{ city_count }} cit{{ 'y' if city_count == 1 else 'ies' }}
-          </span>
-          <span
-            class="inline-flex items-center gap-2 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
-            <span aria-hidden="true">📡</span> {{ source_count }} source{{ '' if source_count == 1 else 's' }}
-          </span>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-2 gap-3 sm:min-w-[340px]">
-        <div
-          class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)]/80 p-4 backdrop-blur-sm">
-          <p class="text-xs uppercase tracking-wide text-[var(--color-faint)]">Events</p>
-          <p class="mt-2 text-2xl font-bold text-[var(--color-heading)]">{{ total_events }}</p>
-          <p class="mt-1 text-xs text-[var(--color-muted)]">Scheduled this month</p>
-        </div>
-        <div
-          class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)]/80 p-4 backdrop-blur-sm">
-          <p class="text-xs uppercase tracking-wide text-[var(--color-faint)]">Busy days</p>
-          <p class="mt-2 text-2xl font-bold text-[var(--color-heading)]">{{ busy_days_count }}</p>
-          <p class="mt-1 text-xs text-[var(--color-muted)]">Days with at least one event</p>
-        </div>
-        <div
-          class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)]/80 p-4 backdrop-blur-sm">
-          <p class="text-xs uppercase tracking-wide text-[var(--color-faint)]">Free</p>
-          <p class="mt-2 text-2xl font-bold text-[var(--color-heading)]">{{ free_events_count }}</p>
-          <p class="mt-1 text-xs text-[var(--color-muted)]">Marked free to attend</p>
-        </div>
-        <div
-          class="rounded-2xl border border-[var(--color-edge-subtle)] bg-[var(--color-surface)]/80 p-4 backdrop-blur-sm">
-          <p class="text-xs uppercase tracking-wide text-[var(--color-faint)]">Attended</p>
-          <p class="mt-2 text-2xl font-bold text-[var(--color-heading)]">{{ attended_events_count }}</p>
-          <p class="mt-1 text-xs text-[var(--color-muted)]">Already logged as attended</p>
+        <div class="grid grid-cols-2 gap-3 sm:min-w-[340px]">
+          {{ stat_card(total_events, "Events this month", icon_name="calendar-days", color="accent") }}
+          {{ stat_card(busy_days_count, "Busy days", icon_name="flame", color="brand") }}
+          {{ stat_card(free_events_count, "Free events", icon_name="gift", color="success") }}
+          {{ stat_card(attended_events_count, "Attended", icon_name="check-circle", color="info") }}
         </div>
       </div>
     </div>

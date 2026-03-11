@@ -7,6 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description"
     content="Family Events — Discover child-friendly events in your city. Browse, plan, and attend curated family activities." />
+  <meta name="view-transition" content="same-origin" />
   <title>{% block title %}Family Events{% endblock %} — Family Events</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,6 +15,10 @@
 
   <link rel="stylesheet" href="/static/styles.css" />
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="/static/app.js" defer></script>
 
   <script>
     (function () {
@@ -34,7 +39,8 @@
   </script>
 </head>
 
-<body hx-indicator="#global-progress" class="min-h-screen bg-[var(--color-surface-secondary)] text-[var(--color-body)]">
+<body hx-indicator="#global-progress" hx-boost="true"
+  class="min-h-screen bg-[var(--color-surface-secondary)] text-[var(--color-body)]">
   <div id="global-progress" role="progressbar" aria-label="Page loading">
     <div class="bar"></div>
   </div>
@@ -48,10 +54,13 @@
     Skip to navigation
   </a>
 
+  {# ═══ HEADER ═══ #}
   <header role="banner"
-    class="nav-bar sticky top-0 z-50 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-edge)] shadow-[var(--shadow-xs)]">
+    class="nav-bar sticky top-0 z-50 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-edge)] shadow-[var(--shadow-xs)]"
+    x-data="mobileMenu()">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
+        {# Logo #}
         <a href="/"
           class="flex items-center gap-2 shrink-0 rounded-lg px-1 py-0.5 hover:bg-[var(--color-surface-tertiary)] transition-colors">
           <span class="text-2xl" aria-hidden="true">🎈</span>
@@ -61,82 +70,79 @@
           </div>
         </a>
 
+        {# Desktop search #}
         <div class="hidden md:flex flex-1 max-w-xl mx-6 lg:mx-8">
           <div class="relative w-full">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
-              stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <i data-lucide="search"
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
             <input type="search" name="q" data-global-event-search value="{{ request.query_params.get('q', '') }}"
               aria-label="Search events by title, place, or city"
-              placeholder="Search events by title, place, or city..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
+              placeholder="Search events..."
+              class="w-full pl-10 pr-16 py-2.5 rounded-full border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
               hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
-              hx-select="#main-content" hx-swap="innerHTML" />
+              hx-select="#main-content" hx-swap="innerHTML" hx-boost="false" />
+            <kbd class="hidden lg:inline-flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-0.5 px-1.5 py-0.5 rounded border border-[var(--color-edge)] bg-[var(--color-surface)] text-[10px] text-[var(--color-faint)] font-mono">
+              <span class="text-xs">⌘</span>K
+            </kbd>
           </div>
         </div>
 
+        {# Right side actions #}
         <div class="flex items-center gap-2">
-          <a href="/weekend"
-            class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 transition-colors touch-target">
-            <span aria-hidden="true">🗓️</span> This Weekend
+          <a href="/weekend" hx-boost="true"
+            class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--color-accent)] text-white font-medium text-sm hover:bg-[var(--color-accent-hover)] transition-colors touch-target">
+            <i data-lucide="sparkles" class="w-4 h-4" aria-hidden="true"></i> This Weekend
           </a>
 
           {% if current_user %}
-          <button id="theme-toggle" type="button"
-            class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
-            aria-label="Toggle theme" aria-pressed="{{ 'true' if current_user.theme == 'dark' else 'false' }}"
-            data-theme-toggle>
-            <svg class="w-5 h-5 text-[var(--color-muted)] dark:hidden" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-            <svg class="w-5 h-5 text-[var(--color-muted)] hidden dark:block" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </button>
+          {# Theme toggle #}
+          <div x-data="themeToggle('{{ current_user.theme }}')">
+            <button type="button" @click="toggle()"
+              class="p-2 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
+              aria-label="Toggle theme" :aria-pressed="isDark.toString()">
+              <i data-lucide="moon" class="w-5 h-5 text-[var(--color-muted)]" x-show="!isDark" aria-hidden="true"></i>
+              <i data-lucide="sun" class="w-5 h-5 text-[var(--color-muted)]" x-show="isDark" x-cloak aria-hidden="true"></i>
+            </button>
+          </div>
           <span class="sr-only" aria-live="polite" id="theme-status"></span>
-          {% endif %}
 
-          {% if current_user %}
-          <div class="relative" id="user-menu">
-            <button id="user-menu-button" aria-haspopup="true" aria-expanded="false" aria-controls="user-dropdown"
+          {# User menu #}
+          <div class="relative" x-data="userDropdown()" @click.outside="close()" @keydown.escape.window="close()">
+            <button x-ref="trigger" @click="toggle()" aria-haspopup="true" :aria-expanded="open.toString()"
               class="flex items-center gap-2 p-1 rounded-full hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target">
               <div class="w-8 h-8 rounded-full bg-[var(--color-brand)] flex items-center justify-center">
-                <span class="text-sm font-medium text-white" aria-hidden="true">{{ current_user.display_name[:2]|upper
-                  }}</span>
+                <span class="text-sm font-medium text-white" aria-hidden="true">{{ current_user.display_name[:2]|upper }}</span>
               </div>
-              <span class="hidden sm:block text-sm font-medium text-[var(--color-heading)]">{{ current_user.display_name
-                }}</span>
-              <svg class="hidden sm:block w-4 h-4 text-[var(--color-faint)]" fill="none" stroke="currentColor"
-                viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
+              <span class="hidden sm:block text-sm font-medium text-[var(--color-heading)]">{{ current_user.display_name }}</span>
+              <i data-lucide="chevron-down" class="hidden sm:block w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
             </button>
-            <div id="user-dropdown" role="menu" aria-labelledby="user-menu-button"
-              class="hidden absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50 animate-scale-in">
+            <div x-ref="dropdown" x-show="open" x-cloak
+              x-transition:enter="transition ease-out duration-200"
+              x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+              x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+              x-transition:leave="transition ease-in duration-150"
+              x-transition:leave-start="opacity-100 scale-100"
+              x-transition:leave-end="opacity-0 scale-95"
+              @keydown="onKeydown($event)" role="menu"
+              class="absolute right-0 mt-2 w-48 bg-[var(--color-surface-elevated)] rounded-xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] py-1 z-50">
               <a href="/profile" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <span aria-hidden="true">⚙️</span> Settings
+                class="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
+                <i data-lucide="settings" class="w-4 h-4 text-[var(--color-muted)]" aria-hidden="true"></i> Settings
               </a>
               <a href="/sources" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <span aria-hidden="true">📡</span> Sources
+                class="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
+                <i data-lucide="radio" class="w-4 h-4 text-[var(--color-muted)]" aria-hidden="true"></i> Sources
               </a>
               <a href="/jobs" role="menuitem" tabindex="-1"
-                class="block px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-                <span aria-hidden="true">🛠️</span> Jobs
+                class="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
+                <i data-lucide="wrench" class="w-4 h-4 text-[var(--color-muted)]" aria-hidden="true"></i> Jobs
               </a>
               <hr class="my-1 border-[var(--color-edge-subtle)]" role="separator" />
-              <form method="POST" action="/logout">
+              <form method="POST" action="/logout" hx-boost="false">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                 <button type="submit" role="menuitem" tabindex="-1"
-                  class="block w-full text-left px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-                  <span aria-hidden="true">↩</span> Log Out
+                  class="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+                  <i data-lucide="log-out" class="w-4 h-4" aria-hidden="true"></i> Log Out
                 </button>
               </form>
             </div>
@@ -152,82 +158,88 @@
           </a>
           {% endif %}
 
-          <button id="menu-toggle"
+          {# Mobile menu toggle #}
+          <button @click="toggle()" :aria-expanded="open.toString()"
             class="md:hidden p-2 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors touch-target"
-            aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-menu">
-            <svg class="w-5 h-5 text-[var(--color-heading)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            aria-label="Toggle navigation menu">
+            <i data-lucide="menu" class="w-5 h-5 text-[var(--color-heading)]" x-show="!open" aria-hidden="true"></i>
+            <i data-lucide="x" class="w-5 h-5 text-[var(--color-heading)]" x-show="open" x-cloak aria-hidden="true"></i>
           </button>
         </div>
       </div>
     </div>
 
+    {# Desktop nav tabs #}
     <nav id="main-nav" aria-label="Main navigation" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
       <div class="flex items-center gap-1 -mb-px">
         {% set nav_items = [
-        ('/', 'Discover', 'discover', '🏠'),
-        ('/events', 'Browse', 'events', '📋'),
-        ('/calendars', 'Calendars', 'calendar', '🗓️'),
-        ('/events?attended=yes', 'Attended', 'attended', '✅'),
-        ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡'),
-        ('/jobs', 'Jobs', 'jobs', '🛠️')
+        ('/', 'Discover', 'discover', 'compass'),
+        ('/events', 'Browse', 'events', 'list'),
+        ('/calendars', 'Calendars', 'calendar', 'calendar'),
+        ('/events?attended=yes', 'Attended', 'attended', 'check-circle'),
+        ('/weekend', 'This Weekend', 'weekend', 'star'),
+        ('/sources', 'Sources', 'sources', 'radio'),
+        ('/jobs', 'Jobs', 'jobs', 'wrench')
         ] %}
-        {% for url, label, key, icon in nav_items %}
+        {% for url, label, key, icon_name in nav_items %}
         <a href="{{ url }}" {% if active_page==key %}aria-current="page" {% endif %}
-          class="nav-tab inline-flex items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-t-lg {% if active_page == key %}active{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-          <span aria-hidden="true">{{ icon }}</span>
+          class="nav-tab inline-flex items-center gap-1.5 px-3 py-3 text-sm font-medium rounded-t-lg {% if active_page == key %}active{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}"
+          {% if url == '/events?attended=yes' %}hx-boost="false"{% endif %}>
+          <i data-lucide="{{ icon_name }}" class="w-4 h-4" aria-hidden="true"></i>
           <span>{{ label }}</span>
         </a>
         {% endfor %}
       </div>
     </nav>
 
-    <div id="mobile-menu" role="navigation" aria-label="Mobile navigation"
-      class="hidden md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)] animate-slide-down">
+    {# Mobile menu #}
+    <div x-show="open" x-cloak
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 -translate-y-2"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0 -translate-y-2"
+      role="navigation" aria-label="Mobile navigation"
+      class="md:hidden border-t border-[var(--color-edge)] bg-[var(--color-surface)]">
       <div class="px-4 py-3 space-y-1">
         <div class="relative mb-3">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" fill="none"
-            stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <i data-lucide="search"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
           <input type="search" name="q" data-global-event-search value="{{ request.query_params.get('q', '') }}"
             aria-label="Search events" placeholder="Search events..."
             class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] text-sm focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
             hx-get="/events" hx-trigger="keyup changed delay:300ms" hx-target="body" hx-push-url="true"
-            hx-select="#main-content" hx-swap="innerHTML" />
+            hx-select="#main-content" hx-swap="innerHTML" hx-boost="false" />
         </div>
 
         {% set mobile_nav = [
-        ('/', 'Discover', 'discover', '🏠'),
-        ('/events', 'Browse All', 'events', '📋'),
-        ('/calendars', 'Calendars', 'calendar', '🗓️'),
-        ('/events?attended=yes', 'Attended', 'attended', '✅'),
-        ('/weekend', 'This Weekend', 'weekend', '⭐'),
-        ('/sources', 'Sources', 'sources', '📡'),
-        ('/jobs', 'Jobs', 'jobs', '🛠️')
+        ('/', 'Discover', 'discover', 'compass'),
+        ('/events', 'Browse All', 'events', 'list'),
+        ('/calendars', 'Calendars', 'calendar', 'calendar'),
+        ('/events?attended=yes', 'Attended', 'attended', 'check-circle'),
+        ('/weekend', 'This Weekend', 'weekend', 'star'),
+        ('/sources', 'Sources', 'sources', 'radio'),
+        ('/jobs', 'Jobs', 'jobs', 'wrench')
         ] %}
-        {% for url, label, key, icon in mobile_nav %}
-        <a href="{{ url }}" {% if active_page==key %}aria-current="page" {% endif %}
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == key %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">
-          <span aria-hidden="true">{{ icon }}</span> {{ label }}
+        {% for url, label, key, icon_name in mobile_nav %}
+        <a href="{{ url }}" @click="close()" {% if active_page==key %}aria-current="page" {% endif %}
+          class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium {% if active_page == key %}bg-[var(--color-brand-light)] text-[var(--color-brand)]{% else %}text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)]{% endif %} transition-colors">
+          <i data-lucide="{{ icon_name }}" class="w-4 h-4" aria-hidden="true"></i> {{ label }}
         </a>
         {% endfor %}
 
         {% if current_user %}
         <hr class="my-2 border-[var(--color-edge-subtle)]" />
-        <a href="/profile"
-          class="block px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
-          <span aria-hidden="true">⚙️</span> Settings
+        <a href="/profile" @click="close()"
+          class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
+          <i data-lucide="settings" class="w-4 h-4" aria-hidden="true"></i> Settings
         </a>
-        <form method="POST" action="/logout">
+        <form method="POST" action="/logout" hx-boost="false">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <button type="submit"
-            class="block w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
-            <span aria-hidden="true">↩</span> Log Out
+            class="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-light)] transition-colors">
+            <i data-lucide="log-out" class="w-4 h-4" aria-hidden="true"></i> Log Out
           </button>
         </form>
         {% endif %}
@@ -235,10 +247,12 @@
     </div>
   </header>
 
+  {# ═══ MAIN CONTENT ═══ #}
   <main id="main-content" role="main" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
     {% block content %}{% endblock %}
   </main>
 
+  {# ═══ FOOTER ═══ #}
   <footer role="contentinfo" class="border-t border-[var(--color-edge-subtle)] mt-16 bg-[var(--color-surface)]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
@@ -291,307 +305,76 @@
       <hr class="my-6 border-[var(--color-edge-subtle)]" />
 
       <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-faint)]">
-        <p>&copy; {{ now().year if now is defined else '2025' }} Family Events. Built with FastAPI, HTMX &amp; Tailwind.
-        </p>
+        <p>&copy; {{ now().year if now is defined else '2025' }} Family Events. Built with FastAPI, HTMX &amp; Tailwind.</p>
         <p>Personalized for your family and your city</p>
       </div>
     </div>
   </footer>
 
-  <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"
+  {# ═══ TOAST CONTAINER (Alpine) ═══ #}
+  <div x-data="toastContainer()" aria-live="polite"
     class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 md:top-20 md:right-6 max-sm:top-auto max-sm:bottom-4 max-sm:right-4 max-sm:left-4">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div x-show="toast.visible" role="alert"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-x-8 scale-95"
+        x-transition:enter-end="opacity-100 translate-x-0 scale-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-x-0"
+        x-transition:leave-end="opacity-0 translate-x-8 scale-95"
+        :class="bgFor(toast.variant)"
+        class="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium min-w-[250px] cursor-pointer"
+        @click="dismiss(toast.id)"
+        @keydown.escape="dismiss(toast.id)" tabindex="0">
+        <i :data-lucide="iconFor(toast.variant)" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+        <span x-text="toast.message"></span>
+        <button x-show="toast.undo && toast.undo.path" @click.stop="handleUndo(toast.undo); dismiss(toast.id)"
+          class="ml-auto underline underline-offset-2 text-white/90 hover:text-white text-xs" type="button">
+          Undo
+        </button>
+      </div>
+    </template>
   </div>
 
-  <script>
-    (function () {
-      var toggle = document.getElementById('menu-toggle');
-      var menu = document.getElementById('mobile-menu');
-      if (toggle && menu) {
-        toggle.addEventListener('click', function () {
-          var isHidden = menu.classList.toggle('hidden');
-          var expanded = !isHidden;
-          toggle.setAttribute('aria-expanded', String(expanded));
-          toggle.setAttribute('aria-label', expanded ? 'Close navigation menu' : 'Open navigation menu');
-        });
-      }
-    })();
-
-    (function () {
-      var menuContainer = document.getElementById('user-menu');
-      var menuButton = document.getElementById('user-menu-button');
-      var dropdown = document.getElementById('user-dropdown');
-      if (!menuContainer || !menuButton || !dropdown) return;
-
-      var menuItems = dropdown.querySelectorAll('[role="menuitem"]');
-
-      function openDropdown() {
-        dropdown.classList.remove('hidden');
-        menuButton.setAttribute('aria-expanded', 'true');
-        if (menuItems.length) menuItems[0].focus();
-      }
-
-      function closeDropdown(returnFocus) {
-        dropdown.classList.add('hidden');
-        menuButton.setAttribute('aria-expanded', 'false');
-        if (returnFocus) menuButton.focus();
-      }
-
-      function isOpen() {
-        return !dropdown.classList.contains('hidden');
-      }
-
-      menuButton.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (isOpen()) {
-          closeDropdown(true);
-        } else {
-          openDropdown();
-        }
-      });
-
-      menuButton.addEventListener('keydown', function (e) {
-        if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (!isOpen()) openDropdown();
-        } else if (e.key === 'Escape') {
-          closeDropdown(true);
-        }
-      });
-
-      dropdown.addEventListener('keydown', function (e) {
-        var items = Array.from(menuItems);
-        var idx = items.indexOf(document.activeElement);
-
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          var next = (idx + 1) % items.length;
-          items[next].focus();
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          var prev = (idx - 1 + items.length) % items.length;
-          items[prev].focus();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          closeDropdown(true);
-        } else if (e.key === 'Tab') {
-          closeDropdown(false);
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          items[0].focus();
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          items[items.length - 1].focus();
-        }
-      });
-
-      document.addEventListener('click', function (e) {
-        if (isOpen() && !menuContainer.contains(e.target)) {
-          closeDropdown(false);
-        }
-      });
-    })();
-
-    function changeTheme(theme) {
-      var html = document.documentElement;
-      html.setAttribute('data-theme', theme);
-      if (theme === 'dark') {
-        html.classList.add('dark');
-      } else if (theme === 'light') {
-        html.classList.remove('dark');
-      } else {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          html.classList.add('dark');
-        } else {
-          html.classList.remove('dark');
-        }
-      }
-      var btn = document.getElementById('theme-toggle');
-      if (btn) btn.setAttribute('aria-pressed', String(html.classList.contains('dark')));
-    }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-      if (document.documentElement.getAttribute('data-theme') === 'auto') {
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
-    });
-
-    document.addEventListener('click', function (event) {
-      var themeToggle = event.target.closest('[data-theme-toggle]');
-      if (themeToggle) {
-        var html = document.documentElement;
-        var isDark = html.classList.contains('dark');
-        var newTheme = isDark ? 'light' : 'dark';
-        var status = document.getElementById('theme-status');
-        if (status) status.textContent = 'Theme changed to ' + newTheme + ' mode';
-        if (window.htmx) {
-          window.htmx.ajax('POST', '/api/profile/theme', {
-            source: themeToggle,
-            values: {
-              theme: newTheme,
-              csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
-            },
-            target: '#profile-status',
-            swap: 'innerHTML'
-          });
-        }
-        return;
-      }
-
-      var copyButton = event.target.closest('[data-copy-url]');
-      if (copyButton) {
-        navigator.clipboard.writeText(copyButton.getAttribute('data-copy-url') || '').then(function () {
-          showToast('Link copied', 'success');
-        });
-        return;
-      }
-    });
-
-    document.body.addEventListener('htmx:afterRequest', function (evt) {
-      var trigger = evt.detail.xhr?.getResponseHeader('HX-Trigger');
-      if (!trigger) return;
-      try {
-        var data = JSON.parse(trigger);
-        if (data.changeTheme) changeTheme(data.changeTheme.theme);
-        if (data.showToast) showToast(data.showToast.message, data.showToast.variant, data.showToast.undo);
-      } catch (e) { }
-    });
-
-    function showToast(message, variant, undo) {
-      var container = document.getElementById('toast-container');
-      var colors = {
-        success: 'bg-[var(--color-success)] text-white',
-        error: 'bg-[var(--color-danger)] text-white',
-        warning: 'bg-[var(--color-warning)] text-white',
-        info: 'bg-[var(--color-info)] text-white'
-      };
-      var icons = {
-        success: '✓',
-        error: '✗',
-        warning: '⚠',
-        info: 'ℹ'
-      };
-      var el = document.createElement('div');
-      el.setAttribute('role', 'alert');
-      el.className = 'toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ' + (colors[variant] || colors.info);
-      el.style.minWidth = '250px';
-      el.innerHTML = '<span class="text-base" aria-hidden="true">' + (icons[variant] || icons.info) + '</span><span>' + message + '</span>';
-
-      if (undo && undo.path) {
-        var undoBtn = document.createElement('button');
-        undoBtn.type = 'button';
-        undoBtn.className = 'ml-auto underline underline-offset-2 text-white/90 hover:text-white';
-        undoBtn.textContent = (undo.label || 'Undo');
-        undoBtn.onclick = function (e) {
-          e.stopPropagation();
-          if (window.htmx) {
-            window.htmx.ajax('POST', undo.path, {
-              values: {
-                csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
-              },
-              swap: 'none'
-            });
-          }
-        };
-        el.appendChild(undoBtn);
-      }
-
-      el.addEventListener('click', function () {
-        el.classList.remove('toast-enter');
-        el.classList.add('toast-exit');
-        setTimeout(function () { el.remove(); }, 250);
-      });
-
-      el.setAttribute('tabindex', '0');
-      el.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-          el.classList.remove('toast-enter');
-          el.classList.add('toast-exit');
-          setTimeout(function () { el.remove(); }, 250);
-        }
-      });
-
-      container.appendChild(el);
-
-      setTimeout(function () {
-        if (el.parentNode) {
-          el.classList.remove('toast-enter');
-          el.classList.add('toast-exit');
-          setTimeout(function () { el.remove(); }, 250);
-        }
-      }, 3500);
-    }
-  </script>
-<script>
-  (function () {
-    function syncGlobalSearchInputs() {
-      var value = new URLSearchParams(window.location.search).get('q') || '';
-      document.querySelectorAll('[data-global-event-search]').forEach(function (input) {
-        if (document.activeElement !== input) input.value = value;
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded', syncGlobalSearchInputs);
-    document.body.addEventListener('htmx:afterSwap', function () {
-      syncGlobalSearchInputs();
-      var pageSearch = document.querySelector('#events-form input[name="q"]');
-      var value = new URLSearchParams(window.location.search).get('q') || '';
-      if (pageSearch && document.activeElement !== pageSearch) pageSearch.value = value;
-    });
-    window.addEventListener('popstate', syncGlobalSearchInputs);
-  })();
-</script>
-
-<script>
-  (function () {
-    function applyAttendedSelectionState(scope) {
-      var root = scope || document;
-      root.querySelectorAll('#bulk-unattend-form').forEach(function (form) {
-        var selectAll = form.querySelector('#select-all-attended');
-        if (!selectAll || selectAll.dataset.bound === 'true') return;
-        selectAll.dataset.bound = 'true';
-        selectAll.addEventListener('change', function () {
-          form.querySelectorAll('.attended-select').forEach(function (el) {
-            el.checked = selectAll.checked;
-          });
-        });
-      });
-    }
-
-    document.body.addEventListener('htmx:configRequest', function (evt) {
-      var target = evt.detail.elt;
-      if (target && target.id === 'bulk-unattend-form') {
-        var ids = Array.from(target.querySelectorAll('.attended-select:checked')).map(function (el) { return el.value; });
-        if (!ids.length) {
-          evt.preventDefault();
-          showToast('Select at least one event', 'warning');
-          return;
-        }
-        evt.detail.parameters.event_ids = ids;
-      }
-    });
-
-    document.body.addEventListener('htmx:afterRequest', function (evt) {
-      var target = evt.detail.elt;
-      if (target && target.id === 'bulk-unattend-form') {
-        var eventsForm = document.getElementById('events-form');
-        if (eventsForm && window.htmx) {
-          window.htmx.trigger(eventsForm, 'submit');
-        }
-      }
-    });
-
-    document.addEventListener('DOMContentLoaded', function () {
-      applyAttendedSelectionState(document);
-    });
-    document.body.addEventListener('htmx:afterSwap', function (event) {
-      applyAttendedSelectionState(event.target);
-    });
-  })();
-</script>
+  {# ═══ COMMAND PALETTE ═══ #}
+  <div x-data="commandPalette()" x-show="open" x-cloak @keydown.escape.window="close()"
+    class="fixed inset-0 z-[10000]">
+    <div class="command-backdrop fixed inset-0" @click="close()"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"></div>
+    <div class="relative max-w-lg mx-auto mt-[20vh]"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 scale-95 -translate-y-4"
+      x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 scale-100"
+      x-transition:leave-end="opacity-0 scale-95 -translate-y-4">
+      <div class="bg-[var(--color-surface-elevated)] rounded-2xl shadow-[var(--shadow-float)] border border-[var(--color-edge)] overflow-hidden">
+        <div class="relative">
+          <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-faint)]" aria-hidden="true"></i>
+          <input x-ref="searchInput" x-model="search" type="text" placeholder="Search pages..."
+            class="w-full pl-12 pr-4 py-4 text-[var(--color-heading)] bg-transparent border-b border-[var(--color-edge-subtle)] text-sm focus:outline-none"
+            @keydown.enter="if (filteredItems.length) navigate(filteredItems[0].url)" />
+        </div>
+        <div class="max-h-64 overflow-y-auto py-2">
+          <template x-for="item in filteredItems" :key="item.url">
+            <button @click="navigate(item.url)"
+              class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--color-body)] hover:bg-[var(--color-surface-tertiary)] transition-colors">
+              <i :data-lucide="item.icon" class="w-4 h-4 text-[var(--color-muted)]" aria-hidden="true"></i>
+              <span x-text="item.label"></span>
+            </button>
+          </template>
+          <div x-show="filteredItems.length === 0" class="px-4 py-6 text-sm text-[var(--color-faint)] text-center">
+            No results found
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </body>
 

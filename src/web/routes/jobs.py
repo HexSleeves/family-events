@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Request
@@ -16,6 +17,7 @@ from src.web.common import (
     get_db,
     get_templates,
     require_login_and_csrf,
+    sse_stream,
     template_response,
     toast,
 )
@@ -160,3 +162,52 @@ async def jobs_page(
             q=q,
         ),
     )
+
+
+@router.get("/api/jobs/stream")
+async def api_jobs_stream(request: Request, job_id: str = ""):
+    """SSE endpoint that streams job status updates for a specific job."""
+    db = get_db(request)
+    user = await get_current_user(request, db)
+    if not user:
+        return HTMLResponse("", status_code=401)
+
+    async def _generate():
+        poll_interval = 1.0
+        max_polls = 300
+        polls = 0
+        last_state = None
+
+        while polls < max_polls:
+            if await request.is_disconnected():
+                break
+
+            if job_id:
+                job = await db.get_job(job_id)
+                if not job:
+                    yield ("error", "Job not found")
+                    break
+
+                tpl = get_templates(request)
+                html = tpl.get_template("partials/_job_status.html").render(
+                    request=request,
+                    csrf_token=ensure_csrf_token(request),
+                    **job_template_context(
+                        job,
+                        target_id=f"sse-job-{job.id}",
+                        can_cancel=job.owner_user_id == user.id,
+                    ),
+                )
+                yield ("job-update", html)
+
+                if job.state != "running":
+                    if last_state == "running":
+                        yield ("job-complete", html)
+                    break
+
+                last_state = job.state
+
+            polls += 1
+            await asyncio.sleep(poll_interval)
+
+    return await sse_stream(request, _generate())

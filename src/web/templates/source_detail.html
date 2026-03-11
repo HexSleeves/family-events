@@ -1,15 +1,10 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, back_link, btn, badge_tag, page_header %}
 {% block title %}{{ source.name }}{% endblock %}
 {% block content %}
 
 <div class="max-w-4xl mx-auto animate-fade-in">
-  <a href="/sources"
-    class="inline-flex items-center gap-1 text-sm text-[var(--color-muted)] hover:text-[var(--color-accent)] mb-4 transition-colors">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-    </svg>
-    Back to sources
-  </a>
+  {{ back_link("/sources", "Back to sources") }}
 
   <div id="source-job-{{ source.id }}" class="mb-4"></div>
 
@@ -17,32 +12,60 @@
   <div
     class="glass rounded-xl p-6 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-card)] mb-4 animate-fade-in-up">
     <div class="flex items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-2">{{ source.name }}</h1>
-        <p class="text-sm text-[var(--color-muted)] break-all">{{ source.url }}</p>
-        <div class="flex items-center gap-3 mt-3 text-sm text-[var(--color-muted)]">
-          <span>Status: <strong class="capitalize">{{ source.status }}</strong></span>
+      <div class="min-w-0">
+        <h1 class="text-2xl font-bold text-[var(--color-heading)] mb-2 flex items-center gap-2">
+          <i data-lucide="radio" class="w-6 h-6 text-[var(--color-accent)] shrink-0" aria-hidden="true"></i>
+          {{ source.name }}
+        </h1>
+        <p class="text-sm text-[var(--color-muted)] break-all flex items-center gap-1">
+          <i data-lucide="link" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
+          {{ source.url }}
+        </p>
+        <div class="flex flex-wrap items-center gap-3 mt-3 text-sm text-[var(--color-muted)]">
+          <span class="flex items-center gap-1">
+            <i data-lucide="activity" class="w-3.5 h-3.5" aria-hidden="true"></i>
+            Status: <strong class="capitalize">{{ source.status }}</strong>
+          </span>
           {% if source.last_event_count %}
-          <span>· {{ source.last_event_count }} events</span>
+          <span class="flex items-center gap-1">
+            <i data-lucide="calendar" class="w-3.5 h-3.5" aria-hidden="true"></i>
+            {{ source.last_event_count }} events
+          </span>
           {% endif %}
           {% if source.last_scraped_at %}
-          <span>· Last scraped {{ source.last_scraped_at.strftime('%b %d, %I:%M%p') }}</span>
+          <span class="flex items-center gap-1">
+            <i data-lucide="clock" class="w-3.5 h-3.5" aria-hidden="true"></i>
+            Last scraped {{ source.last_scraped_at.strftime('%b %d, %I:%M%p') }}
+          </span>
           {% endif %}
         </div>
+        {% if source.last_error %}
+        <p class="mt-2 text-xs text-[var(--color-danger)] flex items-start gap-1">
+          <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true"></i>
+          {{ source.last_error }}
+        </p>
+        {% endif %}
       </div>
       <div class="flex gap-2 shrink-0">
-        <button hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-          hx-target="#source-job-{{ source.id }}" hx-swap="innerHTML" hx-indicator="#test-spin"
+        <button type="button"
+          hx-post="/api/sources/{{ source.id }}/test"
+          hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+          hx-target="#source-job-{{ source.id }}"
+          hx-swap="innerHTML"
+          hx-indicator="#test-spin"
           aria-label="Test scrape for {{ source.name }}"
-          class="px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 touch-target">
-          Test Scrape <span id="test-spin" class="htmx-indicator spinner"></span>
+          class="touch-target inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] border border-[var(--color-accent)] text-white font-medium text-sm hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all">
+          <i data-lucide="play" class="w-4 h-4" aria-hidden="true"></i>
+          Test Scrape
+          <span id="test-spin" class="htmx-indicator spinner"></span>
         </button>
-        <button hx-post="/api/sources/{{ source.id }}/analyze" hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-          hx-target="#source-job-{{ source.id }}" hx-swap="innerHTML"
-          aria-label="Re-analyze recipe for {{ source.name }}"
-          class="px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
-          Re-analyze
-        </button>
+        {{ btn("Re-analyze", variant="secondary", icon_name="refresh-cw", type="button",
+          hx_post="/api/sources/" ~ source.id ~ "/analyze",
+          hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+          hx_target="#source-job-" ~ source.id,
+          hx_swap="innerHTML",
+          aria_label="Re-analyze recipe for " ~ source.name,
+          cls="inline-flex") }}
       </div>
     </div>
   </div>
@@ -51,15 +74,24 @@
   {% if recipe %}
   <div
     class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-4 animate-fade-in-up stagger-1">
-    <h2 class="font-semibold text-[var(--color-heading)] mb-3">Scrape Recipe</h2>
+    <h2 class="font-semibold text-[var(--color-heading)] mb-3 flex items-center gap-2">
+      <i data-lucide="flask-conical" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+      Scrape Recipe
+    </h2>
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-      <div><span class="text-[var(--color-faint)]">Strategy:</span> <strong
-          class="text-[var(--color-heading)] capitalize">{{ recipe.strategy }}</strong></div>
-      <div><span class="text-[var(--color-faint)]">Confidence:</span> <strong class="text-[var(--color-accent)]">{{
-          '%.0f' % (recipe.confidence * 100) }}%</strong></div>
+      <div class="flex items-center gap-2">
+        <span class="text-[var(--color-faint)]">Strategy:</span>
+        <strong class="text-[var(--color-heading)] capitalize">{{ recipe.strategy }}</strong>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[var(--color-faint)]">Confidence:</span>
+        <strong class="text-[var(--color-accent)]">{{ '%.0f' % (recipe.confidence * 100) }}%</strong>
+      </div>
       {% if recipe.analyzed_at %}
-      <div><span class="text-[var(--color-faint)]">Analyzed:</span> <strong class="text-[var(--color-heading)]">{{
-          recipe.analyzed_at.strftime('%b %d') }}</strong></div>
+      <div class="flex items-center gap-2">
+        <span class="text-[var(--color-faint)]">Analyzed:</span>
+        <strong class="text-[var(--color-heading)]">{{ recipe.analyzed_at.strftime('%b %d') }}</strong>
+      </div>
       {% endif %}
     </div>
     {% if recipe.notes %}
@@ -72,15 +104,21 @@
   <section id="source-job-history-panel"
     class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-4 animate-fade-in-up stagger-2">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-[var(--color-heading)]">Recent Jobs</h2>
+      <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2">
+        <i data-lucide="history" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+        Recent Jobs
+      </h2>
       <a href="/jobs?source_id={{ source.id }}"
-        class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] transition-colors">View
-        all →</a>
+        class="text-sm font-medium text-[var(--color-brand)] hover:text-[var(--color-brand-hover)] inline-flex items-center gap-1 transition-colors">
+        View all <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
+      </a>
     </div>
     <div class="space-y-3">
       {% for card in recent_job_cards %}
       {% set job = card.job %}
       {% set target_id = card.target_id %}
+      {% set can_cancel = card.can_cancel %}
+      {% set allow_shared_view = card.allow_shared_view %}
       {% set message = card.message %}
       {% set started_at = card.started_at %}
       {% set finished_at = card.finished_at %}
@@ -101,18 +139,26 @@
   {% if events %}
   <div
     class="glass rounded-xl p-5 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] mb-4 animate-fade-in-up stagger-3">
-    <h2 class="font-semibold text-[var(--color-heading)] mb-3">Recent Events ({{ events|length }})</h2>
+    <h2 class="font-semibold text-[var(--color-heading)] mb-3 flex items-center gap-2">
+      <i data-lucide="calendar" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+      Recent Events ({{ events|length }})
+    </h2>
     <div class="space-y-2">
       {% for event in events %}
       <a href="/event/{{ event.id }}"
-        class="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors">
+        class="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors group">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-[var(--color-heading)] truncate">{{ event.title }}</p>
-          <p class="text-xs text-[var(--color-muted)]">{{ event.start_time.strftime('%b %d, %I:%M%p') }} · {{
-            event.location_city }}</p>
+          <p class="text-sm font-medium text-[var(--color-heading)] truncate group-hover:text-[var(--color-brand)] transition-colors">{{ event.title }}</p>
+          <p class="text-xs text-[var(--color-muted)] flex items-center gap-1">
+            <i data-lucide="clock" class="w-3 h-3 shrink-0" aria-hidden="true"></i>
+            {{ event.start_time.strftime('%b %d, %I:%M%p') }}
+            <span aria-hidden="true">·</span>
+            <i data-lucide="map-pin" class="w-3 h-3 shrink-0" aria-hidden="true"></i>
+            {{ event.location_city }}
+          </p>
         </div>
         {% if event.tags %}
-        <div class="text-right">
+        <div class="text-right shrink-0">
           <div class="text-sm font-bold text-[var(--color-accent)]">{{ event.tags.toddler_score }}/10</div>
           <div class="text-[11px] text-[var(--color-faint)]">{{ event.tags.audience.replace('_', ' ') }}</div>
         </div>

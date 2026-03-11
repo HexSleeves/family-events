@@ -1,38 +1,41 @@
 {# AI tags grid for event detail #}
 {% if tags %}
 <div
-  class="bg-[var(--color-surface)] rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
-  <h3 class="font-semibold text-[var(--color-accent)] mb-4"><span aria-hidden="true">🤖</span> Tag Analysis</h3>
+  class="glass rounded-xl p-5 mb-4 border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] animate-fade-in-up stagger-1">
+  <h3 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2">
+    <i data-lucide="sparkles" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+    Tag Analysis
+  </h3>
 
   <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
     {% set items = [
-    ('🎯', 'Toddler Score', tags.toddler_score ~ '/10', ''),
-    ('🧮', 'Rule Score', tags.raw_rule_score ~ '/100', ''),
-    ('🏷️', 'Version', tags.tagging_version, ''),
-    ('👶', 'Ages', tags.age_min_recommended ~ '-' ~ tags.age_max_recommended, ''),
-    ('👥', 'Audience', tags.audience.replace('_', ' '), ''),
-    ('🏠', 'Setting', tags.indoor_outdoor, ''),
-    ('🔊', 'Noise', tags.noise_level, ''),
-    ('👨‍👩‍👧', 'Crowd', tags.crowd_level, ''),
-    ('⚡', 'Energy', tags.energy_level, ''),
-    ('😤', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk == 'medium' else 'high'),
-    ('👀', 'Attention', tags.parent_attention_required, ''),
-    ('🛍️', 'Stroller', tags.stroller_friendly, 'bool'),
-    ('🅿️', 'Parking', tags.parking_available, 'bool'),
-    ('🚻', 'Bathrooms', tags.bathroom_accessible, 'bool'),
-    ('🌧️', 'Weather Dep.', tags.weather_dependent, 'bool'),
-    ('😴', 'Nap Compatible', tags.nap_compatible, 'bool'),
-    ('🍔', 'Food Available', tags.food_available, 'bool')
+    ('target', 'Toddler Score', tags.toddler_score ~ '/10', ''),
+    ('hash', 'Rule Score', tags.raw_rule_score ~ '/100', ''),
+    ('tag', 'Version', tags.tagging_version, ''),
+    ('baby', 'Ages', tags.age_min_recommended ~ '-' ~ tags.age_max_recommended, ''),
+    ('users', 'Audience', tags.audience.replace('_', ' '), ''),
+    ('home', 'Setting', tags.indoor_outdoor, ''),
+    ('volume-2', 'Noise', tags.noise_level, ''),
+    ('users', 'Crowd', tags.crowd_level, ''),
+    ('zap', 'Energy', tags.energy_level, ''),
+    ('alert-triangle', 'Meltdown Risk', tags.meltdown_risk, 'low' if tags.meltdown_risk == 'low' else 'medium' if tags.meltdown_risk == 'medium' else 'high'),
+    ('eye', 'Attention', tags.parent_attention_required, ''),
+    ('shopping-bag', 'Stroller', tags.stroller_friendly, 'bool'),
+    ('car', 'Parking', tags.parking_available, 'bool'),
+    ('accessibility', 'Bathrooms', tags.bathroom_accessible, 'bool'),
+    ('cloud', 'Weather Dep.', tags.weather_dependent, 'bool'),
+    ('moon', 'Nap Compatible', tags.nap_compatible, 'bool'),
+    ('utensils', 'Food Available', tags.food_available, 'bool')
     ] %}
-    {% for icon, label, value, variant in items %}
+    {% for icon_name, label, value, variant in items %}
     <div class="flex items-center gap-2.5 p-2.5 rounded-lg bg-[var(--color-surface-secondary)] hover:bg-[var(--color-surface-tertiary)] transition-colors duration-150">
-      <span class="text-base" aria-hidden="true">{{ icon }}</span>
+      <i data-lucide="{{ icon_name }}" class="w-4 h-4 text-[var(--color-faint)] shrink-0" aria-hidden="true"></i>
       <div>
         <p class="text-xs text-[var(--color-faint)]">{{ label }}</p>
         {% if variant == 'bool' %}
-        <p class="text-sm font-medium {% if value %}text-[var(--color-success)]{% else %}text-[var(--color-danger)]{% endif %}">
-          <span aria-hidden="true">{% if value %}✅{% else %}❌{% endif %}</span>
-          <span class="sr-only">{% if value %}Yes{% else %}No{% endif %}</span>
+        <p class="text-sm font-medium flex items-center gap-1 {% if value %}text-[var(--color-success)]{% else %}text-[var(--color-danger)]{% endif %}">
+          <i data-lucide="{{ 'check' if value else 'x' }}" class="w-3.5 h-3.5" aria-hidden="true"></i>
+          <span>{% if value %}Yes{% else %}No{% endif %}</span>
         </p>
         {% else %}
         <p class="text-sm font-medium text-[var(--color-heading)] capitalize {% if variant == 'low' %} text-[var(--color-success)]{% elif variant == 'high' %} text-[var(--color-danger)]{% endif %}">{{ value }}</p>
@@ -44,7 +47,9 @@
 
   {% if tags.categories %}
   <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)]">
-    <p class="text-xs text-[var(--color-faint)] mb-2">Categories</p>
+    <p class="text-xs text-[var(--color-faint)] mb-2 flex items-center gap-1">
+      <i data-lucide="tags" class="w-3.5 h-3.5" aria-hidden="true"></i> Categories
+    </p>
     <div class="flex flex-wrap gap-1.5">
       {% for cat in tags.categories %}
       <span class="badge badge-info">{{ cat }}</span>
@@ -56,7 +61,9 @@
   {% if tags.positive_signals or tags.caution_signals or tags.exclusion_signals %}
   <div class="mt-4 pt-4 border-t border-[var(--color-edge-subtle)] grid gap-3 md:grid-cols-3">
     <div>
-      <p class="text-xs text-[var(--color-faint)] mb-2">Positive signals</p>
+      <p class="text-xs text-[var(--color-faint)] mb-2 flex items-center gap-1">
+        <i data-lucide="thumbs-up" class="w-3.5 h-3.5" aria-hidden="true"></i> Positive signals
+      </p>
       <div class="flex flex-wrap gap-1.5">
         {% for item in tags.positive_signals %}
         <span class="badge badge-success">{{ item }}</span>
@@ -66,7 +73,9 @@
       </div>
     </div>
     <div>
-      <p class="text-xs text-[var(--color-faint)] mb-2">Caution signals</p>
+      <p class="text-xs text-[var(--color-faint)] mb-2 flex items-center gap-1">
+        <i data-lucide="alert-circle" class="w-3.5 h-3.5" aria-hidden="true"></i> Caution signals
+      </p>
       <div class="flex flex-wrap gap-1.5">
         {% for item in tags.caution_signals %}
         <span class="badge badge-warning">{{ item }}</span>
@@ -76,7 +85,9 @@
       </div>
     </div>
     <div>
-      <p class="text-xs text-[var(--color-faint)] mb-2">Exclusion signals</p>
+      <p class="text-xs text-[var(--color-faint)] mb-2 flex items-center gap-1">
+        <i data-lucide="shield-alert" class="w-3.5 h-3.5" aria-hidden="true"></i> Exclusion signals
+      </p>
       <div class="flex flex-wrap gap-1.5">
         {% for item in tags.exclusion_signals %}
         <span class="badge badge-danger">{{ item }}</span>
@@ -89,7 +100,10 @@
   {% endif %}
 
   {% if tags.confidence_score %}
-  <p class="text-xs text-[var(--color-faint)] mt-3">Confidence: {{ '%.0f' % (tags.confidence_score * 100) }}%</p>
+  <p class="text-xs text-[var(--color-faint)] mt-3 flex items-center gap-1">
+    <i data-lucide="gauge" class="w-3.5 h-3.5" aria-hidden="true"></i>
+    Confidence: {{ '%.0f' % (tags.confidence_score * 100) }}%
+  </p>
   {% endif %}
 </div>
 {% endif %}

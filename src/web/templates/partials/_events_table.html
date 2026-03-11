@@ -2,7 +2,9 @@
 
 {% if total == 0 %}
 <section class="glass rounded-xl p-10 text-center animate-fade-in-up">
-  <div class="text-4xl mb-3" aria-hidden="true">🔍</div>
+  <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[var(--color-accent-light)] flex items-center justify-center">
+    <i data-lucide="search" class="w-6 h-6 text-[var(--color-accent)]" aria-hidden="true"></i>
+  </div>
   <h2 class="text-lg font-semibold text-[var(--color-heading)]">No events found</h2>
   <p class="mt-1 text-sm text-[var(--color-muted)]">Try broadening your filters or resetting search.</p>
 </section>

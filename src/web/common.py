@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import secrets
 import time
 from collections import deque
 from datetime import UTC, datetime
-from typing import cast
+from typing import AsyncGenerator, cast
 from urllib.parse import urlparse
 
 from fastapi import Request
 from fastapi.datastructures import FormData
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.responses import StreamingResponse
 
 from src.config import settings
 from src.db.database import Database
@@ -255,6 +257,32 @@ async def ctx(request: Request, **extra: object) -> dict[str, object]:
         "active_page": extra.pop("active_page", ""),
         **extra,
     }
+
+
+async def sse_stream(
+    request: Request,
+    event_generator: AsyncGenerator[tuple[str, str], None],
+) -> StreamingResponse:
+    """Create an SSE StreamingResponse from an async generator of (event, data) tuples."""
+
+    async def _stream():
+        try:
+            async for event_name, data in event_generator:
+                if await request.is_disconnected():
+                    break
+                yield f"event: {event_name}\ndata: {data}\n\n"
+        except asyncio.CancelledError:
+            pass
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 def validate_source_url(url: str) -> str | None:

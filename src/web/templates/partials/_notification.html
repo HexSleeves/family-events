@@ -1,5 +1,8 @@
 {# Notification preview #}
 <div class="glass rounded-xl p-5 mt-8 border-l-4 border-l-[var(--color-accent)] animate-fade-in-up">
-    <h3 class="font-semibold text-[var(--color-heading)] mb-3"><span aria-hidden="true">📨</span> Notification Preview</h3>
-    <pre class="bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ message }}</pre>
+  <h3 class="font-semibold text-[var(--color-heading)] mb-3 flex items-center gap-2">
+    <i data-lucide="mail" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+    Notification Preview
+  </h3>
+  <pre class="bg-[var(--color-surface-tertiary)] text-[var(--color-body)] p-4 rounded-lg overflow-x-auto text-sm whitespace-pre-wrap font-mono">{{ message }}</pre>
 </div>

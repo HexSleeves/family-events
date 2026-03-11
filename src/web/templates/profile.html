@@ -1,23 +1,27 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, form_field %}
+
 {% block title %}Settings{% endblock %}
 {% block content %}
 
 <div class="max-w-4xl mx-auto animate-fade-in">
   <div id="profile-status" class="mb-4"></div>
-  <div class="mb-8">
-    <h1 class="text-2xl font-bold text-[var(--color-heading)]">Settings</h1>
-    <p class="text-sm text-[var(--color-muted)] mt-1">{{ current_user.email }} · Member since {{ current_user.created_at.strftime('%b %Y') }}</p>
-  </div>
+
+  {{ page_header("Settings", subtitle=current_user.email ~ " · Member since " ~ current_user.created_at.strftime('%b %Y'), icon_name="settings") }}
 
   {% if initial_import_card %}
   <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6 mb-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="font-semibold text-[var(--color-heading)]">Initial event import is running</h2>
+        <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2">
+          <i data-lucide="package" class="w-4 h-4 text-[var(--color-accent)]" aria-hidden="true"></i>
+          Initial event import is running
+        </h2>
         <p class="mt-1 text-sm text-[var(--color-muted)]">Starter sources are being scraped and tagged in the background so events show up across the app.</p>
       </div>
       <a href="/jobs?scope=shared&kind=pipeline"
-        class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)]">
+        class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)] transition-colors">
+        <i data-lucide="external-link" class="w-4 h-4" aria-hidden="true"></i>
         View import status
       </a>
     </div>
@@ -40,82 +44,169 @@
   {% endif %}
 
   <div class="space-y-6">
-    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
-        <span aria-hidden="true">🧠</span> Child Onboarding Profile
-      </h2>
-      <form hx-post="/api/profile/onboarding" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Home City</label><input type="text" name="home_city" value="{{ current_user.home_city }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Preferred Cities</label><input type="text" name="preferred_cities" value="{{ current_user.preferred_cities | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child Name</label><input type="text" name="child_name" value="{{ current_user.child_name }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Age (years)</label><input type="number" name="child_age_years" value="{{ current_user.interest_profile.child_age_years }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Months</label><input type="number" name="child_age_months" value="{{ current_user.interest_profile.child_age_months }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Nap Time</label><input type="text" name="nap_time" value="{{ current_user.interest_profile.constraints.nap_time }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Bedtime</label><input type="text" name="bedtime" value="{{ current_user.interest_profile.constraints.bedtime }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        </div>
-        <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Temperament</label><input type="text" name="temperament" value="{{ current_user.interest_profile.temperament }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Loves</label><input type="text" name="loves" value="{{ current_user.interest_profile.loves | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Likes</label><input type="text" name="likes" value="{{ current_user.interest_profile.likes | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Dislikes</label><input type="text" name="dislikes" value="{{ current_user.interest_profile.dislikes | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Favorite Categories</label><input type="text" name="favorite_categories" value="{{ current_user.interest_profile.favorite_categories | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Avoid Categories</label><input type="text" name="avoid_categories" value="{{ current_user.interest_profile.avoid_categories | join(', ') }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Budget / Max Drive</label><div class="grid grid-cols-2 gap-3"><input type="number" name="budget" value="{{ current_user.interest_profile.constraints.budget_per_event }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /><input type="number" name="max_drive" value="{{ current_user.interest_profile.constraints.max_drive_time_minutes }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Sensory Notes</label><input type="text" name="sensory_notes" value="{{ current_user.interest_profile.sensory_notes }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Accessibility Needs</label><input type="text" name="accessibility_needs" value="{{ current_user.interest_profile.accessibility_needs }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        </div>
-        <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Recommendation Notes</label><input type="text" name="notes_for_recommendations" value="{{ current_user.interest_profile.notes_for_recommendations }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm">Save Child Profile</button>
-      </form>
+    {# ── Child Profile ── #}
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] overflow-hidden" x-data="collapsible(true)">
+      <button @click="toggle()" class="w-full flex items-center justify-between p-6 text-left hover:bg-[var(--color-surface-secondary)]/50 transition-colors">
+        <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+          {{ icon("baby", size="w-5 h-5", cls="text-[var(--color-accent)]") }}
+          Child Profile
+        </h2>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+      </button>
+      <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-2">
+        <form hx-post="/api/profile/onboarding" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4 px-6 pb-6">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {{ form_field("home_city", "Home City", value=current_user.home_city or "") }}
+            {{ form_field("preferred_cities", "Preferred Cities", value=(current_user.preferred_cities | join(', ')) or "") }}
+            {{ form_field("child_name", "Child Name", value=current_user.child_name or "") }}
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {{ form_field("child_age_years", "Age (years)", type="number", value=current_user.interest_profile.child_age_years | default(3)) }}
+            {{ form_field("child_age_months", "Months", type="number", value=current_user.interest_profile.child_age_months | default(0)) }}
+            {{ form_field("nap_time", "Nap Time", value=current_user.interest_profile.constraints.nap_time | default("13:00-15:00")) }}
+            {{ form_field("bedtime", "Bedtime", value=current_user.interest_profile.constraints.bedtime | default("19:30")) }}
+          </div>
+          {{ form_field("temperament", "Temperament", value=current_user.interest_profile.temperament | default("")) }}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {{ form_field("loves", "Loves", value=(current_user.interest_profile.loves | join(', ')) if current_user.interest_profile.loves else "") }}
+            {{ form_field("likes", "Likes", value=(current_user.interest_profile.likes | join(', ')) if current_user.interest_profile.likes else "") }}
+            {{ form_field("dislikes", "Dislikes", value=(current_user.interest_profile.dislikes | join(', ')) if current_user.interest_profile.dislikes else "") }}
+            {{ form_field("favorite_categories", "Favorite Categories", value=(current_user.interest_profile.favorite_categories | join(', ')) if current_user.interest_profile.favorite_categories else "") }}
+            {{ form_field("avoid_categories", "Avoid Categories", value=(current_user.interest_profile.avoid_categories | join(', ')) if current_user.interest_profile.avoid_categories else "") }}
+            <div class="grid grid-cols-2 gap-3">
+              {{ form_field("budget", "Budget per Event", type="number", value=current_user.interest_profile.constraints.budget_per_event | default(30)) }}
+              {{ form_field("max_drive", "Max Drive (min)", type="number", value=current_user.interest_profile.constraints.max_drive_time_minutes | default(45)) }}
+            </div>
+            {{ form_field("sensory_notes", "Sensory Notes", value=current_user.interest_profile.sensory_notes | default("")) }}
+            {{ form_field("accessibility_needs", "Accessibility Needs", value=current_user.interest_profile.accessibility_needs | default("")) }}
+          </div>
+          {{ form_field("notes_for_recommendations", "Recommendation Notes", value=current_user.interest_profile.notes_for_recommendations | default("")) }}
+          {{ btn("Save Child Profile", variant="primary", icon_name="check", type="submit") }}
+        </form>
+      </div>
     </section>
 
-    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🎨</span> Appearance</h2>
-      <form hx-post="/api/profile/theme" hx-target="#profile-status" hx-swap="innerHTML">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <div class="flex items-center gap-2">
-          {% for value, label in [('light', 'Light'), ('dark', 'Dark'), ('auto', 'System')] %}
-          <label class="flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border border-[var(--color-edge)]">
-            <input type="radio" name="theme" value="{{ value }}" {{ 'checked' if current_user.theme == value }} class="sr-only" />
-            <span class="text-sm font-medium">{{ label }}</span>
-          </label>
-          {% endfor %}
-          <button type="submit" class="ml-auto px-4 py-2 rounded-lg border border-[var(--color-edge)] text-sm">Save</button>
-        </div>
-      </form>
+    {# ── Appearance ── #}
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] overflow-hidden" x-data="collapsible(true)">
+      <button @click="toggle()" class="w-full flex items-center justify-between p-6 text-left hover:bg-[var(--color-surface-secondary)]/50 transition-colors">
+        <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+          {{ icon("palette", size="w-5 h-5", cls="text-[var(--color-accent)]") }}
+          Appearance
+        </h2>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+      </button>
+      <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-2">
+        <form hx-post="/api/profile/theme" hx-target="#profile-status" hx-swap="innerHTML" class="p-6">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {% for value, label, icon_name in [('light', 'Light', 'sun'), ('dark', 'Dark', 'moon'), ('auto', 'System', 'monitor')] %}
+            <label class="flex flex-col items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200
+              {% if current_user.theme == value %}border-[var(--color-brand)] bg-[var(--color-brand-light)]{% else %}border-[var(--color-edge)] hover:border-[var(--color-muted)] hover:bg-[var(--color-surface-secondary)]{% endif %}">
+              <input type="radio" name="theme" value="{{ value }}" {{ 'checked' if current_user.theme == value else '' }} class="sr-only" />
+              <span class="w-12 h-12 rounded-full flex items-center justify-center {% if current_user.theme == value %}bg-[var(--color-brand)] text-white{% else %}bg-[var(--color-surface-tertiary)] text-[var(--color-muted)]{% endif %}">
+                <i data-lucide="{{ icon_name }}" class="w-6 h-6" aria-hidden="true"></i>
+              </span>
+              <span class="text-sm font-medium text-[var(--color-heading)]">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="mt-4">
+            {{ btn("Save Theme", variant="secondary", icon_name="save", type="submit") }}
+          </div>
+        </form>
+      </div>
     </section>
 
-    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🔔</span> Notifications</h2>
-      <form hx-post="/api/profile/notifications" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Child’s Name</label><input type="text" name="child_name" value="{{ current_user.child_name }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Notification Email</label><input type="email" name="email_to" value="{{ current_user.email_to }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-          <div><label class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">SMS Number</label><input type="tel" name="sms_to" value="{{ current_user.sms_to }}" class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" /></div>
-        </div>
-        <div class="flex flex-wrap gap-4">
-          {% for ch in ['console', 'email', 'sms', 'telegram'] %}
-          <label class="flex items-center gap-2"><input type="checkbox" name="channels" value="{{ ch }}" {{ 'checked' if ch in current_user.notification_channels }} class="accent-[var(--color-brand)]" /><span class="text-sm capitalize">{{ ch }}</span></label>
-          {% endfor %}
-        </div>
-        <button type="submit" class="px-5 py-2.5 rounded-lg bg-[var(--color-brand)] text-white font-medium text-sm">Save Notifications</button>
-      </form>
+    {# ── Notifications ── #}
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] overflow-hidden" x-data="collapsible(true)">
+      <button @click="toggle()" class="w-full flex items-center justify-between p-6 text-left hover:bg-[var(--color-surface-secondary)]/50 transition-colors">
+        <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+          {{ icon("bell", size="w-5 h-5", cls="text-[var(--color-accent)]") }}
+          Notifications
+        </h2>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+      </button>
+      <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-2">
+        <form hx-post="/api/profile/notifications" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4 px-6 pb-6">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {{ form_field("child_name", "Child's Name", value=current_user.child_name or "") }}
+            {{ form_field("email_to", "Notification Email", type="email", value=current_user.email_to or "") }}
+            {{ form_field("sms_to", "SMS Number", type="tel", value=current_user.sms_to or "") }}
+          </div>
+          <div class="space-y-3">
+            <span class="block text-xs font-medium text-[var(--color-muted)]">Channels</span>
+            <div class="flex flex-wrap gap-6">
+              {% for ch in ['console', 'email', 'sms', 'telegram'] %}
+              <label class="relative inline-flex items-center gap-3 cursor-pointer group">
+                <input type="checkbox" name="channels" value="{{ ch }}" {{ 'checked' if ch in current_user.notification_channels else '' }} class="peer sr-only" />
+                <span class="relative w-11 h-6 rounded-full bg-[var(--color-edge)] transition-colors duration-200 peer-checked:bg-[var(--color-brand)] after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:block after:w-5 after:h-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:duration-200 peer-checked:after:translate-x-5" aria-hidden="true"></span>
+                <span class="text-sm font-medium text-[var(--color-heading)] capitalize">{{ ch }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {{ btn("Save Notifications", variant="primary", icon_name="check", type="submit") }}
+        </form>
+      </div>
     </section>
 
-    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-6">
-      <h2 class="font-semibold text-[var(--color-heading)] mb-4 flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3"><span aria-hidden="true">🔒</span> Change Password</h2>
-      <form hx-post="/api/profile/password" hx-target="#profile-status" hx-swap="innerHTML" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <input type="password" name="current_password" placeholder="Current password" required class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" />
-        <input type="password" name="new_password" placeholder="New password" required class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" />
-        <input type="password" name="confirm_password" placeholder="Confirm password" required class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)]" />
-        <div class="sm:col-span-3"><button type="submit" class="px-5 py-2.5 rounded-lg border border-[var(--color-edge)] text-sm font-medium">Change Password</button></div>
-      </form>
+    {# ── Password ── #}
+    <section class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] overflow-hidden" x-data="collapsible(false)">
+      <button @click="toggle()" class="w-full flex items-center justify-between p-6 text-left hover:bg-[var(--color-surface-secondary)]/50 transition-colors">
+        <h2 class="font-semibold text-[var(--color-heading)] flex items-center gap-2 border-l-4 border-l-[var(--color-accent)] pl-3">
+          {{ icon("lock", size="w-5 h-5", cls="text-[var(--color-accent)]") }}
+          Password
+        </h2>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200" :class="open ? 'rotate-180' : ''" aria-hidden="true"></i>
+      </button>
+      <div x-show="open" x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0 -translate-y-2">
+        <form hx-post="/api/profile/password" hx-target="#profile-status" hx-swap="innerHTML" class="space-y-4 px-6 pb-6" x-data="passwordStrength()">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {{ form_field("current_password", "Current password", type="password", placeholder="Current password", required=true) }}
+            <div class="sm:col-span-2 space-y-1">
+              <label for="field-new_password" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">New password</label>
+              <input type="password" name="new_password" id="field-new_password" placeholder="New password" required
+                x-model="password"
+                class="w-full px-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
+              <div x-show="password.length > 0" class="mt-1.5 flex items-center gap-2" x-cloak>
+                <div class="flex-1 h-1.5 rounded-full bg-[var(--color-edge)] overflow-hidden">
+                  <div class="h-full rounded-full transition-all duration-200" :class="strengthColor" :style="'width: ' + (strength * 25) + '%'"></div>
+                </div>
+                <span class="text-xs text-[var(--color-muted)]" x-text="strengthLabel"></span>
+              </div>
+            </div>
+            {{ form_field("confirm_password", "Confirm password", type="password", placeholder="Confirm password", required=true) }}
+          </div>
+          {{ btn("Change Password", variant="secondary", icon_name="key", type="submit") }}
+        </form>
+      </div>
     </section>
   </div>
 </div>
