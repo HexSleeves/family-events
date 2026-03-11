@@ -8,10 +8,12 @@
   <div class="max-w-2xl mx-auto w-full px-4">
     <div class="relative overflow-hidden">
       <div class="absolute -inset-4 gradient-mesh rounded-3xl opacity-40" aria-hidden="true"></div>
-      <div class="relative glass rounded-2xl border border-white/20 shadow-[var(--shadow-card)] p-8 sm:p-10 text-center animate-scale-in">
+      <div
+        class="relative glass rounded-2xl border border-white/20 shadow-[var(--shadow-card)] p-8 sm:p-10 text-center animate-scale-in">
         {# Animated compass SVG #}
         <div class="inline-flex items-center justify-center w-28 h-28 mb-6" aria-hidden="true">
-          <svg class="w-full h-full text-[var(--color-accent)]" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="w-full h-full text-[var(--color-accent)]" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="32" cy="32" r="28" class="text-[var(--color-accent)]/30" />
             <circle cx="32" cy="32" r="4" class="text-[var(--color-accent)]" fill="currentColor" />
             <g class="compass-needle">
@@ -26,11 +28,25 @@
             <line x1="38" y1="26" x2="46" y2="18" class="text-[var(--color-faint)]" />
           </svg>
           <style>
-            .compass-needle { transform-origin: 32px 32px; animation: compass-spin 4s ease-in-out infinite; }
+            .compass-needle {
+              transform-origin: 32px 32px;
+              animation: compass-spin 4s ease-in-out infinite;
+            }
+
             @keyframes compass-spin {
-              0%, 100% { transform: rotate(0deg); }
-              25% { transform: rotate(15deg); }
-              75% { transform: rotate(-15deg); }
+
+              0%,
+              100% {
+                transform: rotate(0deg);
+              }
+
+              25% {
+                transform: rotate(15deg);
+              }
+
+              75% {
+                transform: rotate(-15deg);
+              }
             }
           </style>
         </div>
@@ -40,10 +56,12 @@
         </p>
 
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <a href="/" class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
+          <a href="/"
+            class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
             <i data-lucide="compass" class="w-4 h-4 mr-1.5" aria-hidden="true"></i> Go to Discover
           </a>
-          <a href="/events" class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
+          <a href="/events"
+            class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
             <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i> Browse Events
           </a>
         </div>

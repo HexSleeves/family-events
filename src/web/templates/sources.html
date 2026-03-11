@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, form_field, select_field, empty_state %}
+{% from "components/_macros.html" import icon, section_header, btn, badge_tag, page_header, form_field, select_field,
+empty_state %}
 {% block title %}Sources{% endblock %}
 {% block content %}
 
@@ -58,12 +59,14 @@
       </h3>
       <div class="flex flex-col sm:flex-row gap-3">
         <div class="flex-1 relative">
-          <i data-lucide="globe" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
+          <i data-lucide="globe" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]"
+            aria-hidden="true"></i>
           <input type="url" name="url" required placeholder="https://example.com/events"
             class="w-full pl-10 pr-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
         </div>
         <div class="w-full sm:w-48 relative">
-          <i data-lucide="tag" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]" aria-hidden="true"></i>
+          <i data-lucide="tag" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-faint)]"
+            aria-hidden="true"></i>
           <input type="text" name="name" placeholder="Name (optional)"
             class="w-full pl-10 pr-3.5 py-2.5 border border-[var(--color-edge)] rounded-lg text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all" />
         </div>
@@ -83,7 +86,8 @@
     {% include "partials/_source_card.html" %}
     {% endfor %}
     {% else %}
-    {{ empty_state("radio", "No sources yet", "Add a predefined source above or add your own custom event feed.", "Add Custom Source", "#add-custom-source") }}
+    {{ empty_state("radio", "No sources yet", "Add a predefined source above or add your own custom event feed.", "Add
+    Custom Source", "#add-custom-source") }}
     {% endif %}
   </div>
 

@@ -8,10 +8,12 @@
   <div class="max-w-2xl mx-auto w-full px-4">
     <div class="relative overflow-hidden">
       <div class="absolute -inset-4 gradient-mesh rounded-3xl opacity-40" aria-hidden="true"></div>
-      <div class="relative glass rounded-2xl border border-white/20 shadow-[var(--shadow-card)] p-8 sm:p-10 text-center animate-scale-in">
+      <div
+        class="relative glass rounded-2xl border border-white/20 shadow-[var(--shadow-card)] p-8 sm:p-10 text-center animate-scale-in">
         {# Animated error/wrench SVG #}
         <div class="inline-flex items-center justify-center w-28 h-28 mb-6" aria-hidden="true">
-          <svg class="w-full h-full text-[var(--color-danger)]" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="w-full h-full text-[var(--color-danger)]" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="32" cy="32" r="24" class="text-[var(--color-danger)]/30" />
             <path d="M32 20v8M32 36v8M24 32h-8M36 32h8" class="text-[var(--color-danger)]" />
             <path d="M26 26l-4-4M38 38l4 4M38 26l4-4M26 38l-4 4" class="text-[var(--color-danger)]/70" />
@@ -19,10 +21,20 @@
             <path d="M28 28l8 8M36 28l-8 8" class="error-x-animate" stroke-width="2" />
           </svg>
           <style>
-            .error-x-animate { animation: error-pulse 2s ease-in-out infinite; }
+            .error-x-animate {
+              animation: error-pulse 2s ease-in-out infinite;
+            }
+
             @keyframes error-pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.5; }
+
+              0%,
+              100% {
+                opacity: 1;
+              }
+
+              50% {
+                opacity: 0.5;
+              }
             }
           </style>
         </div>
@@ -32,10 +44,12 @@
         </p>
 
         <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <a href="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}" class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
+          <a href="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}"
+            class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-hover)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
             <i data-lucide="refresh-cw" class="w-4 h-4 mr-1.5" aria-hidden="true"></i> Try Again
           </a>
-          <a href="/" class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
+          <a href="/"
+            class="touch-target inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium bg-[var(--color-surface)] border border-[var(--color-edge)] text-[var(--color-body)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] shadow-[var(--shadow-xs)] active:scale-[0.97] transition-all duration-150">
             <i data-lucide="home" class="w-4 h-4 mr-1.5" aria-hidden="true"></i> Go Home
           </a>
         </div>

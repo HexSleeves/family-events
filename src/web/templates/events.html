@@ -48,15 +48,23 @@
 
     <hr class="border-[var(--color-edge-subtle)]" aria-hidden="true" />
 
+    {# Pre-compute options for Jinja2 macro compatibility (no list comprehensions in macro args) #}
+    {% set city_options = [] %}
+    {% for c in cities %}{% if city_options.append((c, c)) %}{% endif %}{% endfor %}
+    {% set source_options = [] %}
+    {% for s in sources %}{% if source_options.append((s, s)) %}{% endif %}{% endfor %}
+    {% set score_options = [] %}
+    {% for v in range(1, 11) %}{% if score_options.append((v, v ~ "+")) %}{% endif %}{% endfor %}
+
     {# Filters grid #}
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       {{ select_field("city", "Location",
-        options=[(c, c) for c in cities],
+        options=city_options,
         value=city,
         empty_label="All cities",
         select_cls="auto-submit h-10") }}
       {{ select_field("source", "Source",
-        options=[(s, s) for s in sources],
+        options=source_options,
         value=source,
         empty_label="All sources",
         select_cls="auto-submit h-10") }}
@@ -70,9 +78,10 @@
         value=attended,
         empty_label="All",
         select_cls="auto-submit h-10") }}
+      {% set score_val = (score_min | string) if score_min is not none else "" %}
       {{ select_field("score_min", "Min Score",
-        options=[(v, v ~ "+") for v in range(1, 11)],
-        value=(score_min | string) if score_min is not none else "",
+        options=score_options,
+        value=score_val,
         empty_label="Any",
         select_cls="auto-submit h-10") }}
       {{ select_field("sort", "Sort",

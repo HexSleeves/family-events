@@ -1,7 +1,6 @@
-{% extends "base.html" %}
-{% from "components/_macros.html" import icon, section_header, stat_card, page_header %}
-{% block title %}Calendars{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% from "components/_macros.html" import icon,
+section_header, stat_card, page_header %} {% block title %}Calendars{% endblock
+%} {% block content %}
 
 <div class="animate-fade-in space-y-6">
   {# ═══ HERO HEADER ═══ #}
@@ -11,14 +10,16 @@
     <div class="relative p-6 sm:p-8">
       <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div class="max-w-3xl space-y-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)] flex items-center gap-1.5">
+          <p
+            class="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-accent)] flex items-center gap-1.5">
             {{ icon("calendar", size="w-3.5 h-3.5") }} Calendars
           </p>
           <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-[var(--color-heading)]">
             A real planning view for family events.
           </h1>
           <p class="max-w-2xl text-sm sm:text-base text-[var(--color-muted)]">
-            Navigate months, see busy days, and plan your family's schedule with a clean visual calendar.
+            Navigate months, see busy days, and plan your family's schedule with
+            a clean visual calendar.
           </p>
           <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-[var(--color-muted)]">
             <span
@@ -27,20 +28,25 @@
             </span>
             <span
               class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
-              {{ icon("map-pin", size="w-3.5 h-3.5") }} {{ city_count }} cit{{ 'y' if city_count == 1 else 'ies' }}
+              {{ icon("map-pin", size="w-3.5 h-3.5") }} {{ city_count }} cit{{
+              'y' if city_count == 1 else 'ies' }}
             </span>
             <span
               class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-surface)]/80 px-3 py-1.5 border border-[var(--color-edge-subtle)]">
-              {{ icon("radio", size="w-3.5 h-3.5") }} {{ source_count }} source{{ '' if source_count == 1 else 's' }}
+              {{ icon("radio", size="w-3.5 h-3.5") }} {{ source_count }}
+              source{{ '' if source_count == 1 else 's' }}
             </span>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3 sm:min-w-[340px]">
-          {{ stat_card(total_events, "Events this month", icon_name="calendar-days", color="accent") }}
-          {{ stat_card(busy_days_count, "Busy days", icon_name="flame", color="brand") }}
-          {{ stat_card(free_events_count, "Free events", icon_name="gift", color="success") }}
-          {{ stat_card(attended_events_count, "Attended", icon_name="check-circle", color="info") }}
+          {{ stat_card(total_events, "Events this month",
+          icon_name="calendar-days", color="accent") }} {{
+          stat_card(busy_days_count, "Busy days", icon_name="flame",
+          color="brand") }} {{ stat_card(free_events_count, "Free events",
+          icon_name="gift", color="success") }} {{
+          stat_card(attended_events_count, "Attended", icon_name="check-circle",
+          color="info") }}
         </div>
       </div>
     </div>

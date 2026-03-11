@@ -23,11 +23,13 @@
   <div class="glass rounded-2xl border border-[var(--color-edge-subtle)] px-6 py-5 shadow-[var(--shadow-card)]">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 id="initial-import-heading" class="text-lg font-semibold text-[var(--color-heading)] flex items-center gap-2">
+        <h2 id="initial-import-heading"
+          class="text-lg font-semibold text-[var(--color-heading)] flex items-center gap-2">
           {{ icon("loader", size="w-5 h-5", cls="text-[var(--color-accent)] animate-spin") }}
           Initial event import is running
         </h2>
-        <p class="mt-1 text-sm text-[var(--color-muted)]">We are scraping and tagging your starter sources now so your dashboard fills in with events.</p>
+        <p class="mt-1 text-sm text-[var(--color-muted)]">We are scraping and tagging your starter sources now so your
+          dashboard fills in with events.</p>
       </div>
       <a href="/jobs?scope=shared&kind=pipeline"
         class="inline-flex items-center justify-center rounded-lg border border-[var(--color-edge)] px-4 py-2 text-sm font-medium text-[var(--color-heading)] hover:bg-[var(--color-surface-secondary)] transition-colors">
@@ -70,7 +72,8 @@
 {# ═══ NEAR YOU ═══ #}
 {% if near_you_events %}
 <section class="mb-10 animate-fade-in-up stagger-3" aria-labelledby="section-near-you">
-  {{ section_header("Near You (" ~ near_city ~ ")", icon_name="map-pin", link_href="/events?city=" ~ near_city ~ "&sort=-score", id="section-near-you") }}
+  {{ section_header("Near You (" ~ near_city ~ ")", icon_name="map-pin", link_href="/events?city=" ~ near_city ~
+  "&sort=-score", id="section-near-you") }}
   <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
     {% for event in near_you_events %}
     <div role="listitem">
@@ -84,7 +87,8 @@
 {# ═══ ARTS & CRAFTS ═══ #}
 {% if arts_events %}
 <section class="mb-10 animate-fade-in-up stagger-4" aria-labelledby="section-arts-crafts">
-  {{ section_header("Arts & Crafts", icon_name="palette", link_href="/events?q=arts+crafts", id="section-arts-crafts") }}
+  {{ section_header("Arts & Crafts", icon_name="palette", link_href="/events?q=arts+crafts", id="section-arts-crafts")
+  }}
   <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
     {% for event in arts_events %}
     <div role="listitem">
@@ -112,7 +116,8 @@
 {# ═══ NATURE & WILDLIFE ═══ #}
 {% if nature_events %}
 <section class="mb-10 animate-fade-in-up stagger-7" aria-labelledby="section-nature">
-  {{ section_header("Nature & Wildlife", icon_name="leaf", link_href="/events?q=nature+wildlife", id="section-nature") }}
+  {{ section_header("Nature & Wildlife", icon_name="leaf", link_href="/events?q=nature+wildlife", id="section-nature")
+  }}
   <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" role="list">
     {% for event in nature_events %}
     <div role="listitem">
@@ -125,13 +130,13 @@
 
 {# ═══ EMPTY STATE ═══ #}
 {% if not top_events and not near_you_events and not arts_events and not outdoor_events and not nature_events %}
-{{ empty_state(emoji="🎈", title="No events yet", description="Run the scrapers and tagger to start discovering toddler-friendly events in your area.") }}
+{{ empty_state(emoji="🎈", title="No events yet", description="Run the scrapers and tagger to start discovering
+toddler-friendly events in your area.") }}
 {% endif %}
 
 {# ═══ ADMIN SECTION ═══ #}
 {% if current_user %}
-<section class="mt-4 mb-2 animate-fade-in-up stagger-9" aria-labelledby="admin-heading"
-  x-data="collapsible(true)">
+<section class="mt-4 mb-2 animate-fade-in-up stagger-9" aria-labelledby="admin-heading" x-data="collapsible(true)">
   <hr class="border-[var(--color-edge-subtle)] mb-8" />
 
   <button @click="toggle()" class="w-full flex items-center justify-between mb-6 group cursor-pointer">
@@ -141,16 +146,12 @@
       Admin
     </h2>
     <i data-lucide="chevron-down" aria-hidden="true"
-      class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200"
-      :class="open ? 'rotate-180' : ''"></i>
+      class="w-4 h-4 text-[var(--color-faint)] transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
   </button>
 
-  <div x-show="open" x-cloak
-    x-transition:enter="transition ease-out duration-200"
-    x-transition:enter-start="opacity-0 -translate-y-2"
-    x-transition:enter-end="opacity-100 translate-y-0"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100"
+  <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
     x-transition:leave-end="opacity-0 -translate-y-2">
 
     {# Stats grid #}
@@ -166,11 +167,13 @@
       <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--color-faint)]">
         <p class="flex items-center gap-1">
           {{ icon("clock", size="w-3.5 h-3.5") }}
-          Last scraped: <span class="text-[var(--color-body)] font-medium">{{ last_scraped_at.strftime('%b %d, %I:%M %p') if last_scraped_at else 'Never' }}</span>
+          Last scraped: <span class="text-[var(--color-body)] font-medium">{{ last_scraped_at.strftime('%b %d, %I:%M
+            %p') if last_scraped_at else 'Never' }}</span>
         </p>
         <p class="flex items-center gap-1">
           {{ icon("tag", size="w-3.5 h-3.5") }}
-          Last tagged: <span class="text-[var(--color-body)] font-medium">{{ last_tagged_at.strftime('%b %d, %I:%M %p') if last_tagged_at else 'Never' }}</span>
+          Last tagged: <span class="text-[var(--color-body)] font-medium">{{ last_tagged_at.strftime('%b %d, %I:%M %p')
+            if last_tagged_at else 'Never' }}</span>
         </p>
       </div>
     </div>
@@ -181,19 +184,19 @@
       {{ section_header("Recent Jobs", icon_name="wrench", link_href="/jobs", id="section-jobs-heading") }}
       <div class="space-y-3">
         {% for card in recent_job_cards %}
-          {% set job = card.job %}
-          {% set target_id = card.target_id %}
-          {% set message = card.message %}
-          {% set started_at = card.started_at %}
-          {% set finished_at = card.finished_at %}
-          {% set result = card.result %}
-          {% set progress = card.progress %}
-          {% set result_summary = card.result_summary %}
-          {% set refresh_path = card.refresh_path %}
-          {% set refresh_select = card.refresh_select %}
-          {% set refresh_target_id = card.refresh_target_id %}
-          {% set auto_refresh_history = false %}
-          {% include "partials/_job_status.html" %}
+        {% set job = card.job %}
+        {% set target_id = card.target_id %}
+        {% set message = card.message %}
+        {% set started_at = card.started_at %}
+        {% set finished_at = card.finished_at %}
+        {% set result = card.result %}
+        {% set progress = card.progress %}
+        {% set result_summary = card.result_summary %}
+        {% set refresh_path = card.refresh_path %}
+        {% set refresh_select = card.refresh_select %}
+        {% set refresh_target_id = card.refresh_target_id %}
+        {% set auto_refresh_history = false %}
+        {% include "partials/_job_status.html" %}
         {% endfor %}
       </div>
     </section>
@@ -201,41 +204,43 @@
 
     <div id="dashboard-job-status" class="mb-4"></div>
 
-    <p class="mb-3 text-sm text-[var(--color-muted)]">Primary workflow: run <span class="font-medium text-[var(--color-body)]">Scrape + Tag</span> after source changes or when refreshing event inventory.</p>
+    <p class="mb-3 text-sm text-[var(--color-muted)]">Primary workflow: run <span
+        class="font-medium text-[var(--color-body)]">Scrape + Tag</span> after source changes or when refreshing event
+      inventory.</p>
 
     {# Action buttons #}
     <div class="flex flex-wrap gap-2">
       {{ btn("Scrape + Tag", variant="primary", icon_name="refresh-cw",
-             hx_post="/api/scrape-tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             aria_label="Run scrape and tag pipeline") }}
+      hx_post="/api/scrape-tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      aria_label="Run scrape and tag pipeline") }}
       {{ btn("Run Scrapers", variant="secondary", icon_name="refresh-cw",
-             hx_post="/api/scrape", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             aria_label="Run scrapers to fetch new events") }}
+      hx_post="/api/scrape", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      aria_label="Run scrapers to fetch new events") }}
       {{ btn("Tag Untagged", variant="secondary", icon_name="tag",
-             hx_post="/api/tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             aria_label="Tag untagged events with AI") }}
+      hx_post="/api/tag", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      aria_label="Tag untagged events with AI") }}
       {{ btn("Retag Stale", variant="secondary", icon_name="clock",
-             hx_post="/api/tag/stale", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             aria_label="Retag stale events") }}
+      hx_post="/api/tag/stale", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      aria_label="Retag stale events") }}
       {{ btn("Send Notification", variant="secondary", icon_name="mail",
-             hx_post="/api/notify", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             aria_label="Send push notification to subscribers") }}
+      hx_post="/api/notify", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      aria_label="Send push notification to subscribers") }}
       {{ btn("Dedupe Events", variant="secondary", icon_name="trash-2",
-             hx_post="/api/dedupe", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-             hx_target="#dashboard-job-status", hx_swap="innerHTML",
-             hx_indicator="this", hx_disabled_elt="this",
-             hx_confirm="Run dedupe on all events? This merges likely duplicates.",
-             aria_label="Deduplicate events") }}
+      hx_post="/api/dedupe", hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+      hx_target="#dashboard-job-status", hx_swap="innerHTML",
+      hx_indicator="this", hx_disabled_elt="this",
+      hx_confirm="Run dedupe on all events? This merges likely duplicates.",
+      aria_label="Deduplicate events") }}
     </div>
   </div>
 </section>

@@ -47,12 +47,8 @@
         {% endif %}
       </div>
       <div class="flex gap-2 shrink-0">
-        <button type="button"
-          hx-post="/api/sources/{{ source.id }}/test"
-          hx-vals='{"csrf_token":"{{ csrf_token }}"}'
-          hx-target="#source-job-{{ source.id }}"
-          hx-swap="innerHTML"
-          hx-indicator="#test-spin"
+        <button type="button" hx-post="/api/sources/{{ source.id }}/test" hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+          hx-target="#source-job-{{ source.id }}" hx-swap="innerHTML" hx-indicator="#test-spin"
           aria-label="Test scrape for {{ source.name }}"
           class="touch-target inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-accent)] border border-[var(--color-accent)] text-white font-medium text-sm hover:bg-[var(--color-accent-hover)] active:scale-[0.98] transition-all">
           <i data-lucide="play" class="w-4 h-4" aria-hidden="true"></i>
@@ -60,12 +56,12 @@
           <span id="test-spin" class="htmx-indicator spinner"></span>
         </button>
         {{ btn("Re-analyze", variant="secondary", icon_name="refresh-cw", type="button",
-          hx_post="/api/sources/" ~ source.id ~ "/analyze",
-          hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
-          hx_target="#source-job-" ~ source.id,
-          hx_swap="innerHTML",
-          aria_label="Re-analyze recipe for " ~ source.name,
-          cls="inline-flex") }}
+        hx_post="/api/sources/" ~ source.id ~ "/analyze",
+        hx_vals='{"csrf_token":"' ~ csrf_token ~ '"}',
+        hx_target="#source-job-" ~ source.id,
+        hx_swap="innerHTML",
+        aria_label="Re-analyze recipe for " ~ source.name,
+        cls="inline-flex") }}
       </div>
     </div>
   </div>
@@ -148,7 +144,9 @@
       <a href="/event/{{ event.id }}"
         class="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--color-surface-tertiary)] transition-colors group">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-[var(--color-heading)] truncate group-hover:text-[var(--color-brand)] transition-colors">{{ event.title }}</p>
+          <p
+            class="text-sm font-medium text-[var(--color-heading)] truncate group-hover:text-[var(--color-brand)] transition-colors">
+            {{ event.title }}</p>
           <p class="text-xs text-[var(--color-muted)] flex items-center gap-1">
             <i data-lucide="clock" class="w-3 h-3 shrink-0" aria-hidden="true"></i>
             {{ event.start_time.strftime('%b %d, %I:%M%p') }}

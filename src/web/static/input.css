@@ -3,6 +3,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+[x-cloak] { display: none !important; }
+
 /* ══════════════════════════════════════════════════════════════
    DESIGN TOKENS — "Warm Modern" family events theme
    Linear.app meets Airbnb: clean, sophisticated, warm.

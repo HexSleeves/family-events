@@ -28,7 +28,9 @@
       </div>
       {{ form_field("q", "Search", type="search", value=q, placeholder="Label, detail, error...", id="job-q") }}
       {{ select_field("state", "State", options=[("running", "running"), ("succeeded", "succeeded"), ("failed", "failed"), ("cancelled", "cancelled")], value=selected_state, empty_label="All states", id="job-state") }}
-      {{ select_field("kind", "Kind", options=[(k, k) for k in job_kinds], value=selected_kind, empty_label="All kinds", id="job-kind") }}
+      {% set kind_options = [] %}
+      {% for k in job_kinds %}{% if kind_options.append((k, k)) %}{% endif %}{% endfor %}
+      {{ select_field("kind", "Kind", options=kind_options, value=selected_kind, empty_label="All kinds", id="job-kind") }}
       <div>
         <label for="job-source" class="block text-xs font-medium text-[var(--color-muted)] mb-1.5">Source</label>
         <select name="source_id" id="job-source"
