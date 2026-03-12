@@ -221,7 +221,7 @@
            aria-label="Main navigation"
            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 hidden md:block">
         <div class="flex items-center gap-1 -mb-px">
-          {% set nav_items = [('/', 'Discover', 'discover', 'compass'), ('/events', 'Browse', 'events', 'list'), ('/calendars', 'Calendars', 'calendar', 'calendar'), ('/events?attended=yes', 'Attended', 'attended', 'check-circle'), ('/weekend', 'This Weekend', 'weekend', 'star'), ('/sources', 'Sources', 'sources', 'radio'), ('/jobs', 'Jobs', 'jobs', 'wrench')] %}
+          {% set nav_items = [('/', 'Discover', 'discover', 'compass'), ('/events', 'Browse', 'events', 'list'), ('/my-events', 'My Events', 'my-events', 'bookmark'), ('/calendars', 'Calendars', 'calendar', 'calendar'), ('/weekend', 'This Weekend', 'weekend', 'star'), ('/sources', 'Sources', 'sources', 'radio'), ('/jobs', 'Jobs', 'jobs', 'wrench')] %}
           {% for url, label, key, icon_name in nav_items %}
             <a href="{{ url }}"
                {% if active_page==key %}aria-current="page"{% endif %}
@@ -263,7 +263,7 @@
                    hx-select="#main-content"
                    hx-swap="innerHTML" />
           </div>
-          {% set mobile_nav = [('/', 'Discover', 'discover', 'compass'), ('/events', 'Browse All', 'events', 'list'), ('/calendars', 'Calendars', 'calendar', 'calendar'), ('/events?attended=yes', 'Attended', 'attended', 'check-circle'), ('/weekend', 'This Weekend', 'weekend', 'star'), ('/sources', 'Sources', 'sources', 'radio'), ('/jobs', 'Jobs', 'jobs', 'wrench')] %}
+          {% set mobile_nav = [('/', 'Discover', 'discover', 'compass'), ('/events', 'Browse All', 'events', 'list'), ('/my-events', 'My Events', 'my-events', 'bookmark'), ('/calendars', 'Calendars', 'calendar', 'calendar'), ('/weekend', 'This Weekend', 'weekend', 'star'), ('/sources', 'Sources', 'sources', 'radio'), ('/jobs', 'Jobs', 'jobs', 'wrench')] %}
           {% for url, label, key, icon_name in mobile_nav %}
             <a href="{{ url }}"
                @click="close()"

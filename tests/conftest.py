@@ -31,11 +31,13 @@ def client(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
 
 @pytest.fixture
 def create_user() -> Callable[..., User]:
-    def _create_user(**overrides: str) -> User:
+    def _create_user(**overrides) -> User:
+        password = overrides.pop("password", "Password123")
         user = User(
-            email=overrides.get("email", "parent@example.com"),
-            display_name=overrides.get("display_name", "Parent"),
-            password_hash=hash_password(overrides.get("password", "Password123")),
+            email=overrides.pop("email", "parent@example.com"),
+            display_name=overrides.pop("display_name", "Parent"),
+            password_hash=hash_password(password),
+            **overrides,
         )
         asyncio.run(appmod.db.create_user(user))
         return user

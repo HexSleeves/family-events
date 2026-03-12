@@ -6,13 +6,25 @@
   <section class="mb-10 animate-fade-in-up" aria-labelledby="hero-heading">
     <div class="gradient-mesh glass rounded-2xl px-6 py-8 sm:py-10 relative overflow-hidden">
       <div class="relative z-10">
-        <h1 id="hero-heading"
-            class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">
-          Discover family events <span aria-hidden="true">🎈</span>
-        </h1>
-        <p class="mt-2 text-[var(--color-muted)] text-sm sm:text-base max-w-xl">
-          Curated child-friendly things to do based on your city and your child's profile
-        </p>
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 id="hero-heading"
+                class="text-2xl sm:text-3xl font-bold text-[var(--color-heading)]">
+              Discover family events <span aria-hidden="true">🎈</span>
+            </h1>
+            <p class="mt-2 text-[var(--color-muted)] text-sm sm:text-base max-w-xl">
+              Curated child-friendly things to do based on your city and your child's profile
+            </p>
+          </div>
+          {% if current_user %}
+            <div class="inline-flex rounded-full border border-[var(--color-edge)] bg-[var(--color-surface)]/85 p-1 shadow-[var(--shadow-xs)]">
+              <a href="/?scope=nearby"
+                 class="rounded-full px-4 py-2 text-sm font-medium {% if scope == 'nearby' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">Near Me</a>
+              <a href="/?scope=all"
+                 class="rounded-full px-4 py-2 text-sm font-medium {% if scope == 'all' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">All Cities</a>
+            </div>
+          {% endif %}
+        </div>
       </div>
     </div>
   </section>
@@ -60,7 +72,7 @@
   {% if top_events %}
     <section class="mb-10 animate-fade-in-up stagger-1"
              aria-labelledby="section-top-picks">
-      {{ section_header("Top Picks", icon_name="star", link_href="/events?sort=-score", id="section-top-picks") }}
+      {{ section_header("Top Picks", icon_name="star", link_href="/events?scope=" ~ scope ~ "&sort=-score", id="section-top-picks") }}
       <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
            role="list">
         {% for event in top_events %}
@@ -73,7 +85,7 @@
   {% if near_you_events %}
     <section class="mb-10 animate-fade-in-up stagger-3"
              aria-labelledby="section-near-you">
-      {{ section_header("Near You (" ~ near_city ~ ")", icon_name="map-pin", link_href="/events?city=" ~ near_city ~
+      {{ section_header("Near You (" ~ near_city ~ ")", icon_name="map-pin", link_href="/events?scope=" ~ scope ~ "&city=" ~ near_city ~
             "&sort=-score", id="section-near-you") }}
       <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
            role="list">
@@ -87,7 +99,7 @@
   {% if arts_events %}
     <section class="mb-10 animate-fade-in-up stagger-4"
              aria-labelledby="section-arts-crafts">
-      {{ section_header("Arts & Crafts", icon_name="palette", link_href="/events?q=arts+crafts", id="section-arts-crafts") 
+      {{ section_header("Arts & Crafts", icon_name="palette", link_href="/events?scope=" ~ scope ~ "&q=arts+crafts", id="section-arts-crafts") 
       }}
       <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
            role="list">
@@ -101,7 +113,7 @@
   {% if outdoor_events %}
     <section class="mb-10 animate-fade-in-up stagger-5"
              aria-labelledby="section-outdoor">
-      {{ section_header("Outdoor Adventures", icon_name="trees", link_href="/events?q=outdoor", id="section-outdoor") }}
+      {{ section_header("Outdoor Adventures", icon_name="trees", link_href="/events?scope=" ~ scope ~ "&q=outdoor", id="section-outdoor") }}
       <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
            role="list">
         {% for event in outdoor_events %}
@@ -114,7 +126,7 @@
   {% if nature_events %}
     <section class="mb-10 animate-fade-in-up stagger-7"
              aria-labelledby="section-nature">
-      {{ section_header("Nature & Wildlife", icon_name="leaf", link_href="/events?q=nature+wildlife", id="section-nature") 
+      {{ section_header("Nature & Wildlife", icon_name="leaf", link_href="/events?scope=" ~ scope ~ "&q=nature+wildlife", id="section-nature") 
       }}
       <div class="scroll-section -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
            role="list">

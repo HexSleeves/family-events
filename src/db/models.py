@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # EventTags - AI-generated metadata about an event
@@ -59,6 +59,7 @@ class Event(BaseModel):
     location_name: str = ""
     location_address: str = ""
     location_city: str = "Lafayette"  # Typically "Lafayette", "Baton Rouge", or "Other"
+    city_slug: str = "lafayette"
     latitude: float | None = None
     longitude: float | None = None
     start_time: datetime
@@ -73,6 +74,19 @@ class Event(BaseModel):
     raw_data: dict[str, Any] = Field(default_factory=dict)
     tags: EventTags | None = None
     score_breakdown: dict[str, float] | None = None
+    viewer_state: UserEventState | None = None
+
+    @model_validator(mode="after")
+    def _default_city_slug(self) -> Event:
+        if not self.city_slug:
+            from src.cities import normalize_city_slug
+
+            self.city_slug = normalize_city_slug(self.location_city)
+        return self
+
+
+class UserEventState(BaseModel):
+    saved: bool = False
     attended: bool = False
 
 
@@ -223,6 +237,7 @@ class Source(BaseModel):
     url: str
     domain: str
     city: str = ""
+    city_slug: str = "unknown"
     category: str = "custom"
     user_id: str | None = None
     builtin: bool = False
@@ -234,3 +249,11 @@ class Source(BaseModel):
     last_error: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(tz=UTC))
+
+    @model_validator(mode="after")
+    def _default_city_slug(self) -> Source:
+        if not self.city_slug:
+            from src.cities import normalize_city_slug
+
+            self.city_slug = normalize_city_slug(self.city)
+        return self

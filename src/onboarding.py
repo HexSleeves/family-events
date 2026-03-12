@@ -2,18 +2,23 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
+from src.cities import normalize_city_slug, normalize_city_list as normalize_city_slug_list
 from src.db.models import Constraints, InterestProfile, User
 from src.predefined_sources import list_predefined_sources, make_predefined_source
 
 
 def normalize_city_list(text: str, *, fallback_home_city: str) -> list[str]:
     values = [item.strip() for item in text.split(",") if item.strip()]
-    if fallback_home_city and fallback_home_city not in values:
+    if fallback_home_city and normalize_city_slug(
+        fallback_home_city
+    ) not in normalize_city_slug_list(values):
         values.insert(0, fallback_home_city)
     deduped: list[str] = []
     seen: set[str] = set()
     for value in values:
-        key = value.casefold()
+        key = normalize_city_slug(value)
+        if key == "unknown":
+            continue
         if key in seen:
             continue
         seen.add(key)

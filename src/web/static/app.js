@@ -215,6 +215,7 @@ document.addEventListener("alpine:init", () => {
       const items = [
         { label: "Discover", url: "/", icon: "compass" },
         { label: "Browse Events", url: "/events", icon: "list" },
+        { label: "My Events", url: "/my-events", icon: "bookmark" },
         { label: "This Weekend", url: "/weekend", icon: "star" },
         { label: "Calendars", url: "/calendars", icon: "calendar" },
         { label: "Sources", url: "/sources", icon: "radio" },

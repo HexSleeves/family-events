@@ -16,7 +16,14 @@ from src.scheduler import SYSTEM_USER_EMAIL
 from src.tagger.taxonomy import TAGGING_VERSION
 from src.timezones import current_weekend_dates, utc_now
 from src.web.auth import get_current_user
-from src.web.common import ctx, format_ts, get_db, template_response
+from src.web.common import (
+    ctx,
+    format_ts,
+    get_db,
+    resolve_event_scope,
+    template_response,
+    visible_city_scope,
+)
 from src.web.jobs_ui import job_template_context, render_job_cards
 
 router = APIRouter()
@@ -74,14 +81,24 @@ async def health_check(request: Request) -> JSONResponse:
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     db = get_db(request)
-    events = await db.get_recent_events(days=30)
+    user = await get_current_user(request, db)
+    scope = resolve_event_scope(request, user)
+    visible_city_slugs = visible_city_scope(user=user, scope=scope)
+    events = await db.get_recent_events(
+        days=30,
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs,
+    )
     total = len(events)
     tagged = sum(1 for event in events if event.tags)
     untagged = total - tagged
-    stale_tagged = await db.count_stale_tagged_events(tagging_version=TAGGING_VERSION)
+    stale_tagged = sum(
+        1
+        for event in events
+        if event.tags and (event.tags.tagging_version or "") != TAGGING_VERSION
+    )
     sources = len(set(event.source for event in events))
     timestamps = await db.get_pipeline_timestamps()
-    user = await get_current_user(request, db)
     recent_jobs = await db.list_jobs(owner_user_id=user.id, limit=8) if user else []
     system_user = await db.get_user_by_email(SYSTEM_USER_EMAIL)
     shared_import_job = await db.get_active_job_by_key("pipeline:scrape-tag")
@@ -145,6 +162,7 @@ async def dashboard(request: Request):
         await ctx(
             request,
             active_page="discover",
+            scope=scope,
             total=total,
             tagged=tagged,
             untagged=untagged,
@@ -169,13 +187,19 @@ async def dashboard(request: Request):
 async def weekend_page(request: Request):
     db = get_db(request)
     saturday, sunday = current_weekend_dates()
-
+    user = await get_current_user(request, db)
+    scope = resolve_event_scope(request, user)
+    visible_city_slugs = visible_city_scope(user=user, scope=scope)
     weather = await WeatherService().get_weekend_forecast(saturday, sunday)
-    events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())
+    events = await db.get_events_for_weekend(
+        saturday.isoformat(),
+        sunday.isoformat(),
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs,
+    )
 
     tagged = [event for event in events if event.tags]
     untagged_count = len(events) - len(tagged)
-    user = await get_current_user(request, db)
     profile = user.interest_profile if user else InterestProfile()
     child_name = user.child_name if user else "Your Little One"
     ranked = rank_events(tagged, profile, weather)
@@ -188,6 +212,7 @@ async def weekend_page(request: Request):
         await ctx(
             request,
             active_page="weekend",
+            scope=scope,
             saturday=saturday,
             sunday=sunday,
             weather=weather,

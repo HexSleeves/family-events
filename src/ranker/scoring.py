@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from src.cities import normalize_city_slug
+
 if TYPE_CHECKING:
     from src.db.models import Event, EventTags, InterestProfile
     from src.ranker.weather import DayForecast
@@ -97,7 +99,9 @@ def score_event_breakdown(
     weather_pts = _weather_score(event, tags, weather) * WEATHER_WEIGHT
     timing = _timing_score(event, profile, tags) * TIMING_WEIGHT
     logistics = _logistics_score(tags) * LOGISTICS_WEIGHT
-    novelty = (5.0 if not event.attended else 0.0) * NOVELTY_WEIGHT
+    novelty = (
+        5.0 if not (event.viewer_state and event.viewer_state.attended) else 0.0
+    ) * NOVELTY_WEIGHT
     city_pts = _city_score(event, profile) * CITY_WEIGHT
     confidence = _confidence_bonus(tags) * CONFIDENCE_WEIGHT
     rule_penalty = _rule_penalty(tags)
@@ -236,13 +240,14 @@ def _logistics_score(tags: EventTags) -> float:
 
 def _city_score(event: Event, profile: InterestProfile) -> float:
     """Boost events in the user's home city, penalize far-away ones."""
-    home = profile.constraints.home_city.strip()
-    preferred = profile.constraints.preferred_cities
-    if home and event.location_city == home:
+    event_city_slug = normalize_city_slug(event.location_city)
+    home = normalize_city_slug(profile.constraints.home_city)
+    preferred = {normalize_city_slug(city) for city in profile.constraints.preferred_cities}
+    if home != "unknown" and event_city_slug == home:
         return 10.0
-    if event.location_city in preferred:
+    if event_city_slug in preferred:
         return 6.0
-    return 3.0 if not home and not preferred else 1.0
+    return 3.0 if home == "unknown" and not preferred else 1.0
 
 
 # ---------------------------------------------------------------------------

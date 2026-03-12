@@ -1,33 +1,40 @@
 {% extends "base.html" %}
 {% from "components/_macros.html" import icon, section_header, btn, badge_tag, back_link, page_header, tab_switcher, form_field, select_field, empty_state %}
-{% block title %}Browse Events{% endblock %}
+{% set is_my_events_page = is_my_events_page|default(false) %}
+{% set results_path = results_path|default('/events') %}
+{% set current_scope = scope|default('all') %}
+{% block title %}{{ page_title|default('Browse Events') }}{% endblock %}
 {% block content %}
-  {% set in_attended = attended == 'yes' %}
   <div class="animate-fade-in space-y-6">
     {# ═══ PAGE HEADER + TAB SWITCHER ═══ #}
     <section id="events-header"
              class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
              aria-labelledby="events-page-heading">
       <div>
-        {{ page_header('Attended Events' if in_attended else 'Browse Events',
-                subtitle='Refine by city, score, source, and attendance state.',
-                icon_name='list' if not in_attended else 'check-circle') }}
+        {{ page_header(page_title|default('Browse Events'),
+                subtitle='Refine by city, source, tagging, and your personal event state.' if is_my_events_page else 'Refine by city, score, source, and request-scoped saved or attended state.',
+                icon_name='bookmark' if is_my_events_page else 'list') }}
       </div>
-      {{ tab_switcher([
-            ("/events", "All", total, not in_attended) ,
-      ("/events?attended=yes", "Attended", "", in_attended)
-      ]) }}
+      {% if current_user and not is_my_events_page %}
+        <div class="inline-flex rounded-full border border-[var(--color-edge)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-xs)]">
+          <a href="/events?scope=nearby"
+             class="rounded-full px-4 py-2 text-sm font-medium {% if current_scope == 'nearby' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">Near Me</a>
+          <a href="/events?scope=all"
+             class="rounded-full px-4 py-2 text-sm font-medium {% if current_scope == 'all' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">All Cities</a>
+        </div>
+      {% endif %}
     </section>
     {# ═══ FILTER BAR — glass + Alpine ═══ #}
     <form id="events-form"
           aria-label="Event filters"
-          hx-get="/events"
+          hx-get="{{ results_path }}"
           hx-target="#events-results"
           hx-swap="innerHTML"
           hx-push-url="true"
           hx-trigger="submit, change from:.auto-submit"
           hx-indicator="#events-results-wrapper"
           class="glass rounded-xl border border-[var(--color-edge-subtle)] shadow-[var(--shadow-xs)] p-4 sm:p-5 space-y-4 transition-all duration-300">
+      <input type="hidden" name="scope" value="{{ current_scope }}" />
       {# Search bar #}
       <div class="relative">
         <i data-lucide="search"
@@ -39,7 +46,7 @@
                placeholder="Search events..."
                aria-label="Search events"
                class="w-full pl-10 pr-4 py-2.5 border border-[var(--color-edge)] rounded-full text-sm bg-[var(--color-surface-secondary)] text-[var(--color-heading)] placeholder:text-[var(--color-faint)] focus:ring-2 focus:ring-[var(--color-brand)]/30 focus:border-[var(--color-brand)] transition-all"
-               hx-get="/events"
+               hx-get="{{ results_path }}"
                hx-target="#events-results"
                hx-swap="innerHTML"
                hx-push-url="true"
@@ -78,17 +85,26 @@
         value=tagged,
         empty_label="All",
         select_cls="auto-submit h-10") }}
-        {{ select_field("attended", "Attended",
-                options=[("yes", "Attended") , ("no", "Not attended")],
-        value=attended,
-        empty_label="All",
-        select_cls="auto-submit h-10") }}
+        {% if current_user %}
+          {{ select_field("saved", "Saved",
+                  options=[("yes", "Saved") , ("no", "Not saved")],
+          value=saved,
+          empty_label="All",
+          select_cls="auto-submit h-10") }}
+          {{ select_field("attended", "Attended",
+                  options=[("yes", "Attended") , ("no", "Not attended")],
+          value=attended,
+          empty_label="All",
+          select_cls="auto-submit h-10") }}
+        {% endif %}
         {% set score_val = (score_min | string) if score_min is not none else "" %}
-        {{ select_field("score_min", "Min Score",
-                options=score_options,
-                value=score_val,
-                empty_label="Any",
-                select_cls="auto-submit h-10") }}
+        {% if not is_my_events_page %}
+          {{ select_field("score_min", "Min Score",
+                  options=score_options,
+                  value=score_val,
+                  empty_label="Any",
+                  select_cls="auto-submit h-10") }}
+        {% endif %}
         {{ select_field("sort", "Sort",
                 options=[("start_time", "Date ↑") , ("-start_time", "Date ↓"), ("-score", "Score ↓"), ("title", "Title")],
         value=sort,
@@ -101,7 +117,7 @@
           Filters auto-apply as you type/select.
         </p>
         <button type="button"
-                hx-get="/events"
+                hx-get="{{ results_path }}"
                 hx-target="#main-content"
                 hx-select="#main-content"
                 hx-swap="innerHTML"

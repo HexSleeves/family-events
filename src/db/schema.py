@@ -37,6 +37,7 @@ events = Table(
     Column("location_name", Text, nullable=False, server_default=""),
     Column("location_address", Text, nullable=False, server_default=""),
     Column("location_city", Text, nullable=False, server_default="Lafayette"),
+    Column("city_slug", Text, nullable=False, server_default="lafayette"),
     Column("latitude", Float),
     Column("longitude", Float),
     Column("start_time", DateTime(timezone=True), nullable=False),
@@ -52,13 +53,12 @@ events = Table(
     Column("tags", json_type),
     Column("tagged_at", DateTime(timezone=True)),
     Column("score_breakdown", json_type),
-    Column("attended", Boolean, nullable=False, server_default=text("false")),
     UniqueConstraint("source", "source_id", name="uq_events_source_source_id"),
 )
 
 Index("idx_events_start_time", events.c.start_time)
 Index("idx_events_source", events.c.source, events.c.source_id)
-Index("idx_events_city", events.c.location_city)
+Index("idx_events_city", events.c.city_slug)
 Index("idx_events_tagging_version", text("((tags->>'tagging_version'))"), postgresql_using="btree")
 Index(
     "idx_events_toddler_score",
@@ -90,6 +90,7 @@ sources = Table(
     Column("url", Text, nullable=False, unique=True),
     Column("domain", Text, nullable=False),
     Column("city", Text, nullable=False, server_default=""),
+    Column("city_slug", Text, nullable=False, server_default="unknown"),
     Column("category", Text, nullable=False, server_default="custom"),
     Column("user_id", uuid_type, ForeignKey("users.id", ondelete="CASCADE")),
     Column("builtin", Boolean, nullable=False, server_default=text("false")),
@@ -109,6 +110,28 @@ sources = Table(
 
 Index("idx_sources_user_id", sources.c.user_id)
 Index("idx_sources_status_enabled", sources.c.status, sources.c.enabled)
+
+user_event_state = Table(
+    "user_event_state",
+    metadata,
+    Column("user_id", uuid_type, ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    Column("event_id", uuid_type, ForeignKey("events.id", ondelete="CASCADE"), nullable=False),
+    Column("saved", Boolean, nullable=False, server_default=text("false")),
+    Column("attended", Boolean, nullable=False, server_default=text("false")),
+    Column("saved_at", DateTime(timezone=True)),
+    Column("attended_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("user_id", "event_id", name="uq_user_event_state_user_event"),
+)
+
+Index(
+    "idx_user_event_state_flags",
+    user_event_state.c.user_id,
+    user_event_state.c.saved,
+    user_event_state.c.attended,
+)
+Index("idx_user_event_state_updated", user_event_state.c.user_id, user_event_state.c.updated_at)
 
 users = Table(
     "users",

@@ -5,6 +5,14 @@
   <div class="animate-fade-in">
     {# ═══ PAGE TITLE — left accent border ═══ #}
     {{ page_header("Weekend Plan: " ~ saturday.strftime('%b %d') ~ " – " ~ sunday.strftime('%b %d'), emoji="🎉") }}
+    {% if current_user %}
+      <div class="mb-6 inline-flex rounded-full border border-[var(--color-edge)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-xs)]">
+        <a href="/weekend?scope=nearby"
+           class="rounded-full px-4 py-2 text-sm font-medium {% if scope == 'nearby' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">Near Me</a>
+        <a href="/weekend?scope=all"
+           class="rounded-full px-4 py-2 text-sm font-medium {% if scope == 'all' %}bg-[var(--color-accent)] text-white{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">All Cities</a>
+      </div>
+    {% endif %}
     {# ═══ WEATHER BANNER — gradient-mesh + glassmorphism ═══ #}
     <section aria-labelledby="weather-heading"
              class="relative overflow-hidden rounded-2xl mb-8 animate-fade-in-up stagger-1">

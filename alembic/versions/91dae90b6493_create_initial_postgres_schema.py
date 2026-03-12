@@ -60,6 +60,7 @@ def upgrade() -> None:
         sa.Column("url", sa.Text(), nullable=False),
         sa.Column("domain", sa.Text(), nullable=False),
         sa.Column("city", sa.Text(), server_default="", nullable=False),
+        sa.Column("city_slug", sa.Text(), server_default="unknown", nullable=False),
         sa.Column("category", sa.Text(), server_default="custom", nullable=False),
         sa.Column("user_id", uuid, nullable=True),
         sa.Column("builtin", sa.Boolean(), server_default=sa.text("false"), nullable=False),
@@ -93,6 +94,7 @@ def upgrade() -> None:
         sa.Column("location_name", sa.Text(), server_default="", nullable=False),
         sa.Column("location_address", sa.Text(), server_default="", nullable=False),
         sa.Column("location_city", sa.Text(), server_default="Lafayette", nullable=False),
+        sa.Column("city_slug", sa.Text(), server_default="lafayette", nullable=False),
         sa.Column("latitude", sa.Float(), nullable=True),
         sa.Column("longitude", sa.Float(), nullable=True),
         sa.Column("start_time", sa.DateTime(timezone=True), nullable=False),
@@ -108,13 +110,12 @@ def upgrade() -> None:
         sa.Column("tags", jsonb, nullable=True),
         sa.Column("tagged_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("score_breakdown", jsonb, nullable=True),
-        sa.Column("attended", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("source", "source_id", name="uq_events_source_source_id"),
     )
     op.create_index("idx_events_start_time", "events", ["start_time"])
     op.create_index("idx_events_source", "events", ["source", "source_id"])
-    op.create_index("idx_events_city", "events", ["location_city"])
+    op.create_index("idx_events_city", "events", ["city_slug"])
     op.execute(
         "CREATE INDEX idx_events_tagging_version ON events (((tags->>'tagging_version')))"
     )
@@ -129,6 +130,30 @@ def upgrade() -> None:
     )
     op.execute(
         "CREATE INDEX idx_events_description_trgm ON events USING gin (lower(description) gin_trgm_ops)"
+    )
+    op.create_table(
+        "user_event_state",
+        sa.Column("user_id", uuid, nullable=False),
+        sa.Column("event_id", uuid, nullable=False),
+        sa.Column("saved", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column("attended", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column("saved_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("attended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.ForeignKeyConstraint(["event_id"], ["events.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.UniqueConstraint("user_id", "event_id", name="uq_user_event_state_user_event"),
+    )
+    op.create_index(
+        "idx_user_event_state_flags",
+        "user_event_state",
+        ["user_id", "saved", "attended"],
+    )
+    op.create_index(
+        "idx_user_event_state_updated",
+        "user_event_state",
+        ["user_id", "updated_at"],
     )
 
     op.create_table(
@@ -161,6 +186,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_index("idx_user_event_state_updated", table_name="user_event_state")
+    op.drop_index("idx_user_event_state_flags", table_name="user_event_state")
+    op.drop_table("user_event_state")
+
     op.drop_index("idx_jobs_key_state", table_name="jobs")
     op.drop_index("idx_jobs_source_created", table_name="jobs")
     op.drop_index("idx_jobs_owner_created", table_name="jobs")

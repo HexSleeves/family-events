@@ -12,6 +12,7 @@ from typing import Any
 
 import aiosqlite
 
+from src.cities import normalize_city_slug
 from src.config import settings
 from src.db.common import (
     USER_UPDATE_FIELDS,
@@ -25,7 +26,7 @@ from src.db.common import (
 from src.db.postgres import PostgresDatabase
 from src.timezones import as_local_date, utc_now, weekend_window_utc
 
-from .models import Event, EventTags, InterestProfile, Job, Source, User
+from .models import Event, EventTags, InterestProfile, Job, Source, User, UserEventState
 
 DEDUP_DEBUG = os.environ.get("DEDUP_DEBUG", "").lower() in {"1", "true", "yes", "on"}
 logger = logging.getLogger("uvicorn.error")
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS events (
     location_name   TEXT NOT NULL DEFAULT '',
     location_address TEXT NOT NULL DEFAULT '',
     location_city   TEXT NOT NULL DEFAULT 'Lafayette',
+    city_slug       TEXT NOT NULL DEFAULT 'lafayette',
     latitude        REAL,
     longitude       REAL,
     start_time      TEXT NOT NULL,
@@ -55,7 +57,6 @@ CREATE TABLE IF NOT EXISTS events (
     raw_data        TEXT NOT NULL DEFAULT '{}',
     tags            TEXT,
     score_breakdown TEXT,
-    attended        INTEGER NOT NULL DEFAULT 0,
     UNIQUE(source, source_id)
 );
 """
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS sources (
     url             TEXT NOT NULL UNIQUE,
     domain          TEXT NOT NULL,
     city            TEXT NOT NULL DEFAULT '',
+    city_slug       TEXT NOT NULL DEFAULT 'unknown',
     category        TEXT NOT NULL DEFAULT 'custom',
     user_id         TEXT,
     builtin         INTEGER NOT NULL DEFAULT 0,
@@ -78,6 +80,22 @@ CREATE TABLE IF NOT EXISTS sources (
     last_error      TEXT,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
+);
+"""
+
+_CREATE_USER_EVENT_STATE_TABLE = """
+CREATE TABLE IF NOT EXISTS user_event_state (
+    user_id         TEXT NOT NULL,
+    event_id        TEXT NOT NULL,
+    saved           INTEGER NOT NULL DEFAULT 0,
+    attended        INTEGER NOT NULL DEFAULT 0,
+    saved_at        TEXT,
+    attended_at     TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    UNIQUE(user_id, event_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE
 );
 """
 
@@ -122,10 +140,12 @@ CREATE TABLE IF NOT EXISTS jobs (
 _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_events_start_time ON events(start_time);",
     "CREATE INDEX IF NOT EXISTS idx_events_source ON events(source, source_id);",
-    "CREATE INDEX IF NOT EXISTS idx_events_city ON events(location_city);",
+    "CREATE INDEX IF NOT EXISTS idx_events_city ON events(city_slug);",
     "CREATE INDEX IF NOT EXISTS idx_events_tags ON events(tags) WHERE tags IS NULL;",
     "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);",
     "CREATE INDEX IF NOT EXISTS idx_sources_user_id ON sources(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_user_event_state_flags ON user_event_state(user_id, saved, attended);",
+    "CREATE INDEX IF NOT EXISTS idx_user_event_state_updated ON user_event_state(user_id, updated_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_jobs_owner_created ON jobs(owner_user_id, created_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_jobs_source_created ON jobs(source_id, created_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_jobs_key_state ON jobs(job_key, state);",
@@ -138,7 +158,13 @@ def _row_to_event(row: aiosqlite.Row) -> Event:
     # Booleans stored as 0/1
     d["is_recurring"] = bool(d["is_recurring"])
     d["is_free"] = bool(d["is_free"])
-    d["attended"] = bool(d["attended"])
+    viewer_saved = d.pop("viewer_saved", None)
+    viewer_attended = d.pop("viewer_attended", None)
+    if viewer_saved is not None or viewer_attended is not None:
+        d["viewer_state"] = UserEventState(
+            saved=bool(viewer_saved or 0),
+            attended=bool(viewer_attended or 0),
+        )
     # JSON fields
     d["raw_data"] = json.loads(str(d["raw_data"])) if d["raw_data"] else {}
     d["tags"] = EventTags.model_validate(json.loads(str(d["tags"]))) if d["tags"] else None
@@ -174,6 +200,7 @@ def _row_to_source(row: aiosqlite.Row) -> Source:
     d["builtin"] = bool(d["builtin"])
     d["enabled"] = bool(d["enabled"])
     d["city"] = str(d.get("city") or "")
+    d["city_slug"] = str(d.get("city_slug") or "unknown")
     d["category"] = str(d.get("category") or "custom")
     d["last_scraped_at"] = (
         datetime.fromisoformat(str(d["last_scraped_at"])) if d["last_scraped_at"] else None
@@ -204,6 +231,7 @@ def _event_to_params(event: Event) -> dict[str, Any]:
         "location_name": event.location_name,
         "location_address": event.location_address,
         "location_city": event.location_city,
+        "city_slug": event.city_slug,
         "latitude": event.latitude,
         "longitude": event.longitude,
         "start_time": event.start_time.isoformat(),
@@ -218,7 +246,6 @@ def _event_to_params(event: Event) -> dict[str, Any]:
         "raw_data": json.dumps(event.raw_data),
         "tags": (json.dumps(event.tags.model_dump()) if event.tags else None),
         "score_breakdown": json.dumps(event.score_breakdown) if event.score_breakdown else None,
-        "attended": int(event.attended),
     }
 
 
@@ -227,6 +254,33 @@ def _sqlite_path_from_url(database_url: str) -> str | None:
     if database_url.startswith(prefix):
         return database_url.removeprefix(prefix)
     return None
+
+
+def _event_query_parts(viewer_user_id: str | None) -> tuple[str, str, dict[str, Any]]:
+    if not viewer_user_id:
+        return "e.*", "", {}
+    return (
+        "e.*, COALESCE(ues.saved, 0) AS viewer_saved, COALESCE(ues.attended, 0) AS viewer_attended",
+        "LEFT JOIN user_event_state ues ON ues.event_id = e.id AND ues.user_id = :viewer_user_id",
+        {"viewer_user_id": viewer_user_id},
+    )
+
+
+def _add_city_slug_filter(
+    conditions: list[str],
+    params: dict[str, Any],
+    visible_city_slugs: list[str] | None,
+    *,
+    column: str = "e.city_slug",
+) -> None:
+    if not visible_city_slugs:
+        return
+    placeholders: list[str] = []
+    for index, city_slug in enumerate(visible_city_slugs):
+        key = f"visible_city_slug_{index}"
+        params[key] = city_slug
+        placeholders.append(f":{key}")
+    conditions.append(f"{column} IN ({', '.join(placeholders)})")
 
 
 class SqliteDatabase:
@@ -246,11 +300,13 @@ class SqliteDatabase:
         await self._db.execute(_CREATE_EVENTS_TABLE)
         await self._db.execute(_CREATE_SOURCES_TABLE)
         await self._db.execute(_CREATE_USERS_TABLE)
+        await self._db.execute(_CREATE_USER_EVENT_STATE_TABLE)
         await self._db.execute(_CREATE_JOBS_TABLE)
         # Migrations for existing databases
         for migration in [
             "ALTER TABLE sources ADD COLUMN user_id TEXT",
             "ALTER TABLE sources ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE sources ADD COLUMN city_slug TEXT NOT NULL DEFAULT 'unknown'",
             "ALTER TABLE sources ADD COLUMN category TEXT NOT NULL DEFAULT 'custom'",
             "ALTER TABLE users ADD COLUMN email_to TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN sms_to TEXT NOT NULL DEFAULT ''",
@@ -258,6 +314,7 @@ class SqliteDatabase:
             "ALTER TABLE users ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE events ADD COLUMN tagged_at TEXT",
             "ALTER TABLE events ADD COLUMN score_breakdown TEXT",
+            "ALTER TABLE events ADD COLUMN city_slug TEXT NOT NULL DEFAULT 'lafayette'",
         ]:
             with contextlib.suppress(Exception):
                 await self._db.execute(migration)
@@ -341,6 +398,11 @@ class SqliteDatabase:
         Also applies cross-source dedupe using fuzzy match on title/date/city.
         Returns the canonical event id (existing id if deduped).
         """
+        event.location_city = (event.location_city or "").strip()
+        if not event.location_city:
+            event.location_city = await self._fallback_event_city(event)
+        event.city_slug = normalize_city_slug(event.location_city)
+
         # 1) strict dedupe for source-local IDs
         async with self.db.execute(
             "SELECT id FROM events WHERE source = :source AND source_id = :source_id",
@@ -381,7 +443,11 @@ class SqliteDatabase:
                         END,
                         tags = COALESCE(tags, :tags),
                         score_breakdown = COALESCE(score_breakdown, :score_breakdown),
-                        attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
+                        city_slug = :city_slug,
+                        location_city = CASE
+                            WHEN (location_city IS NULL OR location_city = '' OR location_city = 'unknown') AND :location_city != '' THEN :location_city
+                            ELSE location_city
+                        END
                     WHERE id = :canonical_id
                     """,
                     params,
@@ -404,18 +470,18 @@ class SqliteDatabase:
             """
             INSERT INTO events (
                 id, source, source_url, source_id, title, description,
-                location_name, location_address, location_city,
+                location_name, location_address, location_city, city_slug,
                 latitude, longitude, start_time, end_time,
                 is_recurring, recurrence_rule, is_free,
                 price_min, price_max, image_url,
-                scraped_at, raw_data, tags, score_breakdown, attended
+                scraped_at, raw_data, tags, score_breakdown
             ) VALUES (
                 :id, :source, :source_url, :source_id, :title, :description,
-                :location_name, :location_address, :location_city,
+                :location_name, :location_address, :location_city, :city_slug,
                 :latitude, :longitude, :start_time, :end_time,
                 :is_recurring, :recurrence_rule, :is_free,
                 :price_min, :price_max, :image_url,
-                :scraped_at, :raw_data, :tags, :score_breakdown, :attended
+                :scraped_at, :raw_data, :tags, :score_breakdown
             )
             ON CONFLICT(source, source_id) DO UPDATE SET
                 source_url      = excluded.source_url,
@@ -424,6 +490,7 @@ class SqliteDatabase:
                 location_name   = excluded.location_name,
                 location_address = excluded.location_address,
                 location_city   = excluded.location_city,
+                city_slug       = excluded.city_slug,
                 latitude        = excluded.latitude,
                 longitude       = excluded.longitude,
                 start_time      = excluded.start_time,
@@ -449,6 +516,31 @@ class SqliteDatabase:
             row = await cursor.fetchone()
             return row["id"] if row else event.id
 
+    async def _fallback_event_city(self, event: Event) -> str:
+        source_id = ""
+        if event.source.startswith("custom:"):
+            source_id = event.source.removeprefix("custom:")
+        elif event.raw_data.get("source_id"):
+            source_id = str(event.raw_data.get("source_id"))
+
+        if source_id:
+            async with self.db.execute(
+                "SELECT city FROM sources WHERE id = :id", {"id": source_id}
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row and str(row["city"] or "").strip():
+                    return str(row["city"]).strip()
+
+        async with self.db.execute(
+            "SELECT city FROM sources WHERE url = :url",
+            {"url": event.source_url},
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row and str(row["city"] or "").strip():
+                return str(row["city"]).strip()
+
+        return "unknown"
+
     async def _find_duplicate_event_id(self, event: Event) -> tuple[str | None, str | None]:
         """Find a likely duplicate event across sources.
 
@@ -458,14 +550,14 @@ class SqliteDatabase:
         end = event.start_time + timedelta(hours=4)
         async with self.db.execute(
             """
-            SELECT id, title, source, source_id, start_time, location_city
+            SELECT id, title, source, source_id, start_time, city_slug
             FROM events
-            WHERE location_city = :city
+            WHERE city_slug = :city_slug
               AND start_time >= :start
               AND start_time <= :end
             """,
             {
-                "city": event.location_city,
+                "city_slug": event.city_slug,
                 "start": start.isoformat(),
                 "end": end.isoformat(),
             },
@@ -478,7 +570,7 @@ class SqliteDatabase:
                 (
                     f"{canonicalize_title(str(row['title']))}|"
                     f"{as_local_date(datetime.fromisoformat(str(row['start_time']))).isoformat()}|"
-                    f"{str(row['location_city']).lower().strip()}"
+                    f"{str(row['city_slug']).strip()}"
                 ).encode()
             ).hexdigest()
             if candidate_fp == fp:
@@ -495,19 +587,46 @@ class SqliteDatabase:
     # Queries
     # ------------------------------------------------------------------
 
-    async def get_events_for_weekend(self, sat_date: str, sun_date: str) -> list[Event]:
+    async def get_events_for_weekend(
+        self,
+        sat_date: str,
+        sun_date: str,
+        *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
+        attended: str = "",
+        saved: str = "",
+    ) -> list[Event]:
         """Return events whose local start date falls on the given Saturday or Sunday."""
         saturday = datetime.fromisoformat(sat_date).date()
         sunday = datetime.fromisoformat(sun_date).date()
         start, end = weekend_window_utc(saturday, sunday)
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :start", "e.start_time < :end"]
+        params: dict[str, Any] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            **extra_params,
+        }
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, 0) = 1")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, 0) = 0")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, 0) = 1")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, 0) = 0")
         async with self.db.execute(
-            """
-            SELECT * FROM events
-            WHERE start_time >= :start
-              AND start_time < :end
-            ORDER BY start_time
+            f"""
+            SELECT {select_cols}
+            FROM events e
+            {join_sql}
+            WHERE {" AND ".join(conditions)}
+            ORDER BY e.start_time
             """,
-            {"start": start.isoformat(), "end": end.isoformat()},
+            params,
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
@@ -580,16 +699,32 @@ class SqliteDatabase:
                 "last_tagged_at": datetime.fromisoformat(str(last_tagged)) if last_tagged else None,
             }
 
-    async def get_recent_events(self, days: int = 14) -> list[Event]:
+    async def get_recent_events(
+        self,
+        days: int = 14,
+        *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
+    ) -> list[Event]:
         """Return events with start_time within the next `days` days."""
         now_dt, future_dt = time_window(days)
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :now", "e.start_time <= :future"]
+        params: dict[str, Any] = {
+            "now": now_dt.isoformat(),
+            "future": future_dt.isoformat(),
+            **extra_params,
+        }
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
         async with self.db.execute(
-            """
-            SELECT * FROM events
-            WHERE start_time >= :now AND start_time <= :future
-            ORDER BY start_time
+            f"""
+            SELECT {select_cols}
+            FROM events e
+            {join_sql}
+            WHERE {" AND ".join(conditions)}
+            ORDER BY e.start_time
             """,
-            {"now": now_dt.isoformat(), "future": future_dt.isoformat()},
+            params,
         ) as cursor:
             rows = await cursor.fetchall()
             return [_row_to_event(r) for r in rows]
@@ -599,23 +734,39 @@ class SqliteDatabase:
         start: datetime,
         end: datetime,
         *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
         attended: str = "",
+        saved: str = "",
     ) -> list[Event]:
         """Return events in [start, end), optionally filtering attended status."""
-        conditions = ["start_time >= :start", "start_time < :end"]
-        params: dict[str, Any] = {"start": start.isoformat(), "end": end.isoformat()}
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :start", "e.start_time < :end"]
+        params: dict[str, Any] = {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            **extra_params,
+        }
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
 
-        if attended == "yes":
-            conditions.append("attended = 1")
-        elif attended == "no":
-            conditions.append("attended = 0")
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, 0) = 1")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, 0) = 0")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, 0) = 1")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, 0) = 0")
 
         where = " AND ".join(conditions)
         async with self.db.execute(
             f"""
-            SELECT * FROM events
+            SELECT {select_cols}
+            FROM events e
+            {join_sql}
             WHERE {where}
-            ORDER BY start_time
+            ORDER BY e.start_time
             """,
             params,
         ) as cursor:
@@ -626,11 +777,14 @@ class SqliteDatabase:
         self,
         *,
         days: int = 30,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
         q: str = "",
         city: str = "",
         source: str = "",
         tagged: str = "",
         attended: str = "",
+        saved: str = "",
         score_min: int | None = None,
         sort: str = "start_time",
         page: int = 1,
@@ -655,66 +809,79 @@ class SqliteDatabase:
         """
         now_dt, future_dt = time_window(days)
 
-        conditions = ["start_time >= :now", "start_time <= :future"]
-        params: dict[str, Any] = {"now": now_dt.isoformat(), "future": future_dt.isoformat()}
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :now", "e.start_time <= :future"]
+        params: dict[str, Any] = {
+            "now": now_dt.isoformat(),
+            "future": future_dt.isoformat(),
+            **extra_params,
+        }
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
 
         if q:
-            conditions.append("(title LIKE :q OR description LIKE :q)")
+            conditions.append("(e.title LIKE :q OR e.description LIKE :q)")
             params["q"] = f"%{q}%"
 
         if city:
-            conditions.append("location_city = :city")
-            params["city"] = city
+            conditions.append("e.city_slug = :city_slug")
+            params["city_slug"] = normalize_city_slug(city)
 
         if source:
-            conditions.append("source = :source")
+            conditions.append("e.source = :source")
             params["source"] = source
 
         if tagged == "yes":
-            conditions.append("tags IS NOT NULL")
+            conditions.append("e.tags IS NOT NULL")
         elif tagged == "no":
-            conditions.append("tags IS NULL")
+            conditions.append("e.tags IS NULL")
 
-        if attended == "yes":
-            conditions.append("attended = 1")
-        elif attended == "no":
-            conditions.append("attended = 0")
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, 0) = 1")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, 0) = 0")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, 0) = 1")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, 0) = 0")
 
         if score_min is not None:
             conditions.append(
-                "tags IS NOT NULL AND CAST(json_extract(tags, '$.toddler_score') AS INTEGER) >= :score_min"
+                "e.tags IS NOT NULL AND CAST(json_extract(e.tags, '$.toddler_score') AS INTEGER) >= :score_min"
             )
             params["score_min"] = score_min
 
         where = " AND ".join(conditions)
 
         # Count total
-        count_sql = f"SELECT COUNT(*) FROM events WHERE {where}"
+        count_sql = f"SELECT COUNT(*) FROM events e {join_sql} WHERE {where}"
         async with self.db.execute(count_sql, params) as cursor:
             row = await cursor.fetchone()
             total = row[0] if row else 0
 
         # Determine sort
         _valid_sorts = {
-            "start_time": "start_time",
-            "-start_time": "start_time DESC",
-            "title": "title",
-            "-title": "title DESC",
-            "city": "location_city",
-            "-city": "location_city DESC",
-            "source": "source",
-            "-source": "source DESC",
-            "score": "CAST(json_extract(tags, '$.toddler_score') AS INTEGER)",
-            "-score": "CAST(json_extract(tags, '$.toddler_score') AS INTEGER) DESC",
+            "start_time": "e.start_time",
+            "-start_time": "e.start_time DESC",
+            "title": "e.title",
+            "-title": "e.title DESC",
+            "city": "e.location_city",
+            "-city": "e.location_city DESC",
+            "source": "e.source",
+            "-source": "e.source DESC",
+            "score": "CAST(json_extract(e.tags, '$.toddler_score') AS INTEGER)",
+            "-score": "CAST(json_extract(e.tags, '$.toddler_score') AS INTEGER) DESC",
         }
-        order_clause = _valid_sorts.get(sort, "start_time")
+        order_clause = _valid_sorts.get(sort, "e.start_time")
 
         offset = (page - 1) * per_page
         params["limit"] = per_page
         params["offset"] = offset
 
         query_sql = f"""
-            SELECT * FROM events
+            SELECT {select_cols}
+            FROM events e
+            {join_sql}
             WHERE {where}
             ORDER BY {order_clause}
             LIMIT :limit OFFSET :offset
@@ -725,16 +892,34 @@ class SqliteDatabase:
 
         return events, int(total)
 
-    async def get_filter_options(self) -> dict[str, list[str]]:
+    async def get_filter_options(
+        self,
+        *,
+        visible_city_slugs: list[str] | None = None,
+    ) -> dict[str, list[str]]:
         """Return distinct values for filter dropdowns."""
+        city_conditions: list[str] = []
+        city_params: dict[str, Any] = {}
+        _add_city_slug_filter(city_conditions, city_params, visible_city_slugs, column="city_slug")
+        city_where = f"WHERE {' AND '.join(city_conditions)}" if city_conditions else ""
         cities: list[str] = []
         async with self.db.execute(
-            "SELECT DISTINCT location_city FROM events ORDER BY location_city"
+            f"""
+            SELECT MIN(location_city) AS location_city
+            FROM events
+            {city_where}
+            GROUP BY city_slug
+            ORDER BY location_city
+            """,
+            city_params,
         ) as cursor:
-            cities = [row[0] for row in await cursor.fetchall()]
+            cities = [row[0] for row in await cursor.fetchall() if row[0]]
 
         sources: list[str] = []
-        async with self.db.execute("SELECT DISTINCT source FROM events ORDER BY source") as cursor:
+        async with self.db.execute(
+            f"SELECT DISTINCT source FROM events {city_where} ORDER BY source",
+            city_params,
+        ) as cursor:
             sources = [row[0] for row in await cursor.fetchall()]
 
         return {"cities": cities, "sources": sources}
@@ -745,14 +930,15 @@ class SqliteDatabase:
 
     async def create_source(self, source: Source) -> str:
         """Insert a new source. Returns the source id."""
+        source.city_slug = normalize_city_slug(source.city)
         await self.db.execute(
             """
             INSERT INTO sources (
-                id, name, url, domain, city, category, user_id, builtin, recipe_json,
+                id, name, url, domain, city, city_slug, category, user_id, builtin, recipe_json,
                 enabled, status, last_scraped_at, last_event_count,
                 last_error, created_at, updated_at
             ) VALUES (
-                :id, :name, :url, :domain, :city, :category, :user_id, :builtin, :recipe_json,
+                :id, :name, :url, :domain, :city, :city_slug, :category, :user_id, :builtin, :recipe_json,
                 :enabled, :status, :last_scraped_at, :last_event_count,
                 :last_error, :created_at, :updated_at
             )
@@ -763,6 +949,7 @@ class SqliteDatabase:
                 "url": source.url,
                 "domain": source.domain,
                 "city": source.city,
+                "city_slug": source.city_slug,
                 "category": source.category,
                 "user_id": source.user_id,
                 "builtin": int(source.builtin),
@@ -781,10 +968,13 @@ class SqliteDatabase:
         await self.db.commit()
         return source.id
 
-    async def get_event(self, event_id: str) -> Event | None:
+    async def get_event(self, event_id: str, *, viewer_user_id: str | None = None) -> Event | None:
         """Get a single event by id."""
+        select_cols, join_sql, params = _event_query_parts(viewer_user_id)
+        params["id"] = event_id
         async with self.db.execute(
-            "SELECT * FROM events WHERE id = :id", {"id": event_id}
+            f"SELECT {select_cols} FROM events e {join_sql} WHERE e.id = :id",
+            params,
         ) as cursor:
             row = await cursor.fetchone()
             return _row_to_event(row) if row else None
@@ -898,27 +1088,188 @@ class SqliteDatabase:
         await self.db.execute("DELETE FROM sources WHERE id = :id", {"id": source_id})
         await self.db.commit()
 
-    async def mark_attended(self, event_id: str) -> None:
-        """Mark an event as attended."""
-        await self.set_attended(event_id, attended=True)
-
-    async def set_attended(self, event_id: str, *, attended: bool) -> None:
-        """Set attendance flag for a single event."""
+    async def get_or_create_user_event_state(self, user_id: str, event_id: str) -> UserEventState:
+        now = utc_now().isoformat()
         await self.db.execute(
-            "UPDATE events SET attended = :attended WHERE id = :id",
-            {"attended": int(attended), "id": event_id},
+            """
+            INSERT INTO user_event_state (
+                user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+            ) VALUES (
+                :user_id, :event_id, 0, 0, NULL, NULL, :now, :now
+            )
+            ON CONFLICT(user_id, event_id) DO NOTHING
+            """,
+            {"user_id": user_id, "event_id": event_id, "now": now},
+        )
+        await self.db.commit()
+        async with self.db.execute(
+            """
+            SELECT saved, attended
+            FROM user_event_state
+            WHERE user_id = :user_id AND event_id = :event_id
+            """,
+            {"user_id": user_id, "event_id": event_id},
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return UserEventState()
+            return UserEventState(saved=bool(row["saved"]), attended=bool(row["attended"]))
+
+    async def set_event_saved(self, user_id: str, event_id: str, saved: bool) -> None:
+        now = utc_now().isoformat()
+        await self.db.execute(
+            """
+            INSERT INTO user_event_state (
+                user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+            ) VALUES (
+                :user_id, :event_id, :saved, 0, :saved_at, NULL, :now, :now
+            )
+            ON CONFLICT(user_id, event_id) DO UPDATE SET
+                saved = :saved,
+                saved_at = :saved_at,
+                updated_at = :now
+            """,
+            {
+                "user_id": user_id,
+                "event_id": event_id,
+                "saved": int(saved),
+                "saved_at": now if saved else None,
+                "now": now,
+            },
         )
         await self.db.commit()
 
-    async def set_attended_bulk(self, event_ids: list[str], *, attended: bool) -> None:
-        """Set attendance for multiple events."""
+    async def set_event_attended(self, user_id: str, event_id: str, attended: bool) -> None:
+        now = utc_now().isoformat()
+        await self.db.execute(
+            """
+            INSERT INTO user_event_state (
+                user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+            ) VALUES (
+                :user_id, :event_id, 0, :attended, NULL, :attended_at, :now, :now
+            )
+            ON CONFLICT(user_id, event_id) DO UPDATE SET
+                attended = :attended,
+                attended_at = :attended_at,
+                updated_at = :now
+            """,
+            {
+                "user_id": user_id,
+                "event_id": event_id,
+                "attended": int(attended),
+                "attended_at": now if attended else None,
+                "now": now,
+            },
+        )
+        await self.db.commit()
+
+    async def set_event_attended_bulk(
+        self, user_id: str, event_ids: list[str], attended: bool
+    ) -> None:
         if not event_ids:
             return
+        now = utc_now().isoformat()
         await self.db.executemany(
-            "UPDATE events SET attended = ? WHERE id = ?",
-            [(int(attended), event_id) for event_id in event_ids],
+            """
+            INSERT INTO user_event_state (
+                user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+            ) VALUES (?, ?, 0, ?, NULL, ?, ?, ?)
+            ON CONFLICT(user_id, event_id) DO UPDATE SET
+                attended = excluded.attended,
+                attended_at = excluded.attended_at,
+                updated_at = excluded.updated_at
+            """,
+            [
+                (
+                    user_id,
+                    event_id,
+                    int(attended),
+                    now if attended else None,
+                    now,
+                    now,
+                )
+                for event_id in event_ids
+            ],
         )
         await self.db.commit()
+
+    async def list_my_events(
+        self,
+        *,
+        viewer_user_id: str,
+        q: str = "",
+        city: str = "",
+        source: str = "",
+        tagged: str = "",
+        attended: str = "",
+        saved: str = "",
+        sort: str = "-start_time",
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[Event], int]:
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["(COALESCE(ues.saved, 0) = 1 OR COALESCE(ues.attended, 0) = 1)"]
+        params: dict[str, Any] = dict(extra_params)
+
+        if q:
+            conditions.append("(e.title LIKE :q OR e.description LIKE :q)")
+            params["q"] = f"%{q}%"
+        if city:
+            conditions.append("e.city_slug = :city_slug")
+            params["city_slug"] = normalize_city_slug(city)
+        if source:
+            conditions.append("e.source = :source")
+            params["source"] = source
+        if tagged == "yes":
+            conditions.append("e.tags IS NOT NULL")
+        elif tagged == "no":
+            conditions.append("e.tags IS NULL")
+        if attended == "yes":
+            conditions.append("COALESCE(ues.attended, 0) = 1")
+        elif attended == "no":
+            conditions.append("COALESCE(ues.attended, 0) = 0")
+        if saved == "yes":
+            conditions.append("COALESCE(ues.saved, 0) = 1")
+        elif saved == "no":
+            conditions.append("COALESCE(ues.saved, 0) = 0")
+
+        where = " AND ".join(conditions)
+        valid_sorts = {
+            "start_time": "e.start_time",
+            "-start_time": "e.start_time DESC",
+            "title": "e.title",
+            "-title": "e.title DESC",
+            "city": "e.location_city",
+            "-city": "e.location_city DESC",
+            "source": "e.source",
+            "-source": "e.source DESC",
+            "score": "CAST(json_extract(e.tags, '$.toddler_score') AS INTEGER)",
+            "-score": "CAST(json_extract(e.tags, '$.toddler_score') AS INTEGER) DESC",
+        }
+        order_clause = valid_sorts.get(sort, "e.start_time DESC")
+        params["limit"] = per_page
+        params["offset"] = (page - 1) * per_page
+
+        async with self.db.execute(
+            f"SELECT COUNT(*) FROM events e {join_sql} WHERE {where}",
+            params,
+        ) as cursor:
+            row = await cursor.fetchone()
+            total = int(row[0] if row else 0)
+
+        async with self.db.execute(
+            f"""
+            SELECT {select_cols}
+            FROM events e
+            {join_sql}
+            WHERE {where}
+            ORDER BY {order_clause}
+            LIMIT :limit OFFSET :offset
+            """,
+            params,
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [_row_to_event(row) for row in rows], total
 
     # ------------------------------------------------------------------
     # Jobs CRUD
@@ -1250,10 +1601,42 @@ class SqliteDatabase:
                         END,
                         tags = COALESCE(tags, :tags),
                         score_breakdown = COALESCE(score_breakdown, :score_breakdown),
-                        attended = CASE WHEN attended = 1 OR :attended = 1 THEN 1 ELSE 0 END
+                        city_slug = :city_slug,
+                        location_city = CASE
+                            WHEN (location_city IS NULL OR location_city = '' OR location_city = 'unknown') AND :location_city != '' THEN :location_city
+                            ELSE location_city
+                        END
                     WHERE id = :canonical_id
                     """,
                     params,
+                )
+                await self.db.execute(
+                    """
+                    INSERT INTO user_event_state (
+                        user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                    )
+                    SELECT
+                        user_id,
+                        :canonical_id,
+                        saved,
+                        attended,
+                        saved_at,
+                        attended_at,
+                        created_at,
+                        updated_at
+                    FROM user_event_state
+                    WHERE event_id = :duplicate_id
+                    ON CONFLICT(user_id, event_id) DO UPDATE SET
+                        saved = CASE WHEN user_event_state.saved = 1 OR excluded.saved = 1 THEN 1 ELSE 0 END,
+                        attended = CASE WHEN user_event_state.attended = 1 OR excluded.attended = 1 THEN 1 ELSE 0 END,
+                        saved_at = COALESCE(user_event_state.saved_at, excluded.saved_at),
+                        attended_at = COALESCE(user_event_state.attended_at, excluded.attended_at),
+                        updated_at = CASE
+                            WHEN user_event_state.updated_at > excluded.updated_at THEN user_event_state.updated_at
+                            ELSE excluded.updated_at
+                        END
+                    """,
+                    {"canonical_id": duplicate_of.id, "duplicate_id": event.id},
                 )
                 await self.db.execute("DELETE FROM events WHERE id = :id", {"id": event.id})
                 merged += 1

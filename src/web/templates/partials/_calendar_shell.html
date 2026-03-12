@@ -1,4 +1,5 @@
 {% set showing_attended = attended == 'yes' %}
+{% set current_scope = scope|default('all') %}
 <section id="calendar-shell"
          class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
   <div class="space-y-5">
@@ -7,7 +8,7 @@
         <div class="flex flex-wrap items-center gap-3">
           <nav class="inline-flex items-center rounded-2xl border border-[var(--color-edge)] bg-[var(--color-surface-secondary)] p-1"
                aria-label="Month navigation">
-            <button hx-get="/calendars?month={{ prev_month.strftime("%Y-%m") }}{% if attended %}&attended={{ attended }}{% endif %}"
+            <button hx-get="/calendars?month={{ prev_month.strftime("%Y-%m") }}&scope={{ current_scope }}{% if attended %}&attended={{ attended }}{% endif %}"
                     hx-target="#calendar-shell"
                     hx-select="#calendar-shell"
                     hx-swap="outerHTML"
@@ -19,7 +20,7 @@
             <div class="px-4 py-2 text-sm font-semibold text-[var(--color-heading)] min-w-[170px] text-center"
                  aria-live="polite"
                  aria-atomic="true">{{ month_label }}</div>
-            <button hx-get="/calendars?month={{ next_month.strftime("%Y-%m") }}{% if attended %}&attended={{ attended }}{% endif %}"
+            <button hx-get="/calendars?month={{ next_month.strftime("%Y-%m") }}&scope={{ current_scope }}{% if attended %}&attended={{ attended }}{% endif %}"
                     hx-target="#calendar-shell"
                     hx-select="#calendar-shell"
                     hx-swap="outerHTML"
@@ -29,33 +30,53 @@
               <i data-lucide="chevron-right" class="w-4 h-4" aria-hidden="true"></i>
             </button>
           </nav>
-          <div role="tablist"
-               aria-label="Calendar filter"
-               class="inline-flex items-center rounded-2xl border border-[var(--color-edge)] bg-[var(--color-surface)] p-1">
-            <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}"
-                    hx-target="#calendar-shell"
-                    hx-select="#calendar-shell"
-                    hx-swap="outerHTML"
-                    hx-push-url="true"
-                    role="tab"
-                    aria-selected="{{ 'true' if not showing_attended else 'false' }}"
-                    class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if not showing_attended %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-              All events
-            </button>
-            <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}&attended=yes"
-                    hx-target="#calendar-shell"
-                    hx-select="#calendar-shell"
-                    hx-swap="outerHTML"
-                    hx-push-url="true"
-                    role="tab"
-                    aria-selected="{{ 'true' if showing_attended else 'false' }}"
-                    class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if showing_attended %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
-              Attended only
-            </button>
-          </div>
+          {% if current_user %}
+            <div class="inline-flex items-center rounded-2xl border border-[var(--color-edge)] bg-[var(--color-surface)] p-1">
+              <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}&scope=nearby{% if attended %}&attended={{ attended }}{% endif %}"
+                      hx-target="#calendar-shell"
+                      hx-select="#calendar-shell"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if current_scope == 'nearby' %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+                Near Me
+              </button>
+              <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}&scope=all{% if attended %}&attended={{ attended }}{% endif %}"
+                      hx-target="#calendar-shell"
+                      hx-select="#calendar-shell"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if current_scope == 'all' %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+                All Cities
+              </button>
+            </div>
+            <div role="tablist"
+                 aria-label="Calendar filter"
+                 class="inline-flex items-center rounded-2xl border border-[var(--color-edge)] bg-[var(--color-surface)] p-1">
+              <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}&scope={{ current_scope }}"
+                      hx-target="#calendar-shell"
+                      hx-select="#calendar-shell"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      role="tab"
+                      aria-selected="{{ 'true' if not showing_attended else 'false' }}"
+                      class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if not showing_attended %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+                All events
+              </button>
+              <button hx-get="/calendars?month={{ month_start.strftime("%Y-%m") }}&scope={{ current_scope }}&attended=yes"
+                      hx-target="#calendar-shell"
+                      hx-select="#calendar-shell"
+                      hx-swap="outerHTML"
+                      hx-push-url="true"
+                      role="tab"
+                      aria-selected="{{ 'true' if showing_attended else 'false' }}"
+                      class="px-4 py-2 rounded-xl text-sm font-medium transition-colors {% if showing_attended %}bg-[var(--color-brand)] text-white shadow-sm{% else %}text-[var(--color-muted)] hover:text-[var(--color-heading)]{% endif %}">
+                Attended only
+              </button>
+            </div>
+          {% endif %}
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <a href="/calendar.ics?month={{ month_start.strftime("%Y-%m") }}{% if attended %}&attended={{ attended }}{% endif %}"
+          <a href="/calendar.ics?month={{ month_start.strftime("%Y-%m") }}&scope={{ current_scope }}{% if attended %}&attended={{ attended }}{% endif %}"
              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--color-edge)] bg-[var(--color-surface)] text-sm font-medium text-[var(--color-body)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors touch-target">
             <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i> Export .ics
           </a>
@@ -110,7 +131,7 @@
           </h2>
           <p class="text-sm text-[var(--color-muted)]">Next events from this month.</p>
         </div>
-        <a href="/events"
+        <a href="/events?scope={{ current_scope }}"
            class="text-sm font-medium text-[var(--color-accent)] hover:underline inline-flex items-center gap-1">
           Browse all <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
         </a>
@@ -128,7 +149,7 @@
                     {{ event.start_time.strftime("%a, %b %-d · %-I:%M %p") }}
                   </p>
                 </div>
-                {% if event.attended %}
+                {% if event.viewer_state and event.viewer_state.attended %}
                   <span class="shrink-0 rounded-full bg-[var(--color-success)]/12 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-success)]">Attended</span>
                 {% endif %}
               </div>

@@ -44,14 +44,14 @@
                         {{ event.start_time.strftime("%-I:%M %p") }}
                       </p>
                     </div>
-                    {% if event.attended %}
+                    {% if event.viewer_state and event.viewer_state.attended %}
                       <span class="mt-0.5 shrink-0 text-[11px]" aria-hidden="true">✅</span>
                     {% endif %}
                   </div>
                 </a>
               {% endfor %}
               {% if cell.event_count > 4 %}
-                <a href="/events?month={{ month_start.strftime("%Y-%m") }}"
+                <a href="/events?scope={{ scope|default('all') }}&month={{ month_start.strftime("%Y-%m") }}"
                    class="block px-1 text-[11px] font-medium text-[var(--color-accent)] hover:underline">+{{ cell.event_count - 4 }} more events</a>
               {% endif %}
             {% else %}

@@ -3,11 +3,19 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from src.db.models import Event
+from src.db.models import Event, EventTags
 
 
-async def _create_event(client, *, title: str, city: str = "Lafayette") -> Event:
+async def _create_event(
+    client,
+    *,
+    title: str,
+    city: str = "Lafayette",
+    start_time: datetime | None = None,
+    tags: EventTags | None = None,
+) -> Event:
     now = datetime.now(tz=UTC)
+    event_start = start_time or (now + timedelta(days=1))
     event = Event(
         id=str(uuid4()),
         source="manual",
@@ -18,10 +26,11 @@ async def _create_event(client, *, title: str, city: str = "Lafayette") -> Event
         location_name="Test Venue",
         location_address="123 Main St",
         location_city=city,
-        start_time=now + timedelta(days=1),
-        end_time=now + timedelta(days=1, hours=2),
+        start_time=event_start,
+        end_time=event_start + timedelta(hours=2),
         scraped_at=now,
         raw_data={},
+        tags=tags,
     )
     await client.app.state.db.upsert_event(event)
     return event
@@ -99,16 +108,23 @@ def test_api_events_returns_paginated_filtered_payload(client, create_user) -> N
 
     from tests.test_security import login
 
-    user = create_user(email="events-api@example.com")
+    user = create_user(email="events-api@example.com", home_city="Baton Rouge")
     login(client, email=user.email)
 
     first = asyncio.run(_create_event(client, title="Alpha Story Time", city="Lafayette"))
     second = asyncio.run(_create_event(client, title="Zoo Morning", city="Baton Rouge"))
-    asyncio.run(client.app.state.db.mark_attended(second.id))
+    asyncio.run(client.app.state.db.set_event_attended(user.id, second.id, True))
+    asyncio.run(client.app.state.db.set_event_saved(user.id, second.id, True))
 
     response = client.get(
         "/api/events",
-        params={"page": 1, "per_page": 1, "city": "Baton Rouge", "attended": "yes"},
+        params={
+            "page": 1,
+            "per_page": 1,
+            "city": "Baton Rouge",
+            "attended": "yes",
+            "saved": "yes",
+        },
     )
 
     assert response.status_code == 200
@@ -116,11 +132,13 @@ def test_api_events_returns_paginated_filtered_payload(client, create_user) -> N
     assert payload["pagination"] == {"page": 1, "per_page": 1, "total": 1, "total_pages": 1}
     assert payload["filters"]["city"] == "Baton Rouge"
     assert payload["filters"]["attended"] == "yes"
+    assert payload["filters"]["saved"] == "yes"
     assert len(payload["items"]) == 1
     assert payload["items"][0]["id"] == second.id
     assert payload["items"][0]["title"] == "Zoo Morning"
-    assert payload["items"][0]["attended"] is True
     assert payload["items"][0]["city"] == "Baton Rouge"
+    assert payload["items"][0]["city_slug"] == "baton-rouge"
+    assert payload["items"][0]["viewer_state"] == {"saved": True, "attended": True}
     assert all(item["id"] != first.id for item in payload["items"])
 
 
@@ -134,3 +152,154 @@ def test_api_events_rejects_invalid_filter_values(client, create_user) -> None:
 
     assert response.status_code == 422
     assert response.json() == {"detail": "tagged must be yes or no"}
+
+
+def test_events_logged_in_default_scope_is_nearby_and_city_override_wins(client, create_user) -> None:
+    import asyncio
+
+    from tests.test_security import login
+
+    user = create_user(email="nearby@example.com", home_city="Lafayette")
+    login(client, email=user.email)
+
+    lafayette = asyncio.run(_create_event(client, title="Lafayette Story Time", city="Lafayette"))
+    san_francisco = asyncio.run(_create_event(client, title="Golden Gate Kids Day", city="San Francisco"))
+
+    nearby = client.get("/events")
+    assert nearby.status_code == 200
+    assert lafayette.title in nearby.text
+    assert san_francisco.title not in nearby.text
+
+    all_cities = client.get("/events", params={"scope": "all"})
+    assert all_cities.status_code == 200
+    assert lafayette.title in all_cities.text
+    assert san_francisco.title in all_cities.text
+
+    explicit_city = client.get("/events", params={"city": "San Francisco"})
+    assert explicit_city.status_code == 200
+    assert san_francisco.title in explicit_city.text
+    assert lafayette.title not in explicit_city.text
+
+
+def test_my_events_shows_saved_and_attended_across_all_cities(client, create_user) -> None:
+    import asyncio
+
+    from tests.test_security import login
+
+    user = create_user(email="my-events@example.com", home_city="Lafayette")
+    login(client, email=user.email)
+
+    saved_event = asyncio.run(_create_event(client, title="Saved Austin Zoo", city="Austin"))
+    attended_event = asyncio.run(_create_event(client, title="Attended Bay Story Time", city="San Francisco"))
+    asyncio.run(client.app.state.db.set_event_saved(user.id, saved_event.id, True))
+    asyncio.run(client.app.state.db.set_event_attended(user.id, attended_event.id, True))
+
+    response = client.get("/my-events")
+
+    assert response.status_code == 200
+    assert saved_event.title in response.text
+    assert attended_event.title in response.text
+
+
+def test_shared_corpus_is_hidden_by_default_for_other_users_but_visible_in_all_scope(
+    client, create_user
+) -> None:
+    import asyncio
+
+    from tests.test_security import login
+
+    create_user(email="sf-parent@example.com", home_city="San Francisco")
+    louisiana_user = create_user(email="la-parent@example.com", home_city="Lafayette")
+
+    sf_event = asyncio.run(_create_event(client, title="Golden Gate Play Day", city="San Francisco"))
+    lafayette_event = asyncio.run(_create_event(client, title="Acadiana Story Time", city="Lafayette"))
+
+    login(client, email=louisiana_user.email)
+
+    nearby = client.get("/events")
+    assert nearby.status_code == 200
+    assert lafayette_event.title in nearby.text
+    assert sf_event.title not in nearby.text
+
+    all_cities = client.get("/events", params={"scope": "all"})
+    assert all_cities.status_code == 200
+    assert sf_event.title in all_cities.text
+
+    explicit_city = client.get("/events", params={"city": "San Francisco"})
+    assert explicit_city.status_code == 200
+    assert sf_event.title in explicit_city.text
+
+
+def test_calendar_logged_in_defaults_to_nearby_scope(client, create_user) -> None:
+    import asyncio
+
+    from tests.test_security import login
+
+    user = create_user(email="calendar-scope@example.com", home_city="Lafayette")
+    login(client, email=user.email)
+
+    now = datetime.now(tz=UTC)
+    lafayette_event = asyncio.run(
+        _create_event(client, title="Calendar Lafayette", city="Lafayette", start_time=now + timedelta(days=2))
+    )
+    san_francisco_event = asyncio.run(
+        _create_event(
+            client,
+            title="Calendar San Francisco",
+            city="San Francisco",
+            start_time=now + timedelta(days=3),
+        )
+    )
+    month = (now + timedelta(days=2)).strftime("%Y-%m")
+
+    response = client.get("/calendars", params={"month": month})
+
+    assert response.status_code == 200
+    assert lafayette_event.title in response.text
+    assert san_francisco_event.title not in response.text
+
+    response_all = client.get("/calendars", params={"month": month, "scope": "all"})
+    assert response_all.status_code == 200
+    assert san_francisco_event.title in response_all.text
+
+
+def test_weekend_logged_in_defaults_to_nearby_scope(client, create_user) -> None:
+    import asyncio
+
+    from src.timezones import current_weekend_dates, weekend_window_utc
+    from tests.test_security import login
+
+    user = create_user(email="weekend-scope@example.com", home_city="Lafayette")
+    login(client, email=user.email)
+
+    saturday, sunday = current_weekend_dates()
+    weekend_start, _weekend_end = weekend_window_utc(saturday, sunday)
+    weekend_start = weekend_start + timedelta(hours=6)
+    nearby_event = asyncio.run(
+        _create_event(
+            client,
+            title="Weekend Lafayette",
+            city="Lafayette",
+            start_time=weekend_start,
+            tags=EventTags(toddler_score=8),
+        )
+    )
+    far_event = asyncio.run(
+        _create_event(
+            client,
+            title="Weekend San Francisco",
+            city="San Francisco",
+            start_time=weekend_start + timedelta(hours=1),
+            tags=EventTags(toddler_score=7),
+        )
+    )
+
+    response = client.get("/weekend")
+
+    assert response.status_code == 200
+    assert nearby_event.title in response.text
+    assert far_event.title not in response.text
+
+    response_all = client.get("/weekend", params={"scope": "all"})
+    assert response_all.status_code == 200
+    assert far_event.title in response_all.text

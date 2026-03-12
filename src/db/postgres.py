@@ -10,9 +10,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from src.cities import normalize_city_slug
 from src.config import settings
 from src.db.common import (
     USER_UPDATE_FIELDS,
@@ -24,7 +25,7 @@ from src.db.common import (
     title_similarity,
 )
 from src.db.migrations import ensure_postgres_schema_current
-from src.db.models import Event, EventTags, InterestProfile, Job, Source, User
+from src.db.models import Event, EventTags, InterestProfile, Job, Source, User, UserEventState
 from src.db.session import get_engine, get_sessionmaker
 from src.timezones import as_local_date, utc_now, weekend_window_utc
 
@@ -51,6 +52,13 @@ def _normalize_uuid(value: Any) -> str | None:
 def _row_to_event(row: Any) -> Event:
     data = dict(row)
     data["id"] = _normalize_uuid(data.get("id"))
+    viewer_saved = data.pop("viewer_saved", None)
+    viewer_attended = data.pop("viewer_attended", None)
+    if viewer_saved is not None or viewer_attended is not None:
+        data["viewer_state"] = UserEventState(
+            saved=bool(viewer_saved or False),
+            attended=bool(viewer_attended or False),
+        )
     tags = data.get("tags")
     data["tags"] = EventTags.model_validate(tags) if tags else None
     return Event.model_validate(data)
@@ -79,6 +87,29 @@ def _row_to_source(row: Any) -> Source:
     data["id"] = _normalize_uuid(data.get("id"))
     data["user_id"] = _normalize_uuid(data.get("user_id"))
     return Source.model_validate(data)
+
+
+def _event_query_parts(viewer_user_id: str | None) -> tuple[str, str, dict[str, Any]]:
+    if not viewer_user_id:
+        return "e.*", "", {}
+    return (
+        "e.*, COALESCE(ues.saved, false) AS viewer_saved, COALESCE(ues.attended, false) AS viewer_attended",
+        "LEFT JOIN user_event_state ues ON ues.event_id = e.id AND ues.user_id = :viewer_user_id",
+        {"viewer_user_id": _uuid_param(viewer_user_id)},
+    )
+
+
+def _add_city_slug_filter(
+    conditions: list[str],
+    params: dict[str, Any],
+    visible_city_slugs: list[str] | None,
+    *,
+    column: str = "e.city_slug",
+) -> None:
+    if not visible_city_slugs:
+        return
+    conditions.append(f"{column} = ANY(:visible_city_slugs)")
+    params["visible_city_slugs"] = visible_city_slugs
 
 
 class PostgresDatabase:
@@ -147,7 +178,11 @@ class PostgresDatabase:
             }
 
     async def upsert_event(self, event: Event) -> str:
+        event.location_city = (event.location_city or "").strip()
         async with self.session() as session:
+            if not event.location_city:
+                event.location_city = await self._fallback_event_city(event, session=session)
+            event.city_slug = normalize_city_slug(event.location_city)
             existing_result = await session.execute(
                 text("SELECT id FROM events WHERE source = :source AND source_id = :source_id"),
                 {"source": event.source, "source_id": event.source_id},
@@ -187,7 +222,11 @@ class PostgresDatabase:
                                 END,
                                 tags = COALESCE(tags, CAST(:tags AS jsonb)),
                                 score_breakdown = COALESCE(score_breakdown, CAST(:score_breakdown AS jsonb)),
-                                attended = attended OR :attended
+                                city_slug = :city_slug,
+                                location_city = CASE
+                                    WHEN (location_city IS NULL OR location_city = '' OR location_city = 'unknown') AND :location_city != '' THEN :location_city
+                                    ELSE location_city
+                                END
                             WHERE id = :canonical_id
                             """
                         ),
@@ -201,18 +240,18 @@ class PostgresDatabase:
                     """
                     INSERT INTO events (
                         id, source, source_url, source_id, title, description,
-                        location_name, location_address, location_city,
+                        location_name, location_address, location_city, city_slug,
                         latitude, longitude, start_time, end_time,
                         is_recurring, recurrence_rule, is_free,
                         price_min, price_max, image_url,
-                        scraped_at, raw_data, tags, tagged_at, score_breakdown, attended
+                        scraped_at, raw_data, tags, tagged_at, score_breakdown
                     ) VALUES (
                         :id, :source, :source_url, :source_id, :title, :description,
-                        :location_name, :location_address, :location_city,
+                        :location_name, :location_address, :location_city, :city_slug,
                         :latitude, :longitude, :start_time, :end_time,
                         :is_recurring, :recurrence_rule, :is_free,
                         :price_min, :price_max, :image_url,
-                        :scraped_at, CAST(:raw_data AS jsonb), CAST(:tags AS jsonb), :tagged_at, CAST(:score_breakdown AS jsonb), :attended
+                        :scraped_at, CAST(:raw_data AS jsonb), CAST(:tags AS jsonb), :tagged_at, CAST(:score_breakdown AS jsonb)
                     )
                     ON CONFLICT (source, source_id) DO UPDATE SET
                         source_url = EXCLUDED.source_url,
@@ -221,6 +260,7 @@ class PostgresDatabase:
                         location_name = EXCLUDED.location_name,
                         location_address = EXCLUDED.location_address,
                         location_city = EXCLUDED.location_city,
+                        city_slug = EXCLUDED.city_slug,
                         latitude = EXCLUDED.latitude,
                         longitude = EXCLUDED.longitude,
                         start_time = EXCLUDED.start_time,
@@ -259,6 +299,7 @@ class PostgresDatabase:
             "location_name": event.location_name,
             "location_address": event.location_address,
             "location_city": event.location_city,
+            "city_slug": event.city_slug,
             "latitude": event.latitude,
             "longitude": event.longitude,
             "start_time": event.start_time,
@@ -274,8 +315,38 @@ class PostgresDatabase:
             "tags": json.dumps(event.tags.model_dump()) if event.tags else None,
             "tagged_at": None,
             "score_breakdown": json.dumps(event.score_breakdown) if event.score_breakdown else None,
-            "attended": event.attended,
         }
+
+    async def _fallback_event_city(
+        self,
+        event: Event,
+        *,
+        session: AsyncSession,
+    ) -> str:
+        source_id = ""
+        if event.source.startswith("custom:"):
+            source_id = event.source.removeprefix("custom:")
+        elif event.raw_data.get("source_id"):
+            source_id = str(event.raw_data.get("source_id"))
+
+        if source_id:
+            result = await session.execute(
+                text("SELECT city FROM sources WHERE id = :id"),
+                {"id": _uuid_param(source_id)},
+            )
+            row = result.mappings().first()
+            if row and str(row["city"] or "").strip():
+                return str(row["city"]).strip()
+
+        result = await session.execute(
+            text("SELECT city FROM sources WHERE url = :url"),
+            {"url": event.source_url},
+        )
+        row = result.mappings().first()
+        if row and str(row["city"] or "").strip():
+            return str(row["city"]).strip()
+
+        return "unknown"
 
     async def _find_duplicate_event_id(
         self,
@@ -294,14 +365,14 @@ class PostgresDatabase:
             result = await session.execute(
                 text(
                     """
-                    SELECT id, title, source, source_id, start_time, location_city
+                    SELECT id, title, source, source_id, start_time, city_slug
                     FROM events
-                    WHERE location_city = :city
+                    WHERE city_slug = :city_slug
                       AND start_time >= :start
                       AND start_time <= :end
                     """
                 ),
-                {"city": event.location_city, "start": start, "end": end},
+                {"city_slug": event.city_slug, "start": start, "end": end},
             )
             rows = result.mappings().all()
             fp = event_fingerprint(event)
@@ -310,7 +381,7 @@ class PostgresDatabase:
                     (
                         f"{canonicalize_title(str(row['title']))}|"
                         f"{as_local_date(row['start_time']).isoformat()}|"
-                        f"{str(row['location_city']).lower().strip()}"
+                        f"{str(row['city_slug']).strip()}"
                     ).encode()
                 ).hexdigest()
                 if candidate_fp == fp:
@@ -324,16 +395,44 @@ class PostgresDatabase:
             if own_session:
                 await session_cm.__aexit__(None, None, None)
 
-    async def get_events_for_weekend(self, sat_date: str, sun_date: str) -> list[Event]:
+    async def get_events_for_weekend(
+        self,
+        sat_date: str,
+        sun_date: str,
+        *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
+        attended: str = "",
+        saved: str = "",
+    ) -> list[Event]:
         saturday = datetime.fromisoformat(sat_date).date()
         sunday = datetime.fromisoformat(sun_date).date()
         start, end = weekend_window_utc(saturday, sunday)
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :start", "e.start_time < :end"]
+        params: dict[str, Any] = {"start": start, "end": end, **extra_params}
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, false) = true")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, false) = false")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, false) = true")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, false) = false")
         async with self.session() as session:
             result = await session.execute(
                 text(
-                    "SELECT * FROM events WHERE start_time >= :start AND start_time < :end ORDER BY start_time"
+                    f"""
+                    SELECT {select_cols}
+                    FROM events e
+                    {join_sql}
+                    WHERE {" AND ".join(conditions)}
+                    ORDER BY e.start_time
+                    """
                 ),
-                {"start": start, "end": end},
+                params,
             )
             return [_row_to_event(row) for row in result.mappings().all()]
 
@@ -401,22 +500,41 @@ class PostgresDatabase:
                 "last_tagged_at": row["last_tagged_at"] if row else None,
             }
 
-    async def get_event(self, event_id: str) -> Event | None:
+    async def get_event(self, event_id: str, *, viewer_user_id: str | None = None) -> Event | None:
+        select_cols, join_sql, params = _event_query_parts(viewer_user_id)
+        params["id"] = _uuid_param(event_id)
         async with self.session() as session:
             result = await session.execute(
-                text("SELECT * FROM events WHERE id = :id"), {"id": _uuid_param(event_id)}
+                text(f"SELECT {select_cols} FROM events e {join_sql} WHERE e.id = :id"),
+                params,
             )
             row = result.mappings().first()
             return _row_to_event(row) if row else None
 
-    async def get_recent_events(self, days: int = 14) -> list[Event]:
+    async def get_recent_events(
+        self,
+        days: int = 14,
+        *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
+    ) -> list[Event]:
         now, future = time_window(days)
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :now", "e.start_time <= :future"]
+        params: dict[str, Any] = {"now": now, "future": future, **extra_params}
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
         async with self.session() as session:
             result = await session.execute(
                 text(
-                    "SELECT * FROM events WHERE start_time >= :now AND start_time <= :future ORDER BY start_time"
+                    f"""
+                    SELECT {select_cols}
+                    FROM events e
+                    {join_sql}
+                    WHERE {" AND ".join(conditions)}
+                    ORDER BY e.start_time
+                    """
                 ),
-                {"now": now, "future": future},
+                params,
             )
             return [_row_to_event(row) for row in result.mappings().all()]
 
@@ -425,15 +543,25 @@ class PostgresDatabase:
         start: datetime,
         end: datetime,
         *,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
         attended: str = "",
+        saved: str = "",
     ) -> list[Event]:
-        conditions = ["start_time >= :start", "start_time < :end"]
-        params: dict[str, Any] = {"start": start, "end": end}
-        if attended == "yes":
-            conditions.append("attended = true")
-        elif attended == "no":
-            conditions.append("attended = false")
-        sql = f"SELECT * FROM events WHERE {' AND '.join(conditions)} ORDER BY start_time"
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :start", "e.start_time < :end"]
+        params: dict[str, Any] = {"start": start, "end": end, **extra_params}
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, false) = true")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, false) = false")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, false) = true")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, false) = false")
+        sql = f"SELECT {select_cols} FROM events e {join_sql} WHERE {' AND '.join(conditions)} ORDER BY e.start_time"
         async with self.session() as session:
             result = await session.execute(text(sql), params)
             return [_row_to_event(row) for row in result.mappings().all()]
@@ -442,80 +570,110 @@ class PostgresDatabase:
         self,
         *,
         days: int = 30,
+        viewer_user_id: str | None = None,
+        visible_city_slugs: list[str] | None = None,
         q: str = "",
         city: str = "",
         source: str = "",
         tagged: str = "",
         attended: str = "",
+        saved: str = "",
         score_min: int | None = None,
         sort: str = "start_time",
         page: int = 1,
         per_page: int = 25,
     ) -> tuple[list[Event], int]:
         now, future = time_window(days)
-        conditions = ["start_time >= :now", "start_time <= :future"]
-        params: dict[str, Any] = {"now": now, "future": future}
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["e.start_time >= :now", "e.start_time <= :future"]
+        params: dict[str, Any] = {"now": now, "future": future, **extra_params}
+        _add_city_slug_filter(conditions, params, visible_city_slugs)
         if q:
-            conditions.append("(title ILIKE :q OR description ILIKE :q)")
+            conditions.append("(e.title ILIKE :q OR e.description ILIKE :q)")
             params["q"] = f"%{q}%"
         if city:
-            conditions.append("location_city = :city")
-            params["city"] = city
+            conditions.append("e.city_slug = :city_slug")
+            params["city_slug"] = normalize_city_slug(city)
         if source:
-            conditions.append("source = :source")
+            conditions.append("e.source = :source")
             params["source"] = source
         if tagged == "yes":
-            conditions.append("tags IS NOT NULL")
+            conditions.append("e.tags IS NOT NULL")
         elif tagged == "no":
-            conditions.append("tags IS NULL")
-        if attended == "yes":
-            conditions.append("attended = true")
-        elif attended == "no":
-            conditions.append("attended = false")
+            conditions.append("e.tags IS NULL")
+        if viewer_user_id:
+            if attended == "yes":
+                conditions.append("COALESCE(ues.attended, false) = true")
+            elif attended == "no":
+                conditions.append("COALESCE(ues.attended, false) = false")
+            if saved == "yes":
+                conditions.append("COALESCE(ues.saved, false) = true")
+            elif saved == "no":
+                conditions.append("COALESCE(ues.saved, false) = false")
         if score_min is not None:
             conditions.append(
-                "tags IS NOT NULL AND CAST(tags->>'toddler_score' AS INTEGER) >= :score_min"
+                "e.tags IS NOT NULL AND CAST(e.tags->>'toddler_score' AS INTEGER) >= :score_min"
             )
             params["score_min"] = score_min
         where = " AND ".join(conditions)
         valid_sorts = {
-            "start_time": "start_time",
-            "-start_time": "start_time DESC",
-            "title": "title",
-            "-title": "title DESC",
-            "city": "location_city",
-            "-city": "location_city DESC",
-            "source": "source",
-            "-source": "source DESC",
-            "score": "CAST(tags->>'toddler_score' AS INTEGER)",
-            "-score": "CAST(tags->>'toddler_score' AS INTEGER) DESC",
+            "start_time": "e.start_time",
+            "-start_time": "e.start_time DESC",
+            "title": "e.title",
+            "-title": "e.title DESC",
+            "city": "e.location_city",
+            "-city": "e.location_city DESC",
+            "source": "e.source",
+            "-source": "e.source DESC",
+            "score": "CAST(e.tags->>'toddler_score' AS INTEGER)",
+            "-score": "CAST(e.tags->>'toddler_score' AS INTEGER) DESC",
         }
-        order_clause = valid_sorts.get(sort, "start_time")
+        order_clause = valid_sorts.get(sort, "e.start_time")
         offset = (page - 1) * per_page
         params |= {"limit": per_page, "offset": offset}
         async with self.session() as session:
             count_result = await session.execute(
-                text(f"SELECT COUNT(*) FROM events WHERE {where}"), params
+                text(f"SELECT COUNT(*) FROM events e {join_sql} WHERE {where}"), params
             )
             total_row = count_result.first()
             total = int(total_row[0] if total_row else 0)
             result = await session.execute(
                 text(
-                    f"SELECT * FROM events WHERE {where} ORDER BY {order_clause} LIMIT :limit OFFSET :offset"
+                    f"SELECT {select_cols} FROM events e {join_sql} WHERE {where} ORDER BY {order_clause} LIMIT :limit OFFSET :offset"
                 ),
                 params,
             )
             return [_row_to_event(row) for row in result.mappings().all()], total
 
-    async def get_filter_options(self) -> dict[str, list[str]]:
+    async def get_filter_options(
+        self,
+        *,
+        visible_city_slugs: list[str] | None = None,
+    ) -> dict[str, list[str]]:
         async with self.session() as session:
+            city_conditions: list[str] = []
+            params: dict[str, Any] = {}
+            _add_city_slug_filter(city_conditions, params, visible_city_slugs, column="city_slug")
+            city_where = f"WHERE {' AND '.join(city_conditions)}" if city_conditions else ""
             city_rows = (
                 await session.execute(
-                    text("SELECT DISTINCT location_city FROM events ORDER BY location_city")
+                    text(
+                        f"""
+                        SELECT MIN(location_city) AS location_city
+                        FROM events
+                        {city_where}
+                        GROUP BY city_slug
+                        ORDER BY location_city
+                        """
+                    ),
+                    params,
                 )
             ).all()
             source_rows = (
-                await session.execute(text("SELECT DISTINCT source FROM events ORDER BY source"))
+                await session.execute(
+                    text(f"SELECT DISTINCT source FROM events {city_where} ORDER BY source"),
+                    params,
+                )
             ).all()
             return {
                 "cities": [str(row[0]) for row in city_rows],
@@ -523,16 +681,17 @@ class PostgresDatabase:
             }
 
     async def create_source(self, source: Source) -> str:
+        source.city_slug = normalize_city_slug(source.city)
         async with self.session() as session:
             await session.execute(
                 text(
                     """
                     INSERT INTO sources (
-                        id, name, url, domain, city, category, user_id, builtin, recipe_json,
+                        id, name, url, domain, city, city_slug, category, user_id, builtin, recipe_json,
                         enabled, status, last_scraped_at, last_event_count,
                         last_error, created_at, updated_at
                     ) VALUES (
-                        :id, :name, :url, :domain, :city, :category, :user_id, :builtin, :recipe_json,
+                        :id, :name, :url, :domain, :city, :city_slug, :category, :user_id, :builtin, :recipe_json,
                         :enabled, :status, :last_scraped_at, :last_event_count,
                         :last_error, :created_at, :updated_at
                     )
@@ -654,32 +813,207 @@ class PostgresDatabase:
             )
             await session.commit()
 
-    async def mark_attended(self, event_id: str) -> None:
-        await self.set_attended(event_id, attended=True)
-
-    async def set_attended(self, event_id: str, *, attended: bool) -> None:
+    async def get_or_create_user_event_state(
+        self, user_id: str, event_id: str
+    ) -> UserEventState:
         async with self.session() as session:
             await session.execute(
-                text("UPDATE events SET attended = :attended WHERE id = :id"),
-                {"attended": attended, "id": _uuid_param(event_id)},
-            )
-            await session.commit()
-
-    async def set_attended_bulk(self, event_ids: list[str], *, attended: bool) -> None:
-        if not event_ids:
-            return
-        stmt = text("UPDATE events SET attended = :attended WHERE id = ANY(:event_ids)").bindparams(
-            bindparam("event_ids")
-        )
-        async with self.session() as session:
-            await session.execute(
-                stmt,
+                text(
+                    """
+                    INSERT INTO user_event_state (
+                        user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                    ) VALUES (
+                        :user_id, :event_id, false, false, NULL, NULL, :now, :now
+                    )
+                    ON CONFLICT (user_id, event_id) DO NOTHING
+                    """
+                ),
                 {
-                    "attended": attended,
-                    "event_ids": [_uuid_param(event_id) for event_id in event_ids],
+                    "user_id": _uuid_param(user_id),
+                    "event_id": _uuid_param(event_id),
+                    "now": utc_now(),
                 },
             )
             await session.commit()
+            result = await session.execute(
+                text(
+                    """
+                    SELECT saved, attended
+                    FROM user_event_state
+                    WHERE user_id = :user_id AND event_id = :event_id
+                    """
+                ),
+                {"user_id": _uuid_param(user_id), "event_id": _uuid_param(event_id)},
+            )
+            row = result.mappings().first()
+            return UserEventState(
+                saved=bool(row["saved"]) if row else False,
+                attended=bool(row["attended"]) if row else False,
+            )
+
+    async def set_event_saved(self, user_id: str, event_id: str, saved: bool) -> None:
+        async with self.session() as session:
+            now = utc_now()
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO user_event_state (
+                        user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                    ) VALUES (
+                        :user_id, :event_id, :saved, false, :saved_at, NULL, :now, :now
+                    )
+                    ON CONFLICT (user_id, event_id) DO UPDATE SET
+                        saved = :saved,
+                        saved_at = :saved_at,
+                        updated_at = :now
+                    """
+                ),
+                {
+                    "user_id": _uuid_param(user_id),
+                    "event_id": _uuid_param(event_id),
+                    "saved": saved,
+                    "saved_at": now if saved else None,
+                    "now": now,
+                },
+            )
+            await session.commit()
+
+    async def set_event_attended(self, user_id: str, event_id: str, attended: bool) -> None:
+        async with self.session() as session:
+            now = utc_now()
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO user_event_state (
+                        user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                    ) VALUES (
+                        :user_id, :event_id, false, :attended, NULL, :attended_at, :now, :now
+                    )
+                    ON CONFLICT (user_id, event_id) DO UPDATE SET
+                        attended = :attended,
+                        attended_at = :attended_at,
+                        updated_at = :now
+                    """
+                ),
+                {
+                    "user_id": _uuid_param(user_id),
+                    "event_id": _uuid_param(event_id),
+                    "attended": attended,
+                    "attended_at": now if attended else None,
+                    "now": now,
+                },
+            )
+            await session.commit()
+
+    async def set_event_attended_bulk(
+        self, user_id: str, event_ids: list[str], attended: bool
+    ) -> None:
+        if not event_ids:
+            return
+        async with self.session() as session:
+            now = utc_now()
+            for event_id in event_ids:
+                await session.execute(
+                    text(
+                        """
+                        INSERT INTO user_event_state (
+                            user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                        ) VALUES (
+                            :user_id, :event_id, false, :attended, NULL, :attended_at, :now, :now
+                        )
+                        ON CONFLICT (user_id, event_id) DO UPDATE SET
+                            attended = :attended,
+                            attended_at = :attended_at,
+                            updated_at = :now
+                        """
+                    ),
+                    {
+                        "user_id": _uuid_param(user_id),
+                        "event_id": _uuid_param(event_id),
+                        "attended": attended,
+                        "attended_at": now if attended else None,
+                        "now": now,
+                    },
+                )
+            await session.commit()
+
+    async def list_my_events(
+        self,
+        *,
+        viewer_user_id: str,
+        q: str = "",
+        city: str = "",
+        source: str = "",
+        tagged: str = "",
+        attended: str = "",
+        saved: str = "",
+        sort: str = "-start_time",
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[Event], int]:
+        select_cols, join_sql, extra_params = _event_query_parts(viewer_user_id)
+        conditions = ["(COALESCE(ues.saved, false) = true OR COALESCE(ues.attended, false) = true)"]
+        params: dict[str, Any] = dict(extra_params)
+        if q:
+            conditions.append("(e.title ILIKE :q OR e.description ILIKE :q)")
+            params["q"] = f"%{q}%"
+        if city:
+            conditions.append("e.city_slug = :city_slug")
+            params["city_slug"] = normalize_city_slug(city)
+        if source:
+            conditions.append("e.source = :source")
+            params["source"] = source
+        if tagged == "yes":
+            conditions.append("e.tags IS NOT NULL")
+        elif tagged == "no":
+            conditions.append("e.tags IS NULL")
+        if attended == "yes":
+            conditions.append("COALESCE(ues.attended, false) = true")
+        elif attended == "no":
+            conditions.append("COALESCE(ues.attended, false) = false")
+        if saved == "yes":
+            conditions.append("COALESCE(ues.saved, false) = true")
+        elif saved == "no":
+            conditions.append("COALESCE(ues.saved, false) = false")
+
+        valid_sorts = {
+            "start_time": "e.start_time",
+            "-start_time": "e.start_time DESC",
+            "title": "e.title",
+            "-title": "e.title DESC",
+            "city": "e.location_city",
+            "-city": "e.location_city DESC",
+            "source": "e.source",
+            "-source": "e.source DESC",
+            "score": "CAST(e.tags->>'toddler_score' AS INTEGER)",
+            "-score": "CAST(e.tags->>'toddler_score' AS INTEGER) DESC",
+        }
+        order_clause = valid_sorts.get(sort, "e.start_time DESC")
+        params["limit"] = per_page
+        params["offset"] = (page - 1) * per_page
+        where = " AND ".join(conditions)
+
+        async with self.session() as session:
+            count_result = await session.execute(
+                text(f"SELECT COUNT(*) FROM events e {join_sql} WHERE {where}"),
+                params,
+            )
+            total_row = count_result.first()
+            total = int(total_row[0] if total_row else 0)
+            result = await session.execute(
+                text(
+                    f"""
+                    SELECT {select_cols}
+                    FROM events e
+                    {join_sql}
+                    WHERE {where}
+                    ORDER BY {order_clause}
+                    LIMIT :limit OFFSET :offset
+                    """
+                ),
+                params,
+            )
+            return [_row_to_event(row) for row in result.mappings().all()], total
 
     async def create_job(self, job: Job) -> str:
         async with self.session() as session:
@@ -961,11 +1295,45 @@ class PostgresDatabase:
                                 scraped_at = CASE WHEN scraped_at < :scraped_at THEN :scraped_at ELSE scraped_at END,
                                 tags = COALESCE(tags, CAST(:tags AS jsonb)),
                                 score_breakdown = COALESCE(score_breakdown, CAST(:score_breakdown AS jsonb)),
-                                attended = attended OR :attended
+                                city_slug = :city_slug,
+                                location_city = CASE
+                                    WHEN (location_city IS NULL OR location_city = '' OR location_city = 'unknown') AND :location_city != '' THEN :location_city
+                                    ELSE location_city
+                                END
                             WHERE id = :canonical_id
                             """
                         ),
                         self._event_params(event) | {"canonical_id": duplicate_of.id},
+                    )
+                    await session.execute(
+                        text(
+                            """
+                            INSERT INTO user_event_state (
+                                user_id, event_id, saved, attended, saved_at, attended_at, created_at, updated_at
+                            )
+                            SELECT
+                                user_id,
+                                :canonical_id,
+                                saved,
+                                attended,
+                                saved_at,
+                                attended_at,
+                                created_at,
+                                updated_at
+                            FROM user_event_state
+                            WHERE event_id = :duplicate_id
+                            ON CONFLICT (user_id, event_id) DO UPDATE SET
+                                saved = user_event_state.saved OR EXCLUDED.saved,
+                                attended = user_event_state.attended OR EXCLUDED.attended,
+                                saved_at = COALESCE(user_event_state.saved_at, EXCLUDED.saved_at),
+                                attended_at = COALESCE(user_event_state.attended_at, EXCLUDED.attended_at),
+                                updated_at = GREATEST(user_event_state.updated_at, EXCLUDED.updated_at)
+                            """
+                        ),
+                        {
+                            "canonical_id": _uuid_param(duplicate_of.id),
+                            "duplicate_id": _uuid_param(event.id),
+                        },
                     )
                     await session.execute(
                         text("DELETE FROM events WHERE id = :id"), {"id": event.id}

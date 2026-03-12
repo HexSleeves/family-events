@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.config import settings
+from src.cities import user_visible_city_slugs
 from src.db.database import Database, create_database
 from src.db.models import InterestProfile, Job, Source, User
 from src.notifications.dispatcher import NotificationDispatcher
@@ -259,12 +260,22 @@ async def run_notify(
         f"Sun {weather['sunday'].icon} {weather['sunday'].temp_high_f:.0f}°F"
     )
 
-    events = await db.get_events_for_weekend(saturday.isoformat(), sunday.isoformat())
+    visible_city_slugs = user_visible_city_slugs(user) if user else None
+    events = await db.get_events_for_weekend(
+        saturday.isoformat(),
+        sunday.isoformat(),
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs or None,
+    )
     print(f"Weekend events: {len(events)}")
 
     if len(events) < 10:
         print("Few weekend events, adding upcoming week...")
-        upcoming = await db.get_recent_events(days=14)
+        upcoming = await db.get_recent_events(
+            days=14,
+            viewer_user_id=user.id if user else None,
+            visible_city_slugs=visible_city_slugs or None,
+        )
         existing_ids = {e.id for e in events}
         for e in upcoming:
             if e.id not in existing_ids:

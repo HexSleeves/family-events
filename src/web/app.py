@@ -36,10 +36,11 @@ _bulk_unattend_undo_store: dict[str, list[str]] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await cast(Database, app.state.db).connect()
-    await job_registry.recover_stale_jobs()
+    db = cast(Database, app.state.db)
+    await db.connect()
+    await job_registry.recover_stale_jobs(database_url=db.database_url)
     yield
-    await cast(Database, app.state.db).close()
+    await db.close()
 
 
 app = FastAPI(title="Family Events", lifespan=lifespan)

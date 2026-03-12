@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from src.cities import normalize_city_list as normalize_city_slug_list
+from src.cities import normalize_city_slug, user_visible_city_slugs
+from src.db.models import User
 from src.onboarding import normalize_city_list
 from src.predefined_sources import get_predefined_source, make_predefined_source
 from src.scrapers.allevents import AllEventsScraper
@@ -13,6 +16,30 @@ def test_normalize_city_list_includes_home_city_and_dedupes():
         "Baton Rouge, Lafayette, baton rouge", fallback_home_city="Baton Rouge"
     )
     assert cities == ["Baton Rouge", "Lafayette"]
+
+
+def test_normalize_city_slug_uses_exact_city_rules():
+    assert normalize_city_slug(" Baton_Rouge!! ") == "baton-rouge"
+    assert normalize_city_slug("San   Francisco") == "san-francisco"
+
+
+def test_normalize_city_slug_list_dedupes_case_insensitively():
+    assert normalize_city_slug_list(["Baton Rouge", "baton rouge", " Lafayette "]) == [
+        "baton-rouge",
+        "lafayette",
+    ]
+
+
+def test_user_visible_city_slugs_prefers_home_and_preferred():
+    user = User(
+        email="cities@example.com",
+        display_name="Cities",
+        password_hash="hash",
+        home_city="Baton Rouge",
+        preferred_cities=["Lafayette", "baton rouge"],
+    )
+
+    assert user_visible_city_slugs(user) == ["baton-rouge", "lafayette"]
 
 
 def test_system_prompt_uses_child_profile():

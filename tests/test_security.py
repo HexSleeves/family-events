@@ -470,6 +470,10 @@ def test_attend_returns_updated_attendance_partial(client, create_user):
     assert response.status_code == 200
     assert "Attended" in response.text
     assert "Undo" in response.text
+    updated = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user.id))
+    assert updated is not None
+    assert updated.viewer_state is not None
+    assert updated.viewer_state.attended is True
 
 
 def test_unattend_bulk_undo_stays_reactive(client, create_user):
@@ -483,9 +487,9 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
         title="Museum Day",
         location_city="Austin",
         start_time=datetime.now(tz=UTC),
-        attended=True,
     )
     asyncio.run(client.app.state.db.upsert_event(event))
+    asyncio.run(client.app.state.db.set_event_attended(user.id, event.id, True))
     page = client.get("/events?attended=yes")
     csrf_token = extract_csrf_token(page.text)
 
@@ -497,9 +501,34 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
     assert response.status_code == 200
     trigger = response.headers.get("HX-Trigger", "")
     assert "Undo" in trigger
-    updated = asyncio.run(client.app.state.db.get_event(event.id))
+    updated = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user.id))
     assert updated is not None
-    assert updated.attended is False
+    assert updated.viewer_state is not None
+    assert updated.viewer_state.attended is False
+
+
+def test_attendance_is_user_scoped(client, create_user):
+    user_a = create_user(email="user-a@example.com", home_city="Austin")
+    user_b = create_user(email="user-b@example.com", home_city="Austin")
+
+    event = Event(
+        source="test",
+        source_url="https://example.com/shared-event",
+        source_id="evt-shared",
+        title="Shared Event",
+        location_city="Austin",
+        start_time=datetime.now(tz=UTC),
+    )
+    asyncio.run(client.app.state.db.upsert_event(event))
+    asyncio.run(client.app.state.db.set_event_attended(user_a.id, event.id, True))
+
+    viewed_by_a = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user_a.id))
+    viewed_by_b = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user_b.id))
+
+    assert viewed_by_a is not None and viewed_by_a.viewer_state is not None
+    assert viewed_by_a.viewer_state.attended is True
+    assert viewed_by_b is not None
+    assert viewed_by_b.viewer_state is None or viewed_by_b.viewer_state.attended is False
 
 
 def test_weekend_page_does_not_fall_back_to_recent_events_when_weekend_empty(client):

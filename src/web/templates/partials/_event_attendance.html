@@ -1,7 +1,32 @@
 {% set attendance_target_id = target_id if target_id is defined else 'event-attendance' %}
+{% set viewer_state = event.viewer_state if event.viewer_state else none %}
+{% set is_saved = viewer_state.saved if viewer_state else false %}
+{% set is_attended = viewer_state.attended if viewer_state else false %}
 <span id="{{ attendance_target_id }}"
-      class="inline-flex items-center gap-2">
-  {% if event.attended %}
+      class="inline-flex flex-wrap items-center gap-2">
+  {% if is_saved %}
+    <span class="badge badge-info flex items-center gap-1">
+      <i data-lucide="bookmark-check" class="w-3.5 h-3.5" aria-hidden="true"></i> Saved
+    </span>
+    <button hx-post="/api/unsave/{{ event.id }}?target_id={{ attendance_target_id }}"
+            hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+            hx-target="#{{ attendance_target_id }}"
+            hx-swap="outerHTML"
+            aria-label="Remove saved mark for {{ event.title }}"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
+      <i data-lucide="bookmark-minus" class="w-3.5 h-3.5" aria-hidden="true"></i> Unsave
+    </button>
+  {% else %}
+    <button hx-post="/api/save/{{ event.id }}?target_id={{ attendance_target_id }}"
+            hx-vals='{"csrf_token":"{{ csrf_token }}"}'
+            hx-target="#{{ attendance_target_id }}"
+            hx-swap="outerHTML"
+            aria-label="Save {{ event.title }}"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-edge)] text-[var(--color-muted)] text-sm font-medium hover:bg-[var(--color-surface-tertiary)] hover:text-[var(--color-heading)] transition-colors touch-target">
+      <i data-lucide="bookmark" class="w-4 h-4" aria-hidden="true"></i> Save
+    </button>
+  {% endif %}
+  {% if is_attended %}
     <span class="badge badge-success flex items-center gap-1">
       <i data-lucide="check-circle" class="w-3.5 h-3.5" aria-hidden="true"></i> Attended
     </span>

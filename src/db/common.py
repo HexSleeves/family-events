@@ -6,6 +6,7 @@ import hashlib
 import re
 from datetime import datetime, timedelta
 
+from src.cities import normalize_city_slug
 from src.db.models import Event
 from src.timezones import as_local_date, utc_now
 
@@ -37,7 +38,7 @@ def canonicalize_title(title: str) -> str:
 def event_fingerprint(event: Event) -> str:
     """Build a stable cross-source fingerprint for likely duplicate events."""
     date_part = as_local_date(event.start_time).isoformat()
-    city = (event.location_city or "").lower().strip()
+    city = event.city_slug or normalize_city_slug(event.location_city)
     title = canonicalize_title(event.title)
     key = f"{title}|{date_part}|{city}"
     return hashlib.sha1(key.encode()).hexdigest()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.cities import normalize_city_slug
 from src.db.models import Source
 from src.scrapers.router import extract_domain
 
@@ -116,6 +117,7 @@ def make_predefined_source(*, user_id: str, source_key: str) -> Source:
         url=item["url"],
         domain=extract_domain(item["url"]),
         city=item["city"],
+        city_slug=normalize_city_slug(item["city"]),
         category=item["category"],
         user_id=user_id,
         builtin=True,

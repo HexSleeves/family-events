@@ -10,7 +10,15 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
 
 from src.timezones import as_local_date, local_date_range_utc, local_today, utc_now
-from src.web.common import ctx, get_db, is_htmx_request, template_response
+from src.web.auth import get_current_user
+from src.web.common import (
+    ctx,
+    get_db,
+    is_htmx_request,
+    resolve_event_scope,
+    template_response,
+    visible_city_scope,
+)
 
 router = APIRouter()
 
@@ -43,14 +51,21 @@ def _resolve_month_range(
 
 @router.get("/calendar", response_class=HTMLResponse)
 @router.get("/calendars", response_class=HTMLResponse)
-async def calendar_page(request: Request, month: str = "", attended: str = ""):
+async def calendar_page(request: Request, month: str = "", attended: str = "", scope: str = ""):
     db = get_db(request)
+    user = await get_current_user(request, db)
+    resolved_scope = resolve_event_scope(request, user)
+    visible_city_slugs = visible_city_scope(user=user, scope=resolved_scope)
+    if not user:
+        attended = ""
     today, month_start, next_month_start, prev_month = _resolve_month_range(month)
 
     range_start, range_end = local_date_range_utc(month_start, next_month_start)
     events = await db.get_events_between(
         range_start,
         range_end,
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs,
         attended=attended,
     )
     events.sort(
@@ -102,6 +117,7 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
         month_label=month_start.strftime("%B %Y"),
         prev_month=prev_month,
         next_month=next_month_start,
+        scope=resolved_scope,
         attended=attended,
         total_events=len(events),
         attended_events_count=len(attended_events),
@@ -123,14 +139,21 @@ async def calendar_page(request: Request, month: str = "", attended: str = ""):
 
 
 @router.get("/calendar.ics")
-async def calendar_ics(request: Request, month: str = "", attended: str = ""):
+async def calendar_ics(request: Request, month: str = "", attended: str = "", scope: str = ""):
     db = get_db(request)
+    user = await get_current_user(request, db)
+    resolved_scope = resolve_event_scope(request, user)
+    visible_city_slugs = visible_city_scope(user=user, scope=resolved_scope)
+    if not user:
+        attended = ""
     _today, month_start, next_month_start, _prev_month = _resolve_month_range(month)
 
     range_start, range_end = local_date_range_utc(month_start, next_month_start)
     events = await db.get_events_between(
         range_start,
         range_end,
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs,
         attended=attended,
     )
 

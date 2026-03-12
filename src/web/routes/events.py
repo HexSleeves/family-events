@@ -19,11 +19,14 @@ from src.web.common import (
     get_bulk_unattend_undo_store,
     get_db,
     get_templates,
+    htmx_redirect_or_redirect,
     hx_target,
     is_htmx_request,
+    resolve_event_scope,
     require_login_and_csrf,
     template_response,
     toast,
+    visible_city_scope,
 )
 
 router = APIRouter()
@@ -34,47 +37,61 @@ EVENTS_API_MAX_PER_PAGE = 100
 @router.get("/events", response_class=HTMLResponse)
 async def events_page(
     request: Request,
+    scope: str = "",
     q: str = "",
     city: str = "",
     source: str = "",
     tagged: str = "",
     attended: str = "",
+    saved: str = "",
     score_min: str = "",
     sort: str = "start_time",
     page: int = 1,
 ):
     db = get_db(request)
+    user = await get_current_user(request, db)
+    resolved_scope = resolve_event_scope(request, user)
+    visible_city_slugs = visible_city_scope(user=user, scope=resolved_scope, explicit_city=city)
+    if not user:
+        attended = ""
+        saved = ""
     per_page = 25
     score_min_int = int(score_min) if score_min.isdigit() else None
     events, total = await db.search_events(
         days=30,
+        viewer_user_id=user.id if user else None,
+        visible_city_slugs=visible_city_slugs,
         q=q,
         city=city,
         source=source,
         tagged=tagged,
         attended=attended,
+        saved=saved,
         score_min=score_min_int,
         sort=sort,
         page=page,
         per_page=per_page,
     )
     total_pages = max(1, (total + per_page - 1) // per_page)
-    filters = await db.get_filter_options()
-    active_page = "attended" if attended == "yes" else "events"
+    filters = await db.get_filter_options(visible_city_slugs=visible_city_slugs)
 
     page_ctx = await ctx(
         request,
-        active_page=active_page,
+        active_page="events",
+        page_title="Browse Events",
+        results_path="/events",
         events=events,
         total=total,
         page=page,
         per_page=per_page,
         total_pages=total_pages,
+        scope=resolved_scope,
         q=q,
         city=city,
         source=source,
         tagged=tagged,
         attended=attended,
+        saved=saved,
         score_min=score_min_int,
         sort=sort,
         cities=filters["cities"],
@@ -89,7 +106,8 @@ async def events_page(
 @router.get("/event/{event_id}", response_class=HTMLResponse)
 async def event_detail(request: Request, event_id: str):
     db = get_db(request)
-    event = await db.get_event(event_id)
+    user = await get_current_user(request, db)
+    event = await db.get_event(event_id, viewer_user_id=user.id if user else None)
     if not event:
         return template_response(
             request,
@@ -115,7 +133,6 @@ async def event_detail(request: Request, event_id: str):
     related_events: list[tuple[object, float]] = []
     score_breakdown: dict[str, float] | None = None
     if event.tags:
-        user = await get_current_user(request, db)
         profile = user.interest_profile if user else InterestProfile()
 
         start = event.start_time.date()
@@ -139,7 +156,10 @@ async def event_detail(request: Request, event_id: str):
                 "budget_penalty": breakdown.budget_penalty,
             }
 
-        candidates = await db.get_recent_events(days=30)
+        candidates = await db.get_recent_events(
+            days=30,
+            viewer_user_id=user.id if user else None,
+        )
         related = [
             candidate
             for candidate in candidates
@@ -195,8 +215,8 @@ async def api_attend(request: Request, event_id: str):
     if throttled := check_rate_limit(request, "api_attend"):
         return throttled
 
-    await db.mark_attended(event_id)
-    event = await db.get_event(event_id)
+    await db.set_event_attended(user.id, event_id, True)
+    event = await db.get_event(event_id, viewer_user_id=user.id)
     if event is None:
         raise ValueError("Event disappeared after attend")
     target_id = request.query_params.get("target_id", "event-attendance")
@@ -215,8 +235,8 @@ async def api_unattend(request: Request, event_id: str):
     if throttled := check_rate_limit(request, "api_unattend"):
         return throttled
 
-    await db.set_attended(event_id, attended=False)
-    event = await db.get_event(event_id)
+    await db.set_event_attended(user.id, event_id, False)
+    event = await db.get_event(event_id, viewer_user_id=user.id)
     if event is None:
         raise ValueError("Event disappeared after unattend")
     target_id = request.query_params.get("target_id", "event-attendance")
@@ -240,7 +260,7 @@ async def api_unattend_bulk(request: Request):
     if not event_ids:
         return toast("Select at least one event", "warning", status_code=422)
 
-    await db.set_attended_bulk(event_ids, attended=False)
+    await db.set_event_attended_bulk(user.id, event_ids, False)
 
     undo_token = str(uuid4())
     get_bulk_unattend_undo_store(request)[undo_token] = event_ids
@@ -270,8 +290,106 @@ async def api_unattend_bulk_undo(request: Request, undo_token: str):
     if not event_ids:
         return toast("Nothing to undo", "warning")
 
-    await db.set_attended_bulk(event_ids, attended=True)
+    await db.set_event_attended_bulk(user.id, event_ids, True)
     return toast(f"Restored {len(event_ids)} event(s)")
+
+
+@router.post("/api/save/{event_id}", response_class=HTMLResponse)
+async def api_save(request: Request, event_id: str):
+    db = get_db(request)
+    user, _form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None
+    if throttled := check_rate_limit(request, "api_save"):
+        return throttled
+
+    await db.set_event_saved(user.id, event_id, True)
+    event = await db.get_event(event_id, viewer_user_id=user.id)
+    if event is None:
+        raise ValueError("Event disappeared after save")
+    target_id = request.query_params.get("target_id", "event-attendance")
+    return toast("Saved", body=_render_event_attendance(request, event, target_id=target_id))
+
+
+@router.post("/api/unsave/{event_id}", response_class=HTMLResponse)
+async def api_unsave(request: Request, event_id: str):
+    db = get_db(request)
+    user, _form, denied = await require_login_and_csrf(request)
+    if denied:
+        return denied
+    assert user is not None
+    if throttled := check_rate_limit(request, "api_unsave"):
+        return throttled
+
+    await db.set_event_saved(user.id, event_id, False)
+    event = await db.get_event(event_id, viewer_user_id=user.id)
+    if event is None:
+        raise ValueError("Event disappeared after unsave")
+    target_id = request.query_params.get("target_id", "event-attendance")
+    return toast(
+        "Removed from My Events",
+        body=_render_event_attendance(request, event, target_id=target_id),
+    )
+
+
+@router.get("/my-events", response_class=HTMLResponse)
+async def my_events_page(
+    request: Request,
+    q: str = "",
+    city: str = "",
+    source: str = "",
+    tagged: str = "",
+    attended: str = "",
+    saved: str = "",
+    sort: str = "-start_time",
+    page: int = 1,
+):
+    db = get_db(request)
+    user = await get_current_user(request, db)
+    if not user:
+        return htmx_redirect_or_redirect(request, "/login")
+    per_page = 25
+    events, total = await db.list_my_events(
+        viewer_user_id=user.id,
+        q=q,
+        city=city,
+        source=source,
+        tagged=tagged,
+        attended=attended,
+        saved=saved,
+        sort=sort,
+        page=page,
+        per_page=per_page,
+    )
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    filters = await db.get_filter_options()
+    page_ctx = await ctx(
+        request,
+        active_page="my-events",
+        page_title="My Events",
+        results_path="/my-events",
+        events=events,
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        scope="all",
+        q=q,
+        city=city,
+        source=source,
+        tagged=tagged,
+        attended=attended,
+        saved=saved,
+        score_min=None,
+        sort=sort,
+        cities=filters["cities"],
+        sources=filters["sources"],
+        is_my_events_page=True,
+    )
+    if is_htmx_request(request) and hx_target(request) == "events-results":
+        return template_response(request, "partials/_events_table.html", page_ctx)
+    return template_response(request, "events.html", page_ctx)
 
 
 @router.get("/api/events")
@@ -279,11 +397,13 @@ async def api_events(
     request: Request,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=EVENTS_API_MAX_PER_PAGE),
+    scope: str = "",
     q: str = "",
     city: str = "",
     source: str = "",
     tagged: str = "",
     attended: str = "",
+    saved: str = "",
     score_min: int | None = Query(default=None, ge=0, le=10),
     sort: str = "start_time",
 ):
@@ -297,6 +417,8 @@ async def api_events(
         raise HTTPException(status_code=422, detail="tagged must be yes or no")
     if attended and attended not in {"yes", "no"}:
         raise HTTPException(status_code=422, detail="attended must be yes or no")
+    if saved and saved not in {"yes", "no"}:
+        raise HTTPException(status_code=422, detail="saved must be yes or no")
     if sort not in {
         "start_time",
         "-start_time",
@@ -312,13 +434,18 @@ async def api_events(
         raise HTTPException(status_code=422, detail="invalid sort")
 
     db = get_db(request)
+    resolved_scope = scope if scope in {"nearby", "all"} else "nearby"
+    visible_city_slugs = visible_city_scope(user=user, scope=resolved_scope, explicit_city=city)
     events, total = await db.search_events(
         days=30,
+        viewer_user_id=user.id,
+        visible_city_slugs=visible_city_slugs,
         q=q,
         city=city,
         source=source,
         tagged=tagged,
         attended=attended,
+        saved=saved,
         score_min=score_min,
         sort=sort,
         page=page,
@@ -331,10 +458,11 @@ async def api_events(
                 "title": event.title,
                 "source": event.source,
                 "city": event.location_city,
+                "city_slug": event.city_slug,
                 "start_time": event.start_time.isoformat(),
                 "tagged": event.tags is not None,
                 "toddler_score": event.tags.toddler_score if event.tags else None,
-                "attended": event.attended,
+                "viewer_state": event.viewer_state.model_dump() if event.viewer_state else None,
             }
             for event in events
         ],
@@ -345,11 +473,13 @@ async def api_events(
             "total_pages": max(1, (total + per_page - 1) // per_page),
         },
         "filters": {
+            "scope": resolved_scope,
             "q": q,
             "city": city,
             "source": source,
             "tagged": tagged,
             "attended": attended,
+            "saved": saved,
             "score_min": score_min,
             "sort": sort,
         },

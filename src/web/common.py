@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.responses import StreamingResponse
 
+from src.cities import normalize_city_slug, user_visible_city_slugs
 from src.config import settings
 from src.db.database import Database
 from src.db.models import User
@@ -88,7 +89,7 @@ def template_response(
     headers: dict[str, str] | None = None,
 ) -> HTMLResponse:
     response = get_templates(request).TemplateResponse(
-        template_name, context, status_code=status_code
+        request, template_name, context, status_code=status_code
     )
     for key, value in (headers or {}).items():
         response.headers[key] = value
@@ -303,3 +304,24 @@ async def get_current_user_or_redirect(request: Request, location: str = "/login
     if not user:
         return None, htmx_redirect_or_redirect(request, location)
     return user, None
+
+
+def resolve_event_scope(request: Request, user: User | None) -> str:
+    scope = request.query_params.get("scope", "").strip().lower()
+    if scope in {"nearby", "all"}:
+        return scope
+    return "nearby" if user else "all"
+
+
+def visible_city_scope(
+    *,
+    user: User | None,
+    scope: str,
+    explicit_city: str = "",
+) -> list[str] | None:
+    if explicit_city.strip():
+        return [normalize_city_slug(explicit_city)]
+    if scope != "nearby" or not user:
+        return None
+    slugs = user_visible_city_slugs(user)
+    return slugs or None
