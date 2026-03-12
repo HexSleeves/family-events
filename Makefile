@@ -1,6 +1,7 @@
-.PHONY: help install lint format format-check typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate railway-up-web railway-up-cron railway-logs-web railway-logs-cron
+.PHONY: help install lint format format-check typecheck check fix clean run dev scrape test deploy restart logs db-up db-down db-logs db-reset db-migrate railway-up-web railway-up-cron railway-up-all railway-pull-config railway-logs-web railway-logs-cron
 
 DJLINT_FLAGS=--profile=jinja --indent 2 --max-line-length 100 --ignore H006,H023,H029,H031,J004,J018,T003,T028
+RAILWAY_UP_FLAGS?=
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -117,11 +118,30 @@ deploy: check ## Run all checks then restart the service
 	@sleep 2
 	@journalctl -u family-events -n 5 --no-pager
 
-railway-up-web: ## Deploy the web service to Railway
-	railway up --service web
+railway-pull-config: ## Pull Railway service snapshots into tmp/railway-config
+	./scripts/railway-pull-config.sh
 
-railway-up-cron: ## Deploy the cron service to Railway
-	railway up --service cron
+railway-up-web: ## Deploy web service using railway.web.toml
+	@set -eu; \
+	tmp="$$(mktemp)"; \
+	cp railway.toml "$$tmp"; \
+	cleanup() { mv "$$tmp" railway.toml; }; \
+	trap cleanup EXIT INT TERM; \
+	cp railway.web.toml railway.toml; \
+	railway up --service web $(RAILWAY_UP_FLAGS)
+
+railway-up-cron: ## Deploy cron service using railway.cron.toml
+	@set -eu; \
+	tmp="$$(mktemp)"; \
+	cp railway.toml "$$tmp"; \
+	cleanup() { mv "$$tmp" railway.toml; }; \
+	trap cleanup EXIT INT TERM; \
+	cp railway.cron.toml railway.toml; \
+	railway up --service cron $(RAILWAY_UP_FLAGS)
+
+railway-up-all: ## Deploy web then cron using service configs
+	$(MAKE) railway-up-web
+	$(MAKE) railway-up-cron
 
 railway-logs-web: ## Tail Railway logs for the web service
 	railway logs --service web

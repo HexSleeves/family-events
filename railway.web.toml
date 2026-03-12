@@ -4,6 +4,7 @@ watchPatterns = [
   "Dockerfile",
   ".dockerignore",
   "railway.toml",
+  "railway.web.toml",
   "pyproject.toml",
   "uv.lock",
   "alembic.ini",
@@ -17,6 +18,9 @@ watchPatterns = [
 ]
 
 [deploy]
+startCommand            = "APP_ROLE=web ./scripts/railway-entrypoint.sh"
+healthcheckPath         = "/health"
+healthcheckTimeout      = 300
 restartPolicyType       = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 drainingSeconds         = 60
