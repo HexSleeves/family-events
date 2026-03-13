@@ -94,29 +94,29 @@ WATER_TERMS = CATEGORY_RULES["water"]
 
 @dataclass(slots=True)
 class RuleEvaluation:
-    raw_score: int
-    categories: list[str]
-    audience: Literal["toddler_focused", "family_mixed", "general_public", "adult_skewed"]
-    positive_signals: list[str]
-    caution_signals: list[str]
-    exclusion_signals: list[str]
-    indoor_outdoor: Literal["indoor", "outdoor", "both"]
-    noise_level: Literal["quiet", "moderate", "loud"]
-    crowd_level: Literal["small", "medium", "large"]
-    stroller_friendly: bool
-    parking_available: bool
-    bathroom_accessible: bool
-    food_available: bool
-    nap_compatible: bool
-    energy_level: Literal["calm", "moderate", "active"]
-    weather_dependent: bool
-    good_for_rain: bool
-    good_for_heat: bool
-    parent_attention_required: Literal["full", "partial", "minimal"]
-    meltdown_risk: Literal["low", "medium", "high"]
-    age_min_recommended: int
     age_max_recommended: int
+    age_min_recommended: int
+    audience: Literal["toddler_focused", "family_mixed", "general_public", "adult_skewed"]
+    bathroom_accessible: bool
+    categories: list[str]
+    caution_signals: list[str]
     confidence_score: float
+    crowd_level: Literal["small", "medium", "large"]
+    energy_level: Literal["calm", "moderate", "active"]
+    exclusion_signals: list[str]
+    food_available: bool
+    good_for_heat: bool
+    good_for_rain: bool
+    indoor_outdoor: Literal["indoor", "outdoor", "both"]
+    meltdown_risk: Literal["low", "medium", "high"]
+    nap_compatible: bool
+    noise_level: Literal["quiet", "moderate", "loud"]
+    parent_attention_required: Literal["full", "partial", "minimal"]
+    parking_available: bool
+    positive_signals: list[str]
+    raw_score: int
+    stroller_friendly: bool
+    weather_dependent: bool
 
 
 class EventTagger:
