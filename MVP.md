@@ -4,7 +4,7 @@ This document is the release checklist for taking Family Events from a private/d
 
 The goal is not "perfect architecture." The goal is a stable, understandable, operable product that can safely run in public with scheduled scraping, manual scraping, tagging after scraping, and enough observability to debug issues quickly.
 
-## Current status (2026-03-11)
+## Current status (2026-03-13)
 
 Already completed in the codebase:
 
@@ -16,6 +16,7 @@ Already completed in the codebase:
 - Persisted background jobs with duplicate prevention, stale-job recovery, cancellation, progress payloads, and job history UI
 - Explicit dev vs prod serve commands (`serve-dev` vs `serve`) with production `reload=False`
 - Explicit Postgres migration flow with Alembic and `make db-migrate`
+- Forward-only follow-up Alembic migrations for production schema drift (`user_event_state` and `city_slug`)
 - Central `America/Chicago` timezone helpers used by weekend selection, calendar boundaries, cron, and notify flows
 - `/health` pipeline freshness reporting for scrape/tag/notify plus stuck-job detection
 - Structured notification dispatch results and explicit unknown-channel failures
@@ -86,7 +87,7 @@ We should consider the app MVP-ready only when all of these are true:
 - [x] 4. Background jobs are visible for both manual and scheduled runs.
 - [x] 5. Production serving does not use autoreload.
 - [x] 6. Database migrations are explicit and safe.
-- [ ] 7. Timezone behavior is deterministic and documented.
+- [x] 7. Timezone behavior is deterministic and documented.
 - [x] 8. Health checks expose pipeline freshness.
 - [x] 9. Notification delivery results are visible enough to debug failures.
 - [ ] 10. Search and key pages remain fast on realistic data volume.
@@ -135,7 +136,7 @@ Several technical decisions depend on this:
 - [x] Make production serve run with `reload=False`
 - [x] Keep local development autoreload in `make dev` or a dedicated dev serve mode
 - [x] Update service files and README to reflect correct production startup
-- [ ] Add a small test or verification note to ensure prod mode does not reload
+- [x] Add a small test or verification note to ensure prod mode does not reload
 
 ### Deliverable
 
@@ -213,15 +214,15 @@ The app stores UTC in many places, but weekend logic and cron comments assume lo
 
 ### Tasks
 
-- [ ] Define canonical storage policy: store datetimes in UTC
-- [ ] Define display/query policy: convert date-window logic through `America/Chicago`
-- [ ] Audit weekend selection logic in `src/web/app.py` and `src/scheduler.py`
+- [x] Define canonical storage policy: store datetimes in UTC
+- [x] Define display/query policy: convert date-window logic through `America/Chicago`
+- [x] Audit weekend selection logic in `src/web/app.py` and `src/scheduler.py`
 - [ ] Audit event date parsing in all scrapers
-- [ ] Audit notification scheduling assumptions
-- [ ] Audit calendar month/day boundaries
-- [ ] Ensure weather lookups match local weekend dates
+- [x] Audit notification scheduling assumptions
+- [x] Audit calendar month/day boundaries
+- [x] Ensure weather lookups match local weekend dates
 - [ ] Add tests around boundary times near midnight and DST transitions
-- [ ] Document the timezone policy in README or architecture docs
+- [x] Document the timezone policy in README or architecture docs
 
 ### Deliverable
 
@@ -342,7 +343,7 @@ External HTTP calls behave consistently and fail in visible ways.
   - [x] recipient used
   - [x] timestamp
 - [x] Persist notification job details/results
-- [ ] Show notification results in job history or notification-specific UI
+- [x] Show notification results in job history or notification-specific UI
 - [x] Make unknown notification channels explicit failures, not quiet prints
 - [x] Add tests for successful and failed deliveries
 
@@ -771,7 +772,7 @@ We are ready to launch the MVP when:
 - [x] Manual scrape + tag exists and is the main path
 - [x] Scheduled and manual jobs are visible in the UI
 - [ ] Migrations are explicit and tested
-- [ ] Timezone behavior is documented and covered by tests
+- [x] Timezone behavior is documented and covered by tests
 - [x] `/health` includes freshness information
 - [x] Notification failures are diagnosable
 - [ ] Search remains responsive on realistic data

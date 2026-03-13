@@ -25,42 +25,42 @@ A prioritized engineering plan based on the current codebase audit.
 
 ## P1 — Reliability and operations
 
-- [ ] Move long-running work off the request path
-  - [ ] Run scrape jobs asynchronously/backgrounded
-  - [ ] Run tag jobs asynchronously/backgrounded
-  - [ ] Run source analyze/test asynchronously/backgrounded
-  - [ ] Add job status tracking visible in UI
-  - [ ] Prevent duplicate concurrent jobs
-- [ ] Introduce explicit database migrations
-  - [ ] Add schema version tracking table
-  - [ ] Replace silent `ALTER TABLE` migration attempts with versioned migrations
-  - [ ] Add migration command / startup migration step
+- [x] Move long-running work off the request path
+  - [x] Run scrape jobs asynchronously/backgrounded
+  - [x] Run tag jobs asynchronously/backgrounded
+  - [x] Run source analyze/test asynchronously/backgrounded
+  - [x] Add job status tracking visible in UI
+  - [x] Prevent duplicate concurrent jobs
+- [x] Introduce explicit database migrations
+  - [x] Add schema version tracking table
+  - [x] Replace silent `ALTER TABLE` migration attempts with versioned migrations
+  - [x] Add migration command / startup migration step
 - [ ] Standardize timezone handling
-  - [ ] Store and enforce timezone-aware datetimes everywhere
-  - [ ] Set APScheduler timezone explicitly to `America/Chicago`
-  - [ ] Review weekend/date-window queries for UTC/local correctness
+  - [x] Store and enforce timezone-aware datetimes everywhere
+  - [x] Set APScheduler timezone explicitly to `America/Chicago`
+  - [x] Review weekend/date-window queries for UTC/local correctness
   - [ ] Audit scraper timestamp parsing for timezone consistency
 - [ ] Improve health and observability
   - [ ] Replace `print()`-style operational logs with structured logging
   - [ ] Add logging context for user/source/job failures
-  - [ ] Expand `/health` to include scheduler/job freshness signals
+  - [x] Expand `/health` to include scheduler/job freshness signals
   - [ ] Add timing metrics for scrape/tag/notify stages
-- [ ] Improve resilience of external HTTP calls
-  - [ ] Centralize `httpx` client configuration
-  - [ ] Add sane connect/read timeouts everywhere
-  - [ ] Add retries/backoff for transient failures
-  - [ ] Add consistent user-agent headers
+- [x] Improve resilience of external HTTP calls
+  - [x] Centralize `httpx` client configuration
+  - [x] Add sane connect/read timeouts everywhere
+  - [x] Add retries/backoff for transient failures
+  - [x] Add consistent user-agent headers
 
 ## P2 — Maintainability and architecture
 
-- [ ] Break up `src/web/app.py`
-  - [ ] Extract auth routes
-  - [ ] Extract profile routes
-  - [ ] Extract events routes
-  - [ ] Extract calendar routes
-  - [ ] Extract sources routes
-  - [ ] Extract pipeline/action routes
-  - [ ] Extract shared response helpers and middleware
+- [x] Break up `src/web/app.py`
+  - [x] Extract auth routes
+  - [x] Extract profile routes
+  - [x] Extract events routes
+  - [x] Extract calendar routes
+  - [x] Extract sources routes
+  - [x] Extract pipeline/action routes
+  - [x] Extract shared response helpers and middleware
 - [ ] Break up `src/db/database.py`
   - [ ] Extract connection/bootstrap code
   - [ ] Extract event repository methods
@@ -91,14 +91,14 @@ A prioritized engineering plan based on the current codebase audit.
 - [ ] Add route tests
   - [x] Login/signup/logout flows
   - [ ] Profile update endpoints
-  - [ ] Attend/unattend endpoints
+  - [x] Attend/unattend endpoints
   - [ ] Source management endpoints
-  - [ ] Health and page rendering smoke tests
+  - [x] Health and page rendering smoke tests
 - [ ] Add unit tests for core logic
-  - [ ] Heuristic tagger
-  - [ ] Ranking/scoring
+  - [x] Heuristic tagger
+  - [x] Ranking/scoring
   - [ ] Weather summarization
-  - [ ] Notification dispatch behavior
+  - [x] Notification dispatch behavior
 - [ ] Add regression tests for security-sensitive flows
   - [x] CSRF rejection
   - [ ] Unauthorized access rejection
@@ -115,12 +115,12 @@ A prioritized engineering plan based on the current codebase audit.
   - [ ] Add indexes for `start_time`, `attended`, `location_city`, source/date combinations
   - [ ] Benchmark query performance on larger datasets
 - [ ] Optimize tagging throughput
-  - [ ] Add bounded concurrency for LLM tagging
+  - [x] Add bounded concurrency for LLM tagging
   - [ ] Add retry behavior for transient LLM failures
   - [ ] Only retag changed/stale events
   - [ ] Store tagging version/model metadata
 - [ ] Reduce heavy-page/query load
-  - [ ] Paginate or limit `/api/events`
+  - [x] Paginate or limit `/api/events`
   - [ ] Avoid fetching more events than needed on dashboard/detail pages
   - [ ] Cache weather results for a short window
 
@@ -147,15 +147,15 @@ A prioritized engineering plan based on the current codebase audit.
 ## P6 — Cleanup and polish
 
 - [ ] Fix docs/runtime drift
-  - [ ] Update README to match current build/runtime behavior
+  - [x] Update README to match current build/runtime behavior
   - [ ] Document testing expectations accurately
   - [ ] Clarify library/source support status
 - [ ] Separate runtime data from repo root
   - [ ] Move SQLite DB files under `data/` or `var/`
   - [ ] Update config/docs/service files accordingly
-- [ ] Split dev vs prod server behavior
-  - [ ] Disable `reload=True` outside development
-  - [ ] Add explicit dev/prod serve modes
+- [x] Split dev vs prod server behavior
+  - [x] Disable `reload=True` outside development
+  - [x] Add explicit dev/prod serve modes
 - [ ] Decide whether in-memory undo/rate-limit state should be ephemeral
   - [ ] If not, persist them in SQLite or another shared store
 - [ ] Add browser/UI verification setup notes for this VM environment
