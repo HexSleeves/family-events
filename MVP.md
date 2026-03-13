@@ -18,10 +18,13 @@ Already completed in the codebase:
 - Explicit Postgres migration flow with Alembic and `make db-migrate`
 - Forward-only follow-up Alembic migrations for production schema drift (`user_event_state` and `city_slug`)
 - Central `America/Chicago` timezone helpers used by weekend selection, calendar boundaries, cron, and notify flows
+- Scraper datetime parsing now defaults naive event times to `America/Chicago`, with DST/midnight regression coverage
 - `/health` pipeline freshness reporting for scrape/tag/notify plus stuck-job detection
 - Structured notification dispatch results and explicit unknown-channel failures
 - Shared outbound HTTP client behavior across scrapers, analyzer, weather, and notification providers
 - Authenticated, paginated, rate-limited `/api/events` contract documented in `README.md`
+- Expanded regression coverage for profile updates, source management routes, and unauthorized-access paths
+- Alembic history regression checks now guard follow-up revision lineage and historical revision immutability
 - Repo-wide formatting/lint coverage for Python, templates, docs, config, and frontend assets via `make check`
 - Operator runbook covering deploys, migrations, scheduler checks, failed-job/source inspection, secret rotation, and Postgres backup/restore
 
@@ -217,11 +220,11 @@ The app stores UTC in many places, but weekend logic and cron comments assume lo
 - [x] Define canonical storage policy: store datetimes in UTC
 - [x] Define display/query policy: convert date-window logic through `America/Chicago`
 - [x] Audit weekend selection logic in `src/web/app.py` and `src/scheduler.py`
-- [ ] Audit event date parsing in all scrapers
+- [x] Audit event date parsing in all scrapers
 - [x] Audit notification scheduling assumptions
 - [x] Audit calendar month/day boundaries
 - [x] Ensure weather lookups match local weekend dates
-- [ ] Add tests around boundary times near midnight and DST transitions
+- [x] Add tests around boundary times near midnight and DST transitions
 - [x] Document the timezone policy in README or architecture docs
 
 ### Deliverable
@@ -607,7 +610,7 @@ Data durability is adequate for an MVP product.
 
 ### Tasks
 
-- [ ] Add route tests for profile update endpoints
+- [x] Add route tests for profile update endpoints
 - [x] Add route tests for scrape/tag/notify job endpoints
 - [x] Add tests for pipeline job execution and duplicate prevention
 - [ ] Add migration tests

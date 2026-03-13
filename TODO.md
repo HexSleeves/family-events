@@ -35,11 +35,11 @@ A prioritized engineering plan based on the current codebase audit.
   - [x] Add schema version tracking table
   - [x] Replace silent `ALTER TABLE` migration attempts with versioned migrations
   - [x] Add migration command / startup migration step
-- [ ] Standardize timezone handling
+- [x] Standardize timezone handling
   - [x] Store and enforce timezone-aware datetimes everywhere
   - [x] Set APScheduler timezone explicitly to `America/Chicago`
   - [x] Review weekend/date-window queries for UTC/local correctness
-  - [ ] Audit scraper timestamp parsing for timezone consistency
+  - [x] Audit scraper timestamp parsing for timezone consistency
 - [ ] Improve health and observability
   - [ ] Replace `print()`-style operational logs with structured logging
   - [ ] Add logging context for user/source/job failures
@@ -90,9 +90,9 @@ A prioritized engineering plan based on the current codebase audit.
   - [ ] User/source CRUD tests
 - [ ] Add route tests
   - [x] Login/signup/logout flows
-  - [ ] Profile update endpoints
+  - [x] Profile update endpoints
   - [x] Attend/unattend endpoints
-  - [ ] Source management endpoints
+  - [x] Source management endpoints
   - [x] Health and page rendering smoke tests
 - [ ] Add unit tests for core logic
   - [x] Heuristic tagger
@@ -101,7 +101,7 @@ A prioritized engineering plan based on the current codebase audit.
   - [x] Notification dispatch behavior
 - [ ] Add regression tests for security-sensitive flows
   - [x] CSRF rejection
-  - [ ] Unauthorized access rejection
+  - [x] Unauthorized access rejection
   - [x] Rate-limit behavior
 
 ## P4 — Performance and scaling
