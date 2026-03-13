@@ -15,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src.config import settings
 from src.db.database import Database, create_database
+from src.observability import configure_logging
 from src.web.common import ctx, template_response
 from src.web.jobs import job_registry
 from src.web.middleware import LocalSessionCookieMiddleware, RequestLoggingMiddleware
@@ -29,6 +30,11 @@ from src.web.routes.sources import router as sources_router
 
 db = create_database()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+configure_logging(
+    app_env=settings.app_env,
+    log_format=settings.log_format,
+    log_level=settings.log_level,
+)
 
 _rate_limit_store: dict[str, deque[float]] = {}
 _bulk_unattend_undo_store: dict[str, list[str]] = {}

@@ -7,6 +7,9 @@ import asyncio
 
 
 def cli() -> None:
+    from src.config import settings
+    from src.observability import configure_logging
+
     parser = argparse.ArgumentParser(description="Family Events Discovery System")
     sub = parser.add_subparsers(dest="command")
 
@@ -22,6 +25,11 @@ def cli() -> None:
     sub.add_parser("dedupe", help="Backfill-dedupe existing events in database")
 
     args = parser.parse_args()
+    configure_logging(
+        app_env=settings.app_env,
+        log_format=settings.log_format,
+        log_level=settings.log_level,
+    )
 
     if args.command == "scrape":
         from src.scheduler import run_scrape
@@ -85,12 +93,18 @@ def _serve(*, reload: bool) -> None:
     import uvicorn
 
     from src.config import settings
+    from src.observability import build_logging_config
 
     uvicorn.run(
         "src.web.app:app",
         host=settings.host,
         port=settings.port,
         reload=reload,
+        log_config=build_logging_config(
+            app_env=settings.app_env,
+            log_format=settings.log_format,
+            log_level=settings.log_level,
+        ),
     )
 
 

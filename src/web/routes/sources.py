@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -9,12 +10,14 @@ from fastapi.responses import HTMLResponse
 
 from src.db.database import create_database
 from src.db.models import Source
+from src.observability import log_event
 from src.predefined_sources import (
     get_predefined_source,
     list_predefined_sources,
     make_predefined_source,
 )
 from src.scrapers.analyzer import PageAnalyzer
+from src.scrapers.generic import GenericScraper
 from src.scrapers.recipe import ScrapeRecipe
 from src.scrapers.router import BUILTIN_DOMAIN_MESSAGE, extract_domain, is_builtin_domain
 from src.web.auth import ensure_csrf_token, get_current_user
@@ -32,6 +35,134 @@ from src.web.common import (
 from src.web.jobs_ui import render_job_cards, start_background_job
 
 router = APIRouter()
+logger = logging.getLogger("uvicorn.error")
+
+
+async def _run_source_analyze_job(
+    job_db,
+    *,
+    source_id: str,
+    source_name: str,
+    source_url: str,
+) -> dict[str, Any]:
+    log_event(
+        logger,
+        logging.INFO,
+        "source_job_runner_started",
+        action="analyze",
+        source_id=source_id,
+        source_name=source_name,
+        source_url=source_url,
+    )
+    try:
+        recipe = await PageAnalyzer().analyze(source_url)
+        status = "active" if recipe.confidence >= 0.3 else "failed"
+        await job_db.update_source_recipe(
+            source_id,
+            recipe.model_dump_json(),
+            status=status,
+        )
+        result = {
+            "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
+            "strategy": recipe.strategy,
+            "confidence": recipe.confidence,
+            "notes": recipe.notes,
+            "recipe": recipe.model_dump(mode="json"),
+        }
+        log_event(
+            logger,
+            logging.INFO,
+            "source_job_runner_succeeded",
+            action="analyze",
+            source_id=source_id,
+            source_name=source_name,
+            source_url=source_url,
+            strategy=recipe.strategy,
+            confidence=round(recipe.confidence, 3),
+            status=status,
+        )
+        return result
+    except Exception as exc:
+        await job_db.update_source_status(source_id, status="failed", error=str(exc))
+        log_event(
+            logger,
+            logging.WARNING,
+            "source_job_runner_failed",
+            action="analyze",
+            source_id=source_id,
+            source_name=source_name,
+            source_url=source_url,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+        raise
+
+
+async def _run_source_test_job(job_db, *, source_id: str) -> dict[str, Any]:
+    source_for_job = await job_db.get_source(source_id)
+    source_name = source_for_job.name if source_for_job else "-"
+    source_url = source_for_job.url if source_for_job else "-"
+    log_event(
+        logger,
+        logging.INFO,
+        "source_job_runner_started",
+        action="test",
+        source_id=source_id,
+        source_name=source_name,
+        source_url=source_url,
+    )
+    try:
+        if not source_for_job or not source_for_job.recipe_json:
+            raise ValueError("No recipe to test")
+        recipe = ScrapeRecipe.model_validate_json(source_for_job.recipe_json)
+        scraper = GenericScraper(
+            url=source_for_job.url,
+            source_id=source_for_job.id,
+            recipe=recipe,
+        )
+        events = await scraper.scrape()
+        sample_events = [
+            {
+                "title": event.title,
+                "start_time": event.start_time.isoformat(),
+                "location_name": event.location_name,
+                "location_city": event.location_city,
+                "source_url": event.source_url,
+            }
+            for event in events[:5]
+        ]
+        result = {
+            "summary": f"{len(events)} events found",
+            "count": len(events),
+            "sample_events": sample_events,
+            "source_url": source_for_job.url,
+            "strategy": recipe.strategy,
+        }
+        log_event(
+            logger,
+            logging.INFO,
+            "source_job_runner_succeeded",
+            action="test",
+            source_id=source_id,
+            source_name=source_name,
+            source_url=source_url,
+            event_count=len(events),
+            strategy=recipe.strategy,
+        )
+        return result
+    except Exception as exc:
+        log_event(
+            logger,
+            logging.WARNING,
+            "source_job_runner_failed",
+            action="test",
+            source_id=source_id,
+            source_name=source_name,
+            source_url=source_url,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+        raise
 
 
 def _render_source_card(request: Request, source: Source) -> str:
@@ -161,23 +292,12 @@ async def api_add_source(request: Request):
 
     async def runner(_job) -> dict[str, Any]:
         async with create_database(database_url=database_url) as job_db:
-            try:
-                recipe = await PageAnalyzer().analyze(url)
-                await job_db.update_source_recipe(
-                    source.id,
-                    recipe.model_dump_json(),
-                    status="active" if recipe.confidence >= 0.3 else "failed",
-                )
-                return {
-                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
-                    "strategy": recipe.strategy,
-                    "confidence": recipe.confidence,
-                    "notes": recipe.notes,
-                    "recipe": recipe.model_dump(mode="json"),
-                }
-            except Exception as exc:
-                await job_db.update_source_status(source.id, status="failed", error=str(exc))
-                raise
+            return await _run_source_analyze_job(
+                job_db,
+                source_id=source.id,
+                source_name=source.name,
+                source_url=url,
+            )
 
     sources = await db.get_user_sources(user.id)
     return await start_background_job(
@@ -221,23 +341,12 @@ async def api_reanalyze(request: Request, source_id: str):
             source_for_job = await job_db.get_source(source_id)
             if not source_for_job:
                 raise ValueError("Source not found")
-            try:
-                recipe = await PageAnalyzer().analyze(source_for_job.url)
-                await job_db.update_source_recipe(
-                    source_id,
-                    recipe.model_dump_json(),
-                    status="active" if recipe.confidence >= 0.3 else "failed",
-                )
-                return {
-                    "summary": f"{recipe.strategy} strategy at {recipe.confidence:.0%} confidence",
-                    "strategy": recipe.strategy,
-                    "confidence": recipe.confidence,
-                    "notes": recipe.notes,
-                    "recipe": recipe.model_dump(mode="json"),
-                }
-            except Exception as exc:
-                await job_db.update_source_status(source_id, status="failed", error=str(exc))
-                raise
+            return await _run_source_analyze_job(
+                job_db,
+                source_id=source_id,
+                source_name=source_for_job.name,
+                source_url=source_for_job.url,
+            )
 
     return await start_background_job(
         request,
@@ -272,36 +381,8 @@ async def api_test_source(request: Request, source_id: str):
     database_url = db.database_url
 
     async def runner(_job) -> dict[str, Any]:
-        from src.scrapers.generic import GenericScraper
-
         async with create_database(database_url=database_url) as job_db:
-            source_for_job = await job_db.get_source(source_id)
-            if not source_for_job or not source_for_job.recipe_json:
-                raise ValueError("No recipe to test")
-            recipe = ScrapeRecipe.model_validate_json(source_for_job.recipe_json)
-            scraper = GenericScraper(
-                url=source_for_job.url,
-                source_id=source_for_job.id,
-                recipe=recipe,
-            )
-            events = await scraper.scrape()
-            sample_events = [
-                {
-                    "title": event.title,
-                    "start_time": event.start_time.isoformat(),
-                    "location_name": event.location_name,
-                    "location_city": event.location_city,
-                    "source_url": event.source_url,
-                }
-                for event in events[:5]
-            ]
-            return {
-                "summary": f"{len(events)} events found",
-                "count": len(events),
-                "sample_events": sample_events,
-                "source_url": source_for_job.url,
-                "strategy": recipe.strategy,
-            }
+            return await _run_source_test_job(job_db, source_id=source_id)
 
     return await start_background_job(
         request,

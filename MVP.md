@@ -20,6 +20,8 @@ Already completed in the codebase:
 - Central `America/Chicago` timezone helpers used by weekend selection, calendar boundaries, cron, and notify flows
 - Scraper datetime parsing now defaults naive event times to `America/Chicago`, with DST/midnight regression coverage
 - `/health` pipeline freshness reporting for scrape/tag/notify plus stuck-job detection
+- Production-aware structured logging with readable dev output and JSON production output
+- Structured failure context and stage timing logs for pipeline runs, source jobs, and notification delivery
 - Structured notification dispatch results and explicit unknown-channel failures
 - Shared outbound HTTP client behavior across scrapers, analyzer, weather, and notification providers
 - Authenticated, paginated, rate-limited `/api/events` contract documented in `README.md`

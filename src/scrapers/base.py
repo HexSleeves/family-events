@@ -1,11 +1,14 @@
 """Abstract base scraper for all event sources."""
 
+import logging
 from abc import ABC, abstractmethod
 
 import httpx
 
 from src.db.models import Event
 from src.http import build_async_client
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class BaseScraper(ABC):
@@ -20,8 +23,18 @@ class BaseScraper(ABC):
 
     # -- helpers -------------------------------------------------------------
 
-    def log(self, msg: str) -> None:
-        print(f"[{self.source_name}] {msg}")
+    def log(self, msg: str, *, level: int = logging.INFO, **context: object) -> None:
+        logger.log(
+            level,
+            "scraper_message",
+            extra={
+                "stage": "scrape",
+                "source_name": self.source_name,
+                "scraper_class": type(self).__name__,
+                "detail": msg,
+                **{key: value for key, value in context.items() if value is not None},
+            },
+        )
 
     def _client(self, **kwargs) -> httpx.AsyncClient:
         """Return a pre-configured httpx async client."""

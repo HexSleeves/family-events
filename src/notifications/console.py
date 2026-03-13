@@ -1,6 +1,19 @@
+import logging
+
+from src.observability import log_event
+
+logger = logging.getLogger("uvicorn.error")
+
+
 class ConsoleNotifier:
     async def send(self, message: str) -> bool:
-        print("\n" + "=" * 50)
-        print(message)
-        print("=" * 50 + "\n")
+        log_event(
+            logger,
+            logging.INFO,
+            "notification_delivery_succeeded",
+            channel="console",
+            recipient="console",
+            message_length=len(message),
+            notification_body=message,
+        )
         return True

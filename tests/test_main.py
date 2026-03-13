@@ -4,8 +4,8 @@ from src import main
 def test_serve_uses_production_mode(monkeypatch):
     captured: dict[str, object] = {}
 
-    def fake_run(app: str, *, host: str, port: int, reload: bool) -> None:
-        captured.update(app=app, host=host, port=port, reload=reload)
+    def fake_run(app: str, *, host: str, port: int, reload: bool, log_config: object) -> None:
+        captured.update(app=app, host=host, port=port, reload=reload, log_config=log_config)
 
     monkeypatch.setattr("uvicorn.run", fake_run)
 
@@ -13,13 +13,14 @@ def test_serve_uses_production_mode(monkeypatch):
 
     assert captured["app"] == "src.web.app:app"
     assert captured["reload"] is False
+    assert isinstance(captured["log_config"], dict)
 
 
 def test_serve_dev_enables_autoreload(monkeypatch):
     captured: dict[str, object] = {}
 
-    def fake_run(app: str, *, host: str, port: int, reload: bool) -> None:
-        captured.update(app=app, host=host, port=port, reload=reload)
+    def fake_run(app: str, *, host: str, port: int, reload: bool, log_config: object) -> None:
+        captured.update(app=app, host=host, port=port, reload=reload, log_config=log_config)
 
     monkeypatch.setattr("uvicorn.run", fake_run)
 
@@ -27,6 +28,7 @@ def test_serve_dev_enables_autoreload(monkeypatch):
 
     assert captured["app"] == "src.web.app:app"
     assert captured["reload"] is True
+    assert isinstance(captured["log_config"], dict)
 
 
 def test_pipeline_cli_runs_scrape_tag_then_notify(monkeypatch):

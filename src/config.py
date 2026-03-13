@@ -6,6 +6,11 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
+    # Runtime / observability
+    app_env: Literal["development", "production", "test"] = "development"
+    log_level: str = "INFO"
+    log_format: Literal["auto", "pretty", "json"] = "auto"
+
     # Database
     database_url: str = "sqlite+aiosqlite:///family_events.db"
     database_path: str = "family_events.db"

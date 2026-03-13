@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import TypedDict
+
+from src.observability import log_event
 
 from .console import ConsoleNotifier
 from .email import EmailNotifier
 from .sms import SMSNotifier
 from .telegram import TelegramNotifier
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class NotificationResult(TypedDict):
@@ -52,6 +57,16 @@ class NotificationDispatcher:
         if channels is None:
             channels = ["console"]
 
+        log_event(
+            logger,
+            logging.INFO,
+            "notification_dispatch_started",
+            channel_count=len(channels),
+            channels=channels,
+            email_recipient=email_to or "-",
+            sms_recipient=sms_to or "-",
+        )
+
         results: list[NotificationResult] = []
         for channel in channels:
             if channel == "email":
@@ -71,6 +86,12 @@ class NotificationDispatcher:
                 success = await self.console.send(message)
                 error = "" if success else "Console delivery failed"
             else:
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "notification_dispatch_unknown_channel",
+                    channel=channel,
+                )
                 results.append(
                     self._result(
                         channel=channel,
@@ -80,12 +101,30 @@ class NotificationDispatcher:
                 )
                 continue
 
-            results.append(
-                self._result(
-                    channel=channel,
-                    success=success,
-                    recipient=recipient,
-                    error=error,
-                )
+            result = self._result(
+                channel=channel,
+                success=success,
+                recipient=recipient,
+                error=error,
             )
+            results.append(result)
+            log_event(
+                logger,
+                logging.INFO,
+                "notification_dispatch_result",
+                channel=channel,
+                success=success,
+                recipient=recipient or "-",
+                error=error or "-",
+            )
+
+        success_count = sum(1 for item in results if item["success"])
+        log_event(
+            logger,
+            logging.INFO,
+            "notification_dispatch_completed",
+            channel_count=len(results),
+            success_count=success_count,
+            failure_count=len(results) - success_count,
+        )
         return results

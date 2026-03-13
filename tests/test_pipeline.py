@@ -5,11 +5,13 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import src.scheduler as scheduler_module
+import src.web.jobs as jobs_module
 import src.web.routes.pages as pages_module
 from src.db.database import create_database
 from src.db.models import Event, EventTags, Source
 from src.scheduler import run_notify, run_scheduled_scrape_then_tag
 from src.scrapers.router import extract_domain
+from src.web.jobs import JobRegistry
 
 
 class DummyScraper:
@@ -188,3 +190,130 @@ def test_weekend_page_uses_central_timezone_boundary(client, monkeypatch):
     assert response.status_code == 200
     assert "Saturday Story Time" in response.text
     assert "Monday Music" not in response.text
+
+
+def test_run_scrape_emits_structured_stage_logs(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        emitted: list[tuple[int, str, dict[str, object]]] = []
+        source = Source(
+            name="Example Source",
+            url="https://example.com/events",
+            domain=extract_domain("https://example.com/events"),
+            user_id=str(uuid4()),
+            status="active",
+            builtin=False,
+            recipe_json=(
+                '{"version":1,"root_selector":"body","item_selector":".event",'
+                '"title_selector":".title","date_selector":".date"}'
+            ),
+        )
+        now = datetime.now(tz=UTC)
+        event = Event(
+            source="custom:test",
+            source_url="https://example.com/event-1",
+            source_id="event-1",
+            title="Library Story Time",
+            description="Fun for toddlers",
+            location_name="Library",
+            location_address="123 Main",
+            location_city="Lafayette",
+            start_time=now + timedelta(days=1),
+            end_time=now + timedelta(days=1, hours=1),
+            raw_data={},
+        )
+
+        def capture(level: int, event: str, **context: object) -> None:
+            emitted.append((level, event, context))
+
+        monkeypatch.setattr(
+            scheduler_module, "_build_scraper", lambda _source: DummyScraper([event])
+        )
+        monkeypatch.setattr(scheduler_module, "_runtime_log", capture)
+
+        async with create_database(str(tmp_path / "pipeline-logs.db")) as db:
+            await db.create_source(source)
+            result = await scheduler_module.run_scrape(db)
+
+        assert result == 1
+
+        started = [context for _, event, context in emitted if event == "pipeline_stage_started"]
+        source_started = [
+            context for _, event, context in emitted if event == "pipeline_scrape_source_started"
+        ]
+        source_finished = [
+            context
+            for _, event, context in emitted
+            if event == "pipeline_scrape_source_succeeded"
+        ]
+        finished = [context for _, event, context in emitted if event == "pipeline_stage_succeeded"]
+
+        assert len(started) == 1
+        assert started[0]["stage"] == "scrape"
+        assert started[0]["source_count"] == 1
+        assert len(source_started) == 1
+        assert source_started[0]["source_id"] == source.id
+        assert source_started[0]["source_name"] == source.name
+        assert len(source_finished) == 1
+        assert source_finished[0]["source_id"] == source.id
+        assert source_finished[0]["event_count"] == 1
+        assert source_finished[0]["duration_ms"] >= 0
+        assert len(finished) == 1
+        assert finished[0]["stage"] == "scrape"
+        assert finished[0]["scraped"] == 1
+        assert finished[0]["duration_ms"] >= 0
+
+    asyncio.run(scenario())
+
+
+def test_job_registry_failure_logs_include_job_context(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        database_url = f"sqlite+aiosqlite:///{tmp_path / 'job-logging.db'}"
+        registry = JobRegistry()
+        emitted: list[tuple[int, str, dict[str, object]]] = []
+
+        async def failing_runner(_context):
+            raise ValueError("boom")
+
+        def capture(level: int, event: str, **context: object) -> None:
+            emitted.append((level, event, context))
+
+        monkeypatch.setattr(jobs_module, "_runtime_log", capture)
+        job, created = await registry.start_unique(
+            kind="pipeline",
+            job_key="pipeline:test-failure",
+            label="Pipeline failure test",
+            owner_user_id="owner-1",
+            source_id="source-123",
+            runner=failing_runner,
+            database_url=database_url,
+        )
+
+        assert created is True
+
+        task = registry._active_by_id[job.id].task
+        await task
+
+        async with create_database(database_url=database_url) as db:
+            persisted = await db.get_job(job.id)
+
+        assert persisted is not None
+        assert persisted.state == "failed"
+        assert persisted.error == "boom"
+
+        started = [context for _, event, context in emitted if event == "background_job_started"]
+        failed = [context for _, event, context in emitted if event == "background_job_failed"]
+
+        assert len(started) == 1
+        assert started[0]["job_id"] == job.id
+        assert started[0]["job_key"] == "pipeline:test-failure"
+        assert started[0]["source_id"] == "source-123"
+
+        assert len(failed) == 1
+        assert failed[0]["job_id"] == job.id
+        assert failed[0]["job_key"] == "pipeline:test-failure"
+        assert failed[0]["source_id"] == "source-123"
+        assert failed[0]["error_type"] == "ValueError"
+        assert failed[0]["error_message"] == "boom"
+        assert failed[0]["duration_ms"] >= 0
+
+    asyncio.run(scenario())

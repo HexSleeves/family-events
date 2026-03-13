@@ -40,11 +40,11 @@ A prioritized engineering plan based on the current codebase audit.
   - [x] Set APScheduler timezone explicitly to `America/Chicago`
   - [x] Review weekend/date-window queries for UTC/local correctness
   - [x] Audit scraper timestamp parsing for timezone consistency
-- [ ] Improve health and observability
-  - [ ] Replace `print()`-style operational logs with structured logging
-  - [ ] Add logging context for user/source/job failures
+- [x] Improve health and observability
+  - [x] Replace `print()`-style operational logs with structured logging
+  - [x] Add logging context for user/source/job failures
   - [x] Expand `/health` to include scheduler/job freshness signals
-  - [ ] Add timing metrics for scrape/tag/notify stages
+  - [x] Add timing metrics for scrape/tag/notify stages
 - [x] Improve resilience of external HTTP calls
   - [x] Centralize `httpx` client configuration
   - [x] Add sane connect/read timeouts everywhere

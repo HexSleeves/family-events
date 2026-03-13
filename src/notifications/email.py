@@ -2,17 +2,35 @@ import logging
 
 from src.config import settings
 from src.http import build_async_client, default_timeout
+from src.observability import log_event
 
 logger = logging.getLogger("uvicorn.error")
 
 
 class EmailNotifier:
     async def send(self, message: str, *, to_email: str = "") -> bool:
+        service = "notify.email.resend"
         if not settings.resend_api_key:
-            print("Email: Missing RESEND_API_KEY, skipping")
+            log_event(
+                logger,
+                logging.INFO,
+                "notification_delivery_skipped",
+                service=service,
+                channel="email",
+                recipient=to_email or "-",
+                reason="missing_api_key",
+            )
             return False
         if not to_email:
-            print("Email: No recipient email, skipping")
+            log_event(
+                logger,
+                logging.INFO,
+                "notification_delivery_skipped",
+                service=service,
+                channel="email",
+                recipient="-",
+                reason="missing_recipient",
+            )
             return False
 
         url = "https://api.resend.com/emails"
@@ -20,7 +38,7 @@ class EmailNotifier:
             html = message.replace("\n", "<br>")
 
             async with build_async_client(
-                service="notify.email.resend",
+                service=service,
                 timeout=default_timeout(),
                 headers={
                     "Accept": "application/json",
@@ -38,15 +56,28 @@ class EmailNotifier:
                     },
                 )
                 resp.raise_for_status()
-                print(f"Email sent to {to_email}!")
+                log_event(
+                    logger,
+                    logging.INFO,
+                    "notification_delivery_succeeded",
+                    service=service,
+                    channel="email",
+                    recipient=to_email,
+                    url=url,
+                    message_length=len(message),
+                )
                 return True
         except Exception as exc:
-            logger.warning(
-                "notification_delivery_failed service=%s channel=email recipient=%s url=%s timeout=%ss error=%s",
-                "notify.email.resend",
-                to_email,
-                url,
-                settings.external_http_timeout_seconds,
-                exc,
+            log_event(
+                logger,
+                logging.WARNING,
+                "notification_delivery_failed",
+                service=service,
+                channel="email",
+                recipient=to_email,
+                url=url,
+                timeout_seconds=settings.external_http_timeout_seconds,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
             )
             return False
