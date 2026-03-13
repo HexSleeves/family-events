@@ -21,3 +21,13 @@ def test_user_event_state_change_has_followup_revision() -> None:
         revision.down_revision == "91dae90b6493"
         for revision in script.walk_revisions()
     )
+
+
+def test_city_slug_change_has_followup_revision() -> None:
+    script = _script_directory()
+
+    assert script.get_current_head() != "3d7f85fe4c1a"
+    assert any(
+        revision.down_revision == "3d7f85fe4c1a"
+        for revision in script.walk_revisions()
+    )
