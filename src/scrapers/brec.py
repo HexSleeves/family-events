@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup, Tag
 
 from src.db.models import Event, Source
+from src.timezones import APP_TZ, ensure_aware
 
 from .base import BaseScraper
 
@@ -42,7 +43,7 @@ class BrecScraper(BaseScraper):
 
         # Also scrape next month
         try:
-            now = datetime.now()
+            now = datetime.now(tz=APP_TZ)
             next_month = (now.replace(day=1) + timedelta(days=32)).replace(day=1)
             next_url = f"{CALENDAR_URL}/{next_month.strftime('%Y/%m')}"
             events = await self._scrape_month(next_url)
@@ -193,7 +194,7 @@ class BrecScraper(BaseScraper):
         # Parse start time from time_text
         time_text = time_text.strip().lower()
         if "all day" in time_text or not time_text:
-            return dt.replace(hour=0, minute=0)
+            return ensure_aware(dt.replace(hour=0, minute=0))
 
         # Try to extract start time like "8:30 AM" or "8:30 am - 9:30 am"
         m = re.search(r"(\d{1,2}):(\d{2})\s*(am|pm)", time_text)
@@ -205,9 +206,9 @@ class BrecScraper(BaseScraper):
                 hour += 12
             if ampm == "am" and hour == 12:
                 hour = 0
-            return dt.replace(hour=hour, minute=minute)
+            return ensure_aware(dt.replace(hour=hour, minute=minute))
 
-        return dt
+        return ensure_aware(dt)
 
     def _parse_end_time(self, date_str: str, time_text: str) -> datetime | None:
         """Parse end time from time text like '8:30 AM - 9:30 AM'."""
@@ -233,7 +234,7 @@ class BrecScraper(BaseScraper):
             hour += 12
         if ampm == "am" and hour == 12:
             hour = 0
-        return dt.replace(hour=hour, minute=minute)
+        return ensure_aware(dt.replace(hour=hour, minute=minute))
 
     @staticmethod
     def _parse_date_header(date_str: str) -> datetime:
@@ -245,7 +246,7 @@ class BrecScraper(BaseScraper):
             "%m/%d/%Y",
         ):
             try:
-                return datetime.strptime(date_str, fmt)
+                return ensure_aware(datetime.strptime(date_str, fmt))
             except ValueError:
                 continue
         raise ValueError(f"Cannot parse date header: {date_str!r}")

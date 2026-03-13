@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo
 
 APP_TZ = ZoneInfo("America/Chicago")
@@ -11,6 +11,13 @@ APP_TZ = ZoneInfo("America/Chicago")
 def utc_now() -> datetime:
     """Return the current UTC time as an aware datetime."""
     return datetime.now(tz=UTC)
+
+
+def ensure_aware(value: datetime, *, default_tz: tzinfo = APP_TZ) -> datetime:
+    """Attach a default timezone when parsing returns a naive datetime."""
+    if value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=default_tz)
 
 
 def local_now(*, now: datetime | None = None) -> datetime:

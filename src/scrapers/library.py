@@ -5,12 +5,13 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
 from src.db.models import Event, Source
+from src.timezones import APP_TZ, ensure_aware
 
 from .base import BaseScraper
 
@@ -58,7 +59,7 @@ class LibraryScraper(BaseScraper):
             )
 
         pub_date = item.find("pubDate")
-        start_time = datetime.now()
+        start_time = datetime.now(tz=APP_TZ)
         if pub_date:
             start_time = self._parse_rss_date(pub_date.get_text(strip=True))
 
@@ -133,10 +134,11 @@ class LibraryScraper(BaseScraper):
         return events
 
     def _parse_libcal_datetime(self, date_text: str, time_text: str) -> datetime:
-        year = datetime.now().year
-        dt = datetime.now()
+        current = datetime.now(tz=APP_TZ)
+        year = current.year
+        dt = current
         with contextlib.suppress(ValueError):
-            dt = datetime.strptime(f"{date_text} {year}", "%b %d %Y")
+            dt = ensure_aware(datetime.strptime(f"{date_text} {year}", "%b %d %Y"))
 
         match = re.search(r"(\d{1,2}):(\d{2})(am|pm)", time_text.lower())
         if match:
@@ -148,7 +150,7 @@ class LibraryScraper(BaseScraper):
             if ampm == "am" and hour == 12:
                 hour = 0
             dt = dt.replace(hour=hour, minute=minute)
-        return dt
+        return ensure_aware(dt)
 
     @staticmethod
     def _parse_rss_date(date_str: str) -> datetime:
@@ -159,5 +161,10 @@ class LibraryScraper(BaseScraper):
             "%Y-%m-%d",
         ):
             with contextlib.suppress(ValueError):
-                return datetime.strptime(date_str, fmt)
-        return datetime.now()
+                parsed = datetime.strptime(date_str, fmt)
+                if fmt == "%a, %d %b %Y %H:%M:%S %Z":
+                    zone_name = date_str.rsplit(" ", 1)[-1].upper()
+                    if zone_name in {"GMT", "UTC"}:
+                        return parsed.replace(tzinfo=UTC)
+                return ensure_aware(parsed)
+        return datetime.now(tz=APP_TZ)

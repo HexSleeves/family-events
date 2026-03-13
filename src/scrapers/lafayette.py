@@ -19,6 +19,7 @@ from typing import TypedDict
 from bs4 import BeautifulSoup, Tag
 
 from src.db.models import Event, Source
+from src.timezones import APP_TZ, ensure_aware
 
 from .base import BaseScraper
 
@@ -178,11 +179,11 @@ class LafayetteScraper(BaseScraper):
             if not href.startswith("http"):
                 href = f"{src['base']}{href}"
 
-            start_time = datetime.now()
+            start_time = datetime.now(tz=APP_TZ)
             occ = re.search(r"occurrence=(\d{4}-\d{2}-\d{2})", href)
             if occ:
                 with contextlib.suppress(ValueError):
-                    start_time = datetime.strptime(occ.group(1), "%Y-%m-%d")
+                    start_time = ensure_aware(datetime.strptime(occ.group(1), "%Y-%m-%d"))
 
             m = re.search(r"/events?/([^/?]+)", href)
             sid = f"{src['sub']}_{m.group(1)}" if m else hashlib.md5(href.encode()).hexdigest()
@@ -204,7 +205,7 @@ class LafayetteScraper(BaseScraper):
 
 def _apply_time(dt: datetime, time_text: str) -> datetime:
     if not time_text:
-        return dt
+        return ensure_aware(dt)
     m = re.search(r"(\d{1,2}):(\d{2})\s*(am|pm)", time_text.lower())
     if m:
         h, mi, ap = int(m.group(1)), int(m.group(2)), m.group(3)
@@ -212,13 +213,13 @@ def _apply_time(dt: datetime, time_text: str) -> datetime:
             h += 12
         if ap == "am" and h == 12:
             h = 0
-        return dt.replace(hour=h, minute=mi)
-    return dt
+        return ensure_aware(dt.replace(hour=h, minute=mi))
+    return ensure_aware(dt)
 
 
 def _parse_mec_dt(date_text: str, time_text: str) -> datetime:
     """Parse MEC date formats like '28February2026', 'Saturday - 07 Mar', etc."""
-    now = datetime.now()
+    now = datetime.now(tz=APP_TZ)
     dt = now
 
     # '28February2026' (no spaces)
@@ -234,7 +235,7 @@ def _parse_mec_dt(date_text: str, time_text: str) -> datetime:
     m = re.match(r"\w+\s*-\s*(\d{1,2})\s+([A-Za-z]+)", date_text.strip())
     if m:
         try:
-            dt = datetime.strptime(f"{m.group(1)} {m.group(2)} {now.year}", "%d %b %Y")
+            dt = ensure_aware(datetime.strptime(f"{m.group(1)} {m.group(2)} {now.year}", "%d %b %Y"))
             if dt < now:
                 dt = dt.replace(year=now.year + 1)
             return _apply_time(dt, time_text)

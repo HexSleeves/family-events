@@ -12,6 +12,7 @@ from src.db.models import Event, Source
 from src.scheduler import SYSTEM_USER_EMAIL, ensure_system_user
 from src.scrapers.analyzer import validate_public_http_url
 from src.scrapers.router import extract_domain
+from src.web.auth import verify_password
 from src.web.common import _same_origin
 
 
@@ -95,6 +96,13 @@ def test_logout_requires_valid_csrf(client, create_user):
     response = client.post("/logout", data={"csrf_token": csrf_token}, follow_redirects=False)
     assert response.status_code == 302
     assert response.headers["location"] == "/"
+
+
+def test_profile_page_redirects_when_logged_out(client):
+    response = client.get("/profile", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/login"
 
 
 def test_login_rate_limit_applies(client, create_user):
@@ -307,6 +315,86 @@ def test_dashboard_and_profile_show_shared_initial_import_status(client, create_
     assert shared_jobs.status_code == 200
     assert "Shared Pipeline History" in shared_jobs.text
     assert "Scrape + tag job" in shared_jobs.text
+
+
+def test_profile_notifications_requires_login(client):
+    response = client.post(
+        "/api/profile/notifications",
+        data={"channels": ["console"], "child_name": "Em"},
+    )
+
+    assert response.status_code == 401
+    assert "Please log in first" in response.headers.get("hx-trigger", "")
+
+
+def test_profile_onboarding_updates_child_preferences(client, create_user):
+    user = create_user(email="profile-update@example.com", home_city="Lafayette")
+    login(client, email=user.email)
+    profile = client.get("/profile")
+    csrf_token = extract_csrf_token(profile.text)
+
+    response = client.post(
+        "/api/profile/onboarding",
+        data={
+            "csrf_token": csrf_token,
+            "home_city": "Baton Rouge",
+            "preferred_cities": "Lafayette, Baton Rouge, Lafayette",
+            "child_name": "Em",
+            "child_age_years": "4",
+            "child_age_months": "2",
+            "temperament": "curious but warms up slowly",
+            "loves": "animals, music",
+            "likes": "story time, splash pads",
+            "dislikes": "loud crowds",
+            "favorite_categories": "animals, play",
+            "avoid_categories": "sports",
+            "budget": "18",
+            "max_drive": "25",
+            "nap_time": "12:30-14:00",
+            "bedtime": "19:45",
+            "notes_for_recommendations": "Prefers calm mornings",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Child profile updated" in response.headers.get("hx-trigger", "")
+    updated = asyncio.run(client.app.state.db.get_user_by_email(user.email))
+    assert updated is not None
+    assert updated.onboarding_complete is True
+    assert updated.home_city == "Baton Rouge"
+    assert updated.preferred_cities == ["Lafayette", "Baton Rouge"]
+    assert updated.child_name == "Em"
+    assert updated.interest_profile.child_age_years == 4
+    assert updated.interest_profile.child_age_months == 2
+    assert updated.interest_profile.constraints.home_city == "Baton Rouge"
+    assert updated.interest_profile.constraints.preferred_cities == ["Lafayette", "Baton Rouge"]
+    assert updated.interest_profile.constraints.max_drive_time_minutes == 25
+    assert updated.interest_profile.constraints.budget_per_event == 18.0
+
+
+def test_profile_password_change_updates_credentials(client, create_user):
+    user = create_user(email="password-update@example.com")
+    login(client, email=user.email)
+    profile = client.get("/profile")
+    csrf_token = extract_csrf_token(profile.text)
+
+    response = client.post(
+        "/api/profile/password",
+        data={
+            "csrf_token": csrf_token,
+            "current_password": "Password123",
+            "new_password": "Password456",
+            "confirm_password": "Password456",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Password changed" in response.headers.get("hx-trigger", "")
+    updated = asyncio.run(client.app.state.db.get_user_by_email(user.email))
+    assert updated is not None
+    assert updated.password_hash != user.password_hash
+    assert verify_password("Password456", updated.password_hash)
+    assert not verify_password("Password123", updated.password_hash)
 
 
 def test_signup_duplicate_email_shows_inline_error_for_htmx(client, create_user):

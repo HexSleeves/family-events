@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup, Tag
 from dateutil import parser as dateutil_parser
 
 from src.db.models import Event
+from src.timezones import APP_TZ, ensure_aware
 
 from .base import BaseScraper
 from .recipe import FieldRule, ScrapeRecipe
@@ -178,11 +179,11 @@ class GenericScraper(BaseScraper):
     @staticmethod
     def _parse_dt(raw: str | None) -> datetime:
         if not raw:
-            return datetime.now()
+            return datetime.now(tz=APP_TZ)
         try:
-            return dateutil_parser.parse(raw)
+            return ensure_aware(dateutil_parser.parse(raw))
         except (ValueError, OverflowError):
-            return datetime.now()
+            return datetime.now(tz=APP_TZ)
 
     @staticmethod
     def _make_id(title: str, date_str: str) -> str:

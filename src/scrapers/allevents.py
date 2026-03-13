@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 
 from src.db.models import Event, Source
+from src.timezones import APP_TZ, ensure_aware
 
 from .base import BaseScraper
 
@@ -173,10 +174,11 @@ class AllEventsScraper(BaseScraper):
 
 def _parse_dt(raw: str) -> datetime:
     raw = raw.strip()
+    utc_formats = {"%Y-%m-%dT%H:%M:%SZ"}
     for fmt in (
         "%Y-%m-%dT%H:%M:%S",
         "%Y-%m-%dT%H:%M:%S.%f",
-        "%Y-%m-%dT%H:%M:%SZ",
+        *utc_formats,
         "%Y-%m-%dT%H:%M:%S%z",
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%d",
@@ -190,7 +192,10 @@ def _parse_dt(raw: str) -> datetime:
         "%a, %b %d",
     ):
         try:
-            return datetime.strptime(raw, fmt)
+            parsed = datetime.strptime(raw, fmt)
+            if fmt in utc_formats:
+                return parsed.replace(tzinfo=UTC)
+            return ensure_aware(parsed, default_tz=APP_TZ)
         except ValueError:
             continue
     raise ValueError(f"Cannot parse datetime: {raw!r}")
