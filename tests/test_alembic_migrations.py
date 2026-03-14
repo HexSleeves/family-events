@@ -40,9 +40,7 @@ def test_historical_revisions_keep_expected_successors() -> None:
 def test_historical_revision_sources_are_immutable() -> None:
     script = _script_directory()
     historical_revision_ids = sorted(
-        revision.revision
-        for revision in script.walk_revisions()
-        if revision.nextrev
+        revision.revision for revision in script.walk_revisions() if revision.nextrev
     )
 
     assert set(_HISTORICAL_REVISION_SHA256) == set(historical_revision_ids)

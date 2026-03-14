@@ -241,9 +241,7 @@ def test_run_scrape_emits_structured_stage_logs(tmp_path, monkeypatch):
             context for _, event, context in emitted if event == "pipeline_scrape_source_started"
         ]
         source_finished = [
-            context
-            for _, event, context in emitted
-            if event == "pipeline_scrape_source_succeeded"
+            context for _, event, context in emitted if event == "pipeline_scrape_source_succeeded"
         ]
         finished = [context for _, event, context in emitted if event == "pipeline_stage_succeeded"]
 

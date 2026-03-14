@@ -94,11 +94,7 @@ def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> 
     logger.log(
         level,
         event,
-        extra={
-            key: _serialize_value(value)
-            for key, value in fields.items()
-            if value is not None
-        },
+        extra={key: _serialize_value(value) for key, value in fields.items() if value is not None},
     )
 
 
@@ -120,8 +116,10 @@ class JsonFormatter(logging.Formatter):
 
 class PrettyFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        timestamp = datetime.fromtimestamp(record.created, tz=UTC).astimezone().isoformat(
-            timespec="seconds"
+        timestamp = (
+            datetime.fromtimestamp(record.created, tz=UTC)
+            .astimezone()
+            .isoformat(timespec="seconds")
         )
         parts = [timestamp, record.levelname, record.name, record.getMessage()]
         for key, value in sorted(_extract_extra_fields(record).items()):

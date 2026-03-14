@@ -154,7 +154,9 @@ def test_api_events_rejects_invalid_filter_values(client, create_user) -> None:
     assert response.json() == {"detail": "tagged must be yes or no"}
 
 
-def test_events_logged_in_default_scope_is_nearby_and_city_override_wins(client, create_user) -> None:
+def test_events_logged_in_default_scope_is_nearby_and_city_override_wins(
+    client, create_user
+) -> None:
     import asyncio
 
     from tests.test_security import login
@@ -163,7 +165,9 @@ def test_events_logged_in_default_scope_is_nearby_and_city_override_wins(client,
     login(client, email=user.email)
 
     lafayette = asyncio.run(_create_event(client, title="Lafayette Story Time", city="Lafayette"))
-    san_francisco = asyncio.run(_create_event(client, title="Golden Gate Kids Day", city="San Francisco"))
+    san_francisco = asyncio.run(
+        _create_event(client, title="Golden Gate Kids Day", city="San Francisco")
+    )
 
     nearby = client.get("/events")
     assert nearby.status_code == 200
@@ -190,7 +194,9 @@ def test_my_events_shows_saved_and_attended_across_all_cities(client, create_use
     login(client, email=user.email)
 
     saved_event = asyncio.run(_create_event(client, title="Saved Austin Zoo", city="Austin"))
-    attended_event = asyncio.run(_create_event(client, title="Attended Bay Story Time", city="San Francisco"))
+    attended_event = asyncio.run(
+        _create_event(client, title="Attended Bay Story Time", city="San Francisco")
+    )
     asyncio.run(client.app.state.db.set_event_saved(user.id, saved_event.id, True))
     asyncio.run(client.app.state.db.set_event_attended(user.id, attended_event.id, True))
 
@@ -211,8 +217,12 @@ def test_shared_corpus_is_hidden_by_default_for_other_users_but_visible_in_all_s
     create_user(email="sf-parent@example.com", home_city="San Francisco")
     louisiana_user = create_user(email="la-parent@example.com", home_city="Lafayette")
 
-    sf_event = asyncio.run(_create_event(client, title="Golden Gate Play Day", city="San Francisco"))
-    lafayette_event = asyncio.run(_create_event(client, title="Acadiana Story Time", city="Lafayette"))
+    sf_event = asyncio.run(
+        _create_event(client, title="Golden Gate Play Day", city="San Francisco")
+    )
+    lafayette_event = asyncio.run(
+        _create_event(client, title="Acadiana Story Time", city="Lafayette")
+    )
 
     login(client, email=louisiana_user.email)
 
@@ -240,7 +250,9 @@ def test_calendar_logged_in_defaults_to_nearby_scope(client, create_user) -> Non
 
     now = datetime.now(tz=UTC)
     lafayette_event = asyncio.run(
-        _create_event(client, title="Calendar Lafayette", city="Lafayette", start_time=now + timedelta(days=2))
+        _create_event(
+            client, title="Calendar Lafayette", city="Lafayette", start_time=now + timedelta(days=2)
+        )
     )
     san_francisco_event = asyncio.run(
         _create_event(

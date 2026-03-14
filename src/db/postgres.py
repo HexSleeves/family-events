@@ -813,9 +813,7 @@ class PostgresDatabase:
             )
             await session.commit()
 
-    async def get_or_create_user_event_state(
-        self, user_id: str, event_id: str
-    ) -> UserEventState:
+    async def get_or_create_user_event_state(self, user_id: str, event_id: str) -> UserEventState:
         async with self.session() as session:
             await session.execute(
                 text(

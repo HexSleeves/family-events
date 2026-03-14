@@ -114,8 +114,9 @@ def test_run_source_analyze_job_logs_failure(monkeypatch):
     monkeypatch.setattr(sources_module, "PageAnalyzer", lambda: FakeAnalyzer())
 
     async def scenario() -> None:
-        with capture_uvicorn_logs() as messages, pytest.raises(
-            RuntimeError, match="analysis exploded"
+        with (
+            capture_uvicorn_logs() as messages,
+            pytest.raises(RuntimeError, match="analysis exploded"),
         ):
             await sources_module._run_source_analyze_job(
                 job_db,
@@ -204,7 +205,10 @@ def test_run_logged_pipeline_job_logs_success_and_failure():
     import src.web.routes.pipeline as pipeline_module
 
     async def success_operation() -> dict[str, object]:
-        return {"summary": "2 deliveries succeeded", "results": [{"success": True}, {"success": True}]}
+        return {
+            "summary": "2 deliveries succeeded",
+            "results": [{"success": True}, {"success": True}],
+        }
 
     async def failure_operation() -> int:
         raise RuntimeError("notify exploded")

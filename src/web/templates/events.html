@@ -3,7 +3,7 @@
 {% set is_my_events_page = is_my_events_page|default(false) %}
 {% set results_path = results_path|default('/events') %}
 {% set current_scope = scope|default('all') %}
-{% block title %}{{ page_title|default('Browse Events') }}{% endblock %}
+{% block title %}{{ page_title|default("Browse Events") }}{% endblock %}
 {% block content %}
   <div class="animate-fade-in space-y-6">
     {# ═══ PAGE HEADER + TAB SWITCHER ═══ #}
@@ -11,9 +11,9 @@
              class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
              aria-labelledby="events-page-heading">
       <div>
-        {{ page_header(page_title|default('Browse Events'),
-                subtitle='Refine by city, source, tagging, and your personal event state.' if is_my_events_page else 'Refine by city, score, source, and request-scoped saved or attended state.',
-                icon_name='bookmark' if is_my_events_page else 'list') }}
+        {{ page_header(page_title|default('Browse Events') ,
+        subtitle='Refine by city, source, tagging, and your personal event state.' if is_my_events_page else 'Refine by city, score, source, and request-scoped saved or attended state.',
+        icon_name='bookmark' if is_my_events_page else 'list') }}
       </div>
       {% if current_user and not is_my_events_page %}
         <div class="inline-flex rounded-full border border-[var(--color-edge)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-xs)]">
@@ -87,12 +87,12 @@
         select_cls="auto-submit h-10") }}
         {% if current_user %}
           {{ select_field("saved", "Saved",
-                  options=[("yes", "Saved") , ("no", "Not saved")],
+                    options=[("yes", "Saved") , ("no", "Not saved")],
           value=saved,
           empty_label="All",
           select_cls="auto-submit h-10") }}
           {{ select_field("attended", "Attended",
-                  options=[("yes", "Attended") , ("no", "Not attended")],
+                    options=[("yes", "Attended") , ("no", "Not attended")],
           value=attended,
           empty_label="All",
           select_cls="auto-submit h-10") }}
@@ -100,10 +100,10 @@
         {% set score_val = (score_min | string) if score_min is not none else "" %}
         {% if not is_my_events_page %}
           {{ select_field("score_min", "Min Score",
-                  options=score_options,
-                  value=score_val,
-                  empty_label="Any",
-                  select_cls="auto-submit h-10") }}
+                    options=score_options,
+                    value=score_val,
+                    empty_label="Any",
+                    select_cls="auto-submit h-10") }}
         {% endif %}
         {{ select_field("sort", "Sort",
                 options=[("start_time", "Date ↑") , ("-start_time", "Date ↓"), ("-score", "Score ↓"), ("title", "Title")],

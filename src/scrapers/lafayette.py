@@ -235,7 +235,9 @@ def _parse_mec_dt(date_text: str, time_text: str) -> datetime:
     m = re.match(r"\w+\s*-\s*(\d{1,2})\s+([A-Za-z]+)", date_text.strip())
     if m:
         try:
-            dt = ensure_aware(datetime.strptime(f"{m.group(1)} {m.group(2)} {now.year}", "%d %b %Y"))
+            dt = ensure_aware(
+                datetime.strptime(f"{m.group(1)} {m.group(2)} {now.year}", "%d %b %Y")
+            )
             if dt < now:
                 dt = dt.replace(year=now.year + 1)
             return _apply_time(dt, time_text)

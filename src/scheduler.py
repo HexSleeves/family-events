@@ -226,8 +226,7 @@ async def run_tag(
                         "succeeded": succeeded,
                         "failed": failed,
                         "summary": (
-                            f"{processed}/{total} processed · "
-                            f"{succeeded} tagged · {failed} failed"
+                            f"{processed}/{total} processed · {succeeded} tagged · {failed} failed"
                         ),
                     }
                 )
@@ -545,9 +544,7 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
         return result
     except Exception as exc:
         error_type, error_message = error_details(exc)
-        await update_scheduled_job(
-            db, job_id, state="failed", detail="Failed", error=error_message
-        )
+        await update_scheduled_job(db, job_id, state="failed", detail="Failed", error=error_message)
         runtime_log(
             logging.ERROR,
             "scheduled_job_failed",
