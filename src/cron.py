@@ -15,53 +15,37 @@ from apscheduler.triggers.cron import CronTrigger
 
 from src.db.database import create_database
 from src.scheduler import run_notify, run_scheduled_scrape_then_tag
+from src.utils import duration_ms, error_details, runtime_log
 
 logger = logging.getLogger("uvicorn.error")
 CRON_TZ = ZoneInfo("America/Chicago")
 
 
-def _duration_ms(started: float) -> float:
-    return round((time.perf_counter() - started) * 1000, 2)
-
-
-def _runtime_log(level: int, event: str, **context: object) -> None:
-    logger.log(
-        level,
-        event,
-        extra={key: value for key, value in context.items() if value is not None},
-    )
-
-
-def _error_details(exc: BaseException) -> tuple[str, str]:
-    message = str(exc).strip() or repr(exc)
-    return type(exc).__name__, message
-
-
 async def daily_scrape_and_tag() -> None:
     """Run at 2 AM daily: scrape all sources and tag new events."""
     started = time.perf_counter()
-    _runtime_log(logging.INFO, "cron_job_started", cron_job="daily_scrape_and_tag")
+    runtime_log(logging.INFO, "cron_job_started", cron_job="daily_scrape_and_tag")
     try:
         async with create_database() as db:
             result = await run_scheduled_scrape_then_tag(db)
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "cron_job_succeeded",
             cron_job="daily_scrape_and_tag",
             scraped=result.get("scraped", 0),
             tagged=result.get("tagged", 0),
             failed=result.get("failed", 0),
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
-        _runtime_log(
+        error_type, error_message = error_details(exc)
+        runtime_log(
             logging.ERROR,
             "cron_job_failed",
             cron_job="daily_scrape_and_tag",
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         logger.exception("cron_job_failed_exception", extra={"cron_job": "daily_scrape_and_tag"})
 
@@ -69,12 +53,12 @@ async def daily_scrape_and_tag() -> None:
 async def friday_notification() -> None:
     """Run at 8 AM on Fridays: send weekend plans to each user."""
     started = time.perf_counter()
-    _runtime_log(logging.INFO, "cron_job_started", cron_job="friday_notification")
+    runtime_log(logging.INFO, "cron_job_started", cron_job="friday_notification")
     try:
         async with create_database() as db:
             users = await db.get_all_users()
             if not users:
-                _runtime_log(
+                runtime_log(
                     logging.INFO,
                     "cron_notification_no_users",
                     cron_job="friday_notification",
@@ -82,7 +66,7 @@ async def friday_notification() -> None:
                 await run_notify(db)
             else:
                 for user in users:
-                    _runtime_log(
+                    runtime_log(
                         logging.INFO,
                         "cron_notification_user_started",
                         cron_job="friday_notification",
@@ -91,7 +75,7 @@ async def friday_notification() -> None:
                     )
                     try:
                         await run_notify(db, user=user)
-                        _runtime_log(
+                        runtime_log(
                             logging.INFO,
                             "cron_notification_user_succeeded",
                             cron_job="friday_notification",
@@ -99,8 +83,8 @@ async def friday_notification() -> None:
                             user_email=user.email,
                         )
                     except Exception as exc:
-                        error_type, error_message = _error_details(exc)
-                        _runtime_log(
+                        error_type, error_message = error_details(exc)
+                        runtime_log(
                             logging.ERROR,
                             "cron_notification_user_failed",
                             cron_job="friday_notification",
@@ -117,22 +101,22 @@ async def friday_notification() -> None:
                                 "user_email": user.email,
                             },
                         )
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "cron_job_succeeded",
             cron_job="friday_notification",
             notified_user_count=len(users),
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
-        _runtime_log(
+        error_type, error_message = error_details(exc)
+        runtime_log(
             logging.ERROR,
             "cron_job_failed",
             cron_job="friday_notification",
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         logger.exception("cron_job_failed_exception", extra={"cron_job": "friday_notification"})
 
@@ -155,9 +139,9 @@ async def main() -> None:
     )
 
     scheduler.start()
-    _runtime_log(logging.INFO, "scheduler_started", timezone=CRON_TZ.key)
+    runtime_log(logging.INFO, "scheduler_started", timezone=CRON_TZ.key)
     for job in scheduler.get_jobs():
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "scheduler_job_registered",
             scheduler_job_name=job.name,

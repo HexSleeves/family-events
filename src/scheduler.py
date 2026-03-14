@@ -19,28 +19,12 @@ from src.scrapers.router import get_builtin_scraper
 from src.tagger.llm import EventTagger
 from src.tagger.taxonomy import TAGGING_VERSION
 from src.timezones import current_weekend_dates, local_today, utc_now
+from src.utils import duration_ms, error_details, runtime_log
 from src.web.auth import hash_password
 
 SYSTEM_USER_EMAIL = "system@family-events.local"
 SYSTEM_USER_DISPLAY_NAME = "System"
 logger = logging.getLogger("uvicorn.error")
-
-
-def _duration_ms(started: float) -> float:
-    return round((time.perf_counter() - started) * 1000, 2)
-
-
-def _runtime_log(level: int, event: str, **context: object) -> None:
-    logger.log(
-        level,
-        event,
-        extra={key: value for key, value in context.items() if value is not None},
-    )
-
-
-def _error_details(exc: Exception) -> tuple[str, str]:
-    message = str(exc).strip() or repr(exc)
-    return type(exc).__name__, message
 
 
 async def run_scrape(db: Database | None = None) -> int:
@@ -54,7 +38,7 @@ async def run_scrape(db: Database | None = None) -> int:
     total = 0
     all_sources = await db.get_all_sources()
     enabled_sources = [source for source in all_sources if source.enabled]
-    _runtime_log(
+    runtime_log(
         logging.INFO,
         "pipeline_stage_started",
         stage="scrape",
@@ -67,7 +51,7 @@ async def run_scrape(db: Database | None = None) -> int:
         source_started = time.perf_counter()
         try:
             scraper = _build_scraper(source)
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "pipeline_scrape_source_started",
                 stage="scrape",
@@ -82,7 +66,7 @@ async def run_scrape(db: Database | None = None) -> int:
                 await db.upsert_event(event)
             await db.update_source_status(source.id, count=len(events))
             total += len(events)
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "pipeline_scrape_source_succeeded",
                 stage="scrape",
@@ -90,11 +74,11 @@ async def run_scrape(db: Database | None = None) -> int:
                 source_name=source.name,
                 source_url=source.url,
                 event_count=len(events),
-                duration_ms=_duration_ms(source_started),
+                duration_ms=duration_ms(source_started),
             )
         except Exception as exc:
-            error_type, error_message = _error_details(exc)
-            _runtime_log(
+            error_type, error_message = error_details(exc)
+            runtime_log(
                 logging.ERROR,
                 "pipeline_scrape_source_failed",
                 stage="scrape",
@@ -103,20 +87,20 @@ async def run_scrape(db: Database | None = None) -> int:
                 source_url=source.url,
                 error_type=error_type,
                 error_message=error_message,
-                duration_ms=_duration_ms(source_started),
+                duration_ms=duration_ms(source_started),
             )
             await db.update_source_status(source.id, error=error_message)
 
     if own_db:
         await db.close()
 
-    _runtime_log(
+    runtime_log(
         logging.INFO,
         "pipeline_stage_succeeded",
         stage="scrape",
         source_count=len(enabled_sources),
         scraped=total,
-        duration_ms=_duration_ms(started),
+        duration_ms=duration_ms(started),
     )
     return total
 
@@ -172,7 +156,7 @@ async def run_tag(
         )
         tagger = EventTagger()
         total = len(untagged)
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "pipeline_stage_started",
             stage="tag",
@@ -186,14 +170,14 @@ async def run_tag(
         if not untagged:
             if progress_callback is not None:
                 await progress_callback({"processed": 0, "total": 0, "succeeded": 0, "failed": 0})
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "pipeline_stage_succeeded",
                 stage="tag",
                 total=0,
                 succeeded=0,
                 failed=0,
-                duration_ms=_duration_ms(started),
+                duration_ms=duration_ms(started),
             )
             return 0
 
@@ -225,7 +209,7 @@ async def run_tag(
             processed = min(total, start_idx + len(batch))
             succeeded += len(tagged_batch)
             failed = processed - succeeded
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "pipeline_tag_progress",
                 stage="tag",
@@ -254,25 +238,25 @@ async def run_tag(
             on_batch_complete=on_batch_complete,
         )
         failed = total - len(tagged)
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "pipeline_stage_succeeded",
             stage="tag",
             total=total,
             succeeded=len(tagged),
             failed=failed,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         return len(tagged)
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
-        _runtime_log(
+        error_type, error_message = error_details(exc)
+        runtime_log(
             logging.ERROR,
             "pipeline_stage_failed",
             stage="tag",
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         raise
     finally:
@@ -294,7 +278,7 @@ async def run_scrape_then_tag(
         await db.connect()
 
     current_stage = "scrape"
-    _runtime_log(logging.INFO, "pipeline_run_started", include_stale=include_stale)
+    runtime_log(logging.INFO, "pipeline_run_started", include_stale=include_stale)
     try:
         if progress_callback is not None:
             await progress_callback(
@@ -306,7 +290,7 @@ async def run_scrape_then_tag(
                 }
             )
         scraped = await run_scrape(db)
-        _runtime_log(logging.INFO, "pipeline_stage_checkpoint", stage="scrape", scraped=scraped)
+        runtime_log(logging.INFO, "pipeline_stage_checkpoint", stage="scrape", scraped=scraped)
 
         if progress_callback is not None:
             await progress_callback(
@@ -327,26 +311,26 @@ async def run_scrape_then_tag(
             "failed": failed,
             "summary": f"{scraped} events scraped · {tagged} tagged · {failed} failed",
         }
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "pipeline_run_succeeded",
             scraped=scraped,
             tagged=tagged,
             failed=failed,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         if progress_callback is not None:
             await progress_callback(result)
         return result
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
-        _runtime_log(
+        error_type, error_message = error_details(exc)
+        runtime_log(
             logging.ERROR,
             "pipeline_run_failed",
             stage=current_stage,
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         raise
     finally:
@@ -378,7 +362,7 @@ async def run_notify(
         email_to = user.email_to if user else ""
         sms_to = user.sms_to if user else ""
         name = user.child_name if user else child_name
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "notify_run_started",
             stage="notify",
@@ -424,7 +408,7 @@ async def run_notify(
                 "weekend_event_count": len(events),
                 "ranked_event_count": 0,
             }
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "notify_run_succeeded",
                 stage="notify",
@@ -435,7 +419,7 @@ async def run_notify(
                 delivery_attempt_count=0,
                 delivery_success_count=0,
                 delivery_failure_count=0,
-                duration_ms=_duration_ms(started),
+                duration_ms=duration_ms(started),
             )
             return result
 
@@ -459,7 +443,7 @@ async def run_notify(
             "weekend_event_count": len(events),
             "ranked_event_count": len(ranked),
         }
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "notify_run_succeeded",
             stage="notify",
@@ -470,12 +454,12 @@ async def run_notify(
             delivery_attempt_count=len(results),
             delivery_success_count=delivery_success_count,
             delivery_failure_count=delivery_failure_count,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         return result
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
-        _runtime_log(
+        error_type, error_message = error_details(exc)
+        runtime_log(
             logging.ERROR,
             "notify_run_failed",
             stage="notify",
@@ -483,7 +467,7 @@ async def run_notify(
             user_email=user.email if user else None,
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         raise
     finally:
@@ -526,7 +510,7 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
         detail="Scraping sources…",
     )
     job_key = "scheduled:pipeline:scrape-tag"
-    _runtime_log(
+    runtime_log(
         logging.INFO,
         "scheduled_job_started",
         job_id=job_id,
@@ -547,7 +531,7 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
         await update_scheduled_job(
             db, job_id, state="succeeded", detail="Completed", result=result, error=""
         )
-        _runtime_log(
+        runtime_log(
             logging.INFO,
             "scheduled_job_succeeded",
             job_id=job_id,
@@ -556,15 +540,15 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
             scraped=result.get("scraped"),
             tagged=result.get("tagged"),
             failed=result.get("failed"),
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         return result
     except Exception as exc:
-        error_type, error_message = _error_details(exc)
+        error_type, error_message = error_details(exc)
         await update_scheduled_job(
             db, job_id, state="failed", detail="Failed", error=error_message
         )
-        _runtime_log(
+        runtime_log(
             logging.ERROR,
             "scheduled_job_failed",
             job_id=job_id,
@@ -572,7 +556,7 @@ async def run_scheduled_scrape_then_tag(db: Database) -> dict[str, int | str]:
             stage="pipeline",
             error_type=error_type,
             error_message=error_message,
-            duration_ms=_duration_ms(started),
+            duration_ms=duration_ms(started),
         )
         raise
 

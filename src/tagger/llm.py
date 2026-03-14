@@ -20,6 +20,7 @@ from src.tagger.taxonomy import (
     POSITIVE_RULES,
     TAGGING_VERSION,
 )
+from src.utils import duration_ms, error_details, runtime_log
 
 SYSTEM_PROMPT_TEMPLATE = """You are an expert at evaluating family events for child-friendliness.
 
@@ -93,23 +94,6 @@ STAIRS_TERMS = ("stairs", "upstairs", "historic")
 BATHROOM_TERMS = ("restroom", "bathroom", "facility", "visitor center", "library")
 WATER_TERMS = CATEGORY_RULES["water"]
 logger = logging.getLogger("uvicorn.error")
-
-
-def _duration_ms(started: float) -> float:
-    return round((pytime.perf_counter() - started) * 1000, 2)
-
-
-def _runtime_log(level: int, event: str, **context: object) -> None:
-    logger.log(
-        level,
-        event,
-        extra={key: value for key, value in context.items() if value is not None},
-    )
-
-
-def _error_details(exc: BaseException) -> tuple[str, str]:
-    message = str(exc).strip() or repr(exc)
-    return type(exc).__name__, message
 
 
 @dataclass(slots=True)
@@ -461,7 +445,7 @@ class EventTagger:
             started = pytime.perf_counter()
             try:
                 tags = await self.tag_event(event)
-                _runtime_log(
+                runtime_log(
                     logging.INFO,
                     "tag_event_succeeded",
                     stage="tag",
@@ -473,12 +457,12 @@ class EventTagger:
                     toddler_score=tags.toddler_score,
                     raw_rule_score=tags.raw_rule_score,
                     audience=tags.audience,
-                    duration_ms=_duration_ms(started),
+                    duration_ms=duration_ms(started),
                 )
                 return event, tags
             except Exception as exc:
-                error_type, error_message = _error_details(exc)
-                _runtime_log(
+                error_type, error_message = error_details(exc)
+                runtime_log(
                     logging.ERROR,
                     "tag_event_failed",
                     stage="tag",
@@ -489,7 +473,7 @@ class EventTagger:
                     source_url=event.source_url,
                     error_type=error_type,
                     error_message=error_message,
-                    duration_ms=_duration_ms(started),
+                    duration_ms=duration_ms(started),
                 )
                 return None
 
@@ -519,7 +503,7 @@ class EventTagger:
         for start_idx in range(0, len(events), batch_size):
             batch = events[start_idx : start_idx + batch_size]
             started = pytime.perf_counter()
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "tag_batch_started",
                 stage="tag",
@@ -529,7 +513,7 @@ class EventTagger:
             )
             tagged_batch = await self.tag_events(batch)
             all_results.extend(tagged_batch)
-            _runtime_log(
+            runtime_log(
                 logging.INFO,
                 "tag_batch_succeeded",
                 stage="tag",
@@ -537,7 +521,7 @@ class EventTagger:
                 batch_size=len(batch),
                 tagged_count=len(tagged_batch),
                 failed_count=len(batch) - len(tagged_batch),
-                duration_ms=_duration_ms(started),
+                duration_ms=duration_ms(started),
             )
             if on_batch_complete is not None:
                 await on_batch_complete(start_idx, batch, tagged_batch, all_results)
