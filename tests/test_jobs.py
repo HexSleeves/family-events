@@ -127,7 +127,9 @@ def test_list_jobs_supports_system_owned_records(isolated_postgres_database_url:
         db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
-            await _create_test_user(db, user_id=TEST_SYSTEM_USER_ID, email="jobs-system@example.com")
+            await _create_test_user(
+                db, user_id=TEST_SYSTEM_USER_ID, email="jobs-system@example.com"
+            )
             system_job = Job(
                 kind="pipeline",
                 job_key="scheduled:pipeline:scrape-tag",

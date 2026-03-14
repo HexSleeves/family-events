@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from src.cities import normalize_city_slug, normalize_city_list as normalize_city_slug_list
+from src.cities import normalize_city_list as normalize_city_slug_list
+from src.cities import normalize_city_slug
 from src.db.models import Constraints, InterestProfile, User
 from src.predefined_sources import list_predefined_sources, make_predefined_source
 

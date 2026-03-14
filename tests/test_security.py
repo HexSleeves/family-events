@@ -589,7 +589,9 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
         start_time=datetime.now(tz=UTC),
     )
     run_database_method(client.app.state.db.database_url, "upsert_event", event)
-    run_database_method(client.app.state.db.database_url, "set_event_attended", user.id, event.id, True)
+    run_database_method(
+        client.app.state.db.database_url, "set_event_attended", user.id, event.id, True
+    )
     page = client.get("/events?attended=yes")
     csrf_token = extract_csrf_token(page.text)
 
@@ -721,6 +723,8 @@ def test_duplicate_pipeline_request_reuses_existing_job_card(client, create_user
     assert "started in the background" in first.headers.get("hx-trigger", "")
     assert "already running" in second.headers.get("hx-trigger", "")
 
-    jobs = run_database_method(client.app.state.db.database_url, "list_jobs", owner_user_id=user.id, limit=10)
+    jobs = run_database_method(
+        client.app.state.db.database_url, "list_jobs", owner_user_id=user.id, limit=10
+    )
     running_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
     assert len(running_jobs) == 1
