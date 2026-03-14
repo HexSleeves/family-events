@@ -14,6 +14,7 @@ from src.scrapers.analyzer import validate_public_http_url
 from src.scrapers.router import extract_domain
 from src.web.auth import verify_password
 from src.web.common import _same_origin
+from tests.postgres_test_helpers import run_database_method
 
 
 def extract_csrf_token(html: str) -> str:
@@ -206,12 +207,12 @@ def test_signup_creates_onboarded_user_and_predefined_sources(client):
     )
 
     assert response.status_code == 302
-    user = client.app.state.db
-    created = __import__("asyncio").run(user.get_user_by_email("new@example.com"))
+    database_url = client.app.state.db.database_url
+    created = run_database_method(database_url, "get_user_by_email", "new@example.com")
     assert created is not None
     assert created.onboarding_complete is True
     assert created.home_city == "Baton Rouge"
-    sources = __import__("asyncio").run(user.get_user_sources(created.id))
+    sources = run_database_method(database_url, "get_user_sources", created.id)
     assert len(sources) == 2
 
 
@@ -271,11 +272,12 @@ def test_signup_starts_scrape_tag_job(client, monkeypatch):
     )
 
     assert response.status_code == 302
-    created = asyncio.run(client.app.state.db.get_user_by_email("signup-job@example.com"))
+    database_url = client.app.state.db.database_url
+    created = run_database_method(database_url, "get_user_by_email", "signup-job@example.com")
     assert created is not None
-    system_user = asyncio.run(client.app.state.db.get_user_by_email(SYSTEM_USER_EMAIL))
+    system_user = run_database_method(database_url, "get_user_by_email", SYSTEM_USER_EMAIL)
     assert system_user is not None
-    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=system_user.id, limit=10))
+    jobs = run_database_method(database_url, "list_jobs", owner_user_id=system_user.id, limit=10)
     scrape_tag_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
     assert len(scrape_tag_jobs) == 1
 
@@ -283,20 +285,22 @@ def test_signup_starts_scrape_tag_job(client, monkeypatch):
 def test_dashboard_and_profile_show_shared_initial_import_status(client, create_user):
     user = create_user(email="shared-import@example.com")
     login(client, email=user.email)
+    database_url = client.app.state.db.database_url
 
     async def scenario() -> None:
-        system_user = await ensure_system_user(client.app.state.db)
-        await client.app.state.db.create_job(
-            Job(
-                kind="pipeline",
-                job_key="pipeline:scrape-tag",
-                label="Scrape + tag job",
-                owner_user_id=system_user.id,
-                state="running",
-                detail="Running…",
-                result_json='{"phase":"scrape","processed":0,"total":2,"summary":"Scraping sources…"}',
+        async with create_database(database_url=database_url) as db:
+            system_user = await ensure_system_user(db)
+            await db.create_job(
+                Job(
+                    kind="pipeline",
+                    job_key="pipeline:scrape-tag",
+                    label="Scrape + tag job",
+                    owner_user_id=system_user.id,
+                    state="running",
+                    detail="Running…",
+                    result_json='{"phase":"scrape","processed":0,"total":2,"summary":"Scraping sources…"}',
+                )
             )
-        )
 
     from src.db.models import Job
 
@@ -358,7 +362,7 @@ def test_profile_onboarding_updates_child_preferences(client, create_user):
 
     assert response.status_code == 200
     assert "Child profile updated" in response.headers.get("hx-trigger", "")
-    updated = asyncio.run(client.app.state.db.get_user_by_email(user.email))
+    updated = run_database_method(client.app.state.db.database_url, "get_user_by_email", user.email)
     assert updated is not None
     assert updated.onboarding_complete is True
     assert updated.home_city == "Baton Rouge"
@@ -390,7 +394,7 @@ def test_profile_password_change_updates_credentials(client, create_user):
 
     assert response.status_code == 200
     assert "Password changed" in response.headers.get("hx-trigger", "")
-    updated = asyncio.run(client.app.state.db.get_user_by_email(user.email))
+    updated = run_database_method(client.app.state.db.database_url, "get_user_by_email", user.email)
     assert updated is not None
     assert updated.password_hash != user.password_hash
     assert verify_password("Password456", updated.password_hash)
@@ -436,10 +440,13 @@ def test_signup_duplicate_email_shows_inline_error_for_htmx(client, create_user)
     assert 'value="new@example.com"' in login_page.text
 
 
-def test_signup_succeeds_on_local_http_loopback(tmp_path, monkeypatch):
+def test_signup_succeeds_on_local_http_loopback(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     from src.web import app as appmod
 
-    test_db = create_database(str(tmp_path / "local-http.db"))
+    test_db = create_database(database_url=isolated_postgres_database_url)
     monkeypatch.setattr(appmod, "db", test_db)
     appmod.app.state.db = test_db
     appmod._rate_limit_store.clear()
@@ -492,7 +499,7 @@ def test_toggle_source_returns_refresh_trigger(client, create_user):
         user_id=user.id,
         status="active",
     )
-    asyncio.run(client.app.state.db.create_source(source))
+    run_database_method(client.app.state.db.database_url, "create_source", source)
 
     login(client, email=user.email)
     page = client.get("/sources")
@@ -503,7 +510,7 @@ def test_toggle_source_returns_refresh_trigger(client, create_user):
     assert response.status_code == 200
     assert "Disabled" in response.text
     assert "Enable" in response.text
-    updated = asyncio.run(client.app.state.db.get_source(source.id))
+    updated = run_database_method(client.app.state.db.database_url, "get_source", source.id)
     assert updated is not None
     assert updated.enabled is False
 
@@ -518,7 +525,7 @@ def test_delete_source_returns_refresh_trigger(client, create_user):
         user_id=user.id,
         status="active",
     )
-    asyncio.run(client.app.state.db.create_source(source))
+    run_database_method(client.app.state.db.database_url, "create_source", source)
 
     login(client, email=user.email)
     page = client.get("/sources")
@@ -530,7 +537,7 @@ def test_delete_source_returns_refresh_trigger(client, create_user):
 
     assert response.status_code == 200
     assert response.text == ""
-    deleted = asyncio.run(client.app.state.db.get_source(source.id))
+    deleted = run_database_method(client.app.state.db.database_url, "get_source", source.id)
     assert deleted is None
 
 
@@ -546,7 +553,7 @@ def test_attend_returns_updated_attendance_partial(client, create_user):
         location_city="Austin",
         start_time=datetime.now(tz=UTC),
     )
-    asyncio.run(client.app.state.db.upsert_event(event))
+    run_database_method(client.app.state.db.database_url, "upsert_event", event)
     page = client.get(f"/event/{event.id}")
     csrf_token = extract_csrf_token(page.text)
 
@@ -558,7 +565,12 @@ def test_attend_returns_updated_attendance_partial(client, create_user):
     assert response.status_code == 200
     assert "Attended" in response.text
     assert "Undo" in response.text
-    updated = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user.id))
+    updated = run_database_method(
+        client.app.state.db.database_url,
+        "get_event",
+        event.id,
+        viewer_user_id=user.id,
+    )
     assert updated is not None
     assert updated.viewer_state is not None
     assert updated.viewer_state.attended is True
@@ -576,8 +588,8 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
         location_city="Austin",
         start_time=datetime.now(tz=UTC),
     )
-    asyncio.run(client.app.state.db.upsert_event(event))
-    asyncio.run(client.app.state.db.set_event_attended(user.id, event.id, True))
+    run_database_method(client.app.state.db.database_url, "upsert_event", event)
+    run_database_method(client.app.state.db.database_url, "set_event_attended", user.id, event.id, True)
     page = client.get("/events?attended=yes")
     csrf_token = extract_csrf_token(page.text)
 
@@ -589,7 +601,12 @@ def test_unattend_bulk_undo_stays_reactive(client, create_user):
     assert response.status_code == 200
     trigger = response.headers.get("HX-Trigger", "")
     assert "Undo" in trigger
-    updated = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user.id))
+    updated = run_database_method(
+        client.app.state.db.database_url,
+        "get_event",
+        event.id,
+        viewer_user_id=user.id,
+    )
     assert updated is not None
     assert updated.viewer_state is not None
     assert updated.viewer_state.attended is False
@@ -607,11 +624,27 @@ def test_attendance_is_user_scoped(client, create_user):
         location_city="Austin",
         start_time=datetime.now(tz=UTC),
     )
-    asyncio.run(client.app.state.db.upsert_event(event))
-    asyncio.run(client.app.state.db.set_event_attended(user_a.id, event.id, True))
+    run_database_method(client.app.state.db.database_url, "upsert_event", event)
+    run_database_method(
+        client.app.state.db.database_url,
+        "set_event_attended",
+        user_a.id,
+        event.id,
+        True,
+    )
 
-    viewed_by_a = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user_a.id))
-    viewed_by_b = asyncio.run(client.app.state.db.get_event(event.id, viewer_user_id=user_b.id))
+    viewed_by_a = run_database_method(
+        client.app.state.db.database_url,
+        "get_event",
+        event.id,
+        viewer_user_id=user_a.id,
+    )
+    viewed_by_b = run_database_method(
+        client.app.state.db.database_url,
+        "get_event",
+        event.id,
+        viewer_user_id=user_b.id,
+    )
 
     assert viewed_by_a is not None and viewed_by_a.viewer_state is not None
     assert viewed_by_a.viewer_state.attended is True
@@ -629,17 +662,17 @@ def test_weekend_page_does_not_fall_back_to_recent_events_when_weekend_empty(cli
 
 def test_weekend_page_tolerates_blank_legacy_nap_time(client, create_user):
     user = create_user(email="legacy@example.com")
-    asyncio.run(
-        client.app.state.db.update_user(
-            user.id,
-            interest_profile={
-                **user.interest_profile.model_dump(),
-                "constraints": {
-                    **user.interest_profile.constraints.model_dump(),
-                    "nap_time": "",
-                },
+    run_database_method(
+        client.app.state.db.database_url,
+        "update_user",
+        user.id,
+        interest_profile={
+            **user.interest_profile.model_dump(),
+            "constraints": {
+                **user.interest_profile.constraints.model_dump(),
+                "nap_time": "",
             },
-        )
+        },
     )
 
     login(client, email=user.email)
@@ -688,6 +721,6 @@ def test_duplicate_pipeline_request_reuses_existing_job_card(client, create_user
     assert "started in the background" in first.headers.get("hx-trigger", "")
     assert "already running" in second.headers.get("hx-trigger", "")
 
-    jobs = asyncio.run(client.app.state.db.list_jobs(owner_user_id=user.id, limit=10))
+    jobs = run_database_method(client.app.state.db.database_url, "list_jobs", owner_user_id=user.id, limit=10)
     running_jobs = [job for job in jobs if job.job_key == "pipeline:scrape-tag"]
     assert len(running_jobs) == 1

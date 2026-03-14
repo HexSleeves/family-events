@@ -21,6 +21,13 @@ The host should have:
 - Postgres reachable through `DATABASE_URL`
 - systemd units installed for `family-events` and `family-events-cron`
 
+For local development, use the repo-managed Docker Compose Postgres service:
+
+```bash
+make db-up
+make db-migrate
+```
+
 ## Deploy or update the app
 
 Run from the repo root on the host:

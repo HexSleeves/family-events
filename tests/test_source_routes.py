@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from src.db.models import Event, Source
 from src.scrapers.router import extract_domain
+from tests.postgres_test_helpers import run_database_method
 from tests.test_security import extract_csrf_token, login
 
 
 def _create_source(
-    client,
+    database_url: str,
     *,
     user_id: str,
     name: str = "Example Source",
@@ -27,7 +27,7 @@ def _create_source(
         status=status,
         recipe_json=recipe_json,
     )
-    asyncio.run(client.app.state.db.create_source(source))
+    run_database_method(database_url, "create_source", source)
     return source
 
 
@@ -41,7 +41,7 @@ def test_sources_page_redirects_when_logged_out(client):
 def test_source_detail_forbids_other_users_source(client, create_user):
     owner = create_user(email="source-owner@example.com")
     intruder = create_user(email="source-intruder@example.com")
-    source = _create_source(client, user_id=owner.id)
+    source = _create_source(client.app.state.db.database_url, user_id=owner.id)
 
     login(client, email=intruder.email)
 
@@ -53,7 +53,8 @@ def test_source_detail_forbids_other_users_source(client, create_user):
 
 def test_source_detail_shows_recent_events_for_owner(client, create_user):
     user = create_user(email="source-detail@example.com")
-    source = _create_source(client, user_id=user.id, name="Neighborhood Calendar")
+    database_url = client.app.state.db.database_url
+    source = _create_source(database_url, user_id=user.id, name="Neighborhood Calendar")
     event = Event(
         source=f"custom:{source.id}",
         source_url="https://example.com/events/story-time",
@@ -63,7 +64,7 @@ def test_source_detail_shows_recent_events_for_owner(client, create_user):
         location_city="Lafayette",
         start_time=datetime.now(tz=UTC) + timedelta(days=1),
     )
-    asyncio.run(client.app.state.db.upsert_event(event))
+    run_database_method(database_url, "upsert_event", event)
 
     login(client, email=user.email)
 
@@ -95,7 +96,7 @@ def test_add_predefined_source_adds_source_for_user(client, create_user):
 
     assert response.status_code == 200
     assert "Added BREC Parks" in response.headers.get("hx-trigger", "")
-    sources = asyncio.run(client.app.state.db.get_user_sources(user.id))
+    sources = run_database_method(client.app.state.db.database_url, "get_user_sources", user.id)
     assert len(sources) == 1
     assert sources[0].url == "https://www.brec.org/calendar"
 
@@ -118,7 +119,11 @@ def test_source_mutations_forbid_other_users(
 ):
     owner = create_user(email=f"owner-{method.lower()}@example.com")
     intruder = create_user(email=f"intruder-{method.lower()}@example.com")
-    source = _create_source(client, user_id=owner.id, recipe_json=recipe_json)
+    source = _create_source(
+        client.app.state.db.database_url,
+        user_id=owner.id,
+        recipe_json=recipe_json,
+    )
 
     login(client, email=intruder.email)
     page = client.get("/sources")
@@ -132,6 +137,6 @@ def test_source_mutations_forbid_other_users(
 
     assert response.status_code == 403
     assert response.text == "Forbidden"
-    persisted = asyncio.run(client.app.state.db.get_source(source.id))
+    persisted = run_database_method(client.app.state.db.database_url, "get_source", source.id)
     assert persisted is not None
     assert persisted.user_id == owner.id

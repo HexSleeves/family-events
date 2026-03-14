@@ -5,7 +5,6 @@ description = "Family event discovery system for Lafayette & Baton Rouge, LA"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "aiosqlite>=0.22.1",
   "alembic>=1.16.5",
   "apscheduler>=3.11.2",
   "asyncpg>=0.30.0",
@@ -72,7 +71,7 @@ python-version = "3.12"
 # Start lenient, tighten over time
 possibly-unresolved-reference = "warn"
 unresolved-import = "warn"
-unresolved-attribute = "ignore"        # too noisy with dynamic libs (bs4, aiosqlite)
+unresolved-attribute = "ignore"        # too noisy with dynamic libs
 invalid-argument-type = "warn"
 missing-argument = "warn"
 invalid-return-type = "warn"

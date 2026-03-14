@@ -3,7 +3,7 @@
 Family Events is a FastAPI app that helps parents discover local child-friendly
 activities, score them for toddler fit, and generate weekend recommendations.
 
-It currently targets **PostgreSQL-first local development** and supports:
+It now supports a **PostgreSQL-only runtime** for local development and deployment:
 
 - scraping built-in and custom event sources
 - AI/heuristic event tagging
@@ -214,7 +214,7 @@ Copy `.env.example` to `.env`.
 | Variable         | Description                                                        |
 | ---------------- | ------------------------------------------------------------------ |
 | `OPENAI_API_KEY` | Enables LLM tagging. Without it, the app falls back to heuristics. |
-| `DATABASE_URL`   | Defaults to local Docker Postgres.                                 |
+| `DATABASE_URL`   | Point this at the supported Postgres database.                     |
 | `SESSION_SECRET` | Required for the web app to start.                                 |
 
 ### Common optional settings
@@ -234,7 +234,7 @@ See `.env.example` for the current canonical local/dev defaults.
 
 ## Database
 
-The app now runs primarily on **PostgreSQL**.
+The supported app, CLI, and scheduler runtime runs on **PostgreSQL**.
 
 The Postgres schema includes:
 
@@ -246,8 +246,8 @@ The Postgres schema includes:
 - trigram search indexes on title/description
 - JSON expression indexes for tag filters
 
-SQLite is still supported in code for compatibility/tests, but it is no longer
-the primary documented local path.
+Application startup expects the connected Postgres database to already be at the
+current Alembic head.
 
 ## CLI Commands
 
@@ -350,25 +350,9 @@ Current `/api/events` response shape:
 }
 ```
 
-## Legacy SQLite -> Postgres migration
-
-A one-time migration helper still exists at:
-
-- `scripts/migrate_sqlite_to_postgres.py`
-
-That script is now mainly for legacy recovery/reference. The recommended local
-workflow is a **fresh Postgres start**.
-
-If you intentionally need the legacy migration path:
-
-```bash
-export DATABASE_URL='postgresql+asyncpg://family_events:family_events@localhost:5433/family_events'
-make db-up
-make db-migrate
-uv run python scripts/migrate_sqlite_to_postgres.py \
-  --sqlite-path family_events.db \
-  --postgres-url "$DATABASE_URL"
-```
+There is no longer a documented SQLite-to-Postgres migration path in this
+repository. Local development should start from the Docker Compose Postgres
+database and apply Alembic migrations.
 
 ## Development
 
@@ -423,7 +407,6 @@ npm run css:watch
 | Frontend interactivity | HTMX 2.0.4                                     |
 | CSS                    | Tailwind CSS via CLI build                     |
 | Database               | PostgreSQL 16 + asyncpg + SQLAlchemy + Alembic |
-| SQLite fallback        | aiosqlite                                      |
 | Scraping               | httpx + BeautifulSoup4                         |
 | AI tagging             | OpenAI API (`gpt-4o-mini` by default)          |
 | Scheduling             | APScheduler                                    |

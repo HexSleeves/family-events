@@ -30,6 +30,7 @@ from src.db.session import get_engine, get_sessionmaker
 from src.timezones import as_local_date, utc_now, weekend_window_utc
 
 logger = logging.getLogger("uvicorn.error")
+POSTGRES_SCHEME_PREFIX = "postgresql+"
 
 
 def _uuid_param(value: str | None) -> uuid.UUID | str | None:
@@ -113,10 +114,16 @@ def _add_city_slug_filter(
 
 
 class PostgresDatabase:
-    """Incremental Postgres implementation behind the existing DB API."""
+    """Postgres implementation behind the existing DB API."""
 
-    def __init__(self, database_url: str) -> None:
-        self.database_url = database_url
+    def __init__(self, database_url: str | None = None) -> None:
+        resolved_url = database_url or settings.database_url
+        if not resolved_url.startswith(POSTGRES_SCHEME_PREFIX):
+            raise ValueError(
+                "DATABASE_URL must use a PostgreSQL async SQLAlchemy URL "
+                f"({POSTGRES_SCHEME_PREFIX}...). Got: {resolved_url}"
+            )
+        self.database_url = resolved_url
         self.engine: AsyncEngine | None = None
         self.sessionmaker: async_sessionmaker[AsyncSession] | None = None
 

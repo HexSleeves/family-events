@@ -2,6 +2,10 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings
 
+DEFAULT_DATABASE_URL = (
+    "postgresql+asyncpg://family_events:family_events@localhost:5433/family_events"
+)
+
 
 class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
@@ -12,8 +16,7 @@ class Settings(BaseSettings):
     log_format: Literal["auto", "pretty", "json"] = "auto"
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///family_events.db"
-    database_path: str = "family_events.db"
+    database_url: str = DEFAULT_DATABASE_URL
 
     # OpenAI
     openai_api_key: str = ""

@@ -1,19 +1,35 @@
 from datetime import UTC, datetime, timedelta
 
 from src.db.database import create_database
-from src.db.models import Job
+from src.db.models import Job, User
+from src.web.auth import hash_password
+
+TEST_OWNER_USER_ID = "00000000-0000-0000-0000-000000000001"
+TEST_SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000002"
 
 
-def test_fail_stale_jobs_marks_old_running_jobs_failed(tmp_path):
+async def _create_test_user(db, *, user_id: str, email: str) -> None:
+    await db.create_user(
+        User(
+            id=user_id,
+            email=email,
+            display_name=email.split("@", 1)[0],
+            password_hash=hash_password("Password123"),
+        )
+    )
+
+
+def test_fail_stale_jobs_marks_old_running_jobs_failed(isolated_postgres_database_url: str):
     async def scenario() -> None:
-        db = create_database(str(tmp_path / "jobs.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            await _create_test_user(db, user_id=TEST_OWNER_USER_ID, email="jobs-owner@example.com")
             stale_job = Job(
                 kind="tag",
                 job_key="pipeline:tag",
                 label="Tag job",
-                owner_user_id="user-1",
+                owner_user_id=TEST_OWNER_USER_ID,
                 state="running",
                 created_at=datetime.now(tz=UTC) - timedelta(hours=3),
                 started_at=datetime.now(tz=UTC) - timedelta(hours=3),
@@ -22,7 +38,7 @@ def test_fail_stale_jobs_marks_old_running_jobs_failed(tmp_path):
                 kind="scrape",
                 job_key="pipeline:scrape",
                 label="Scrape job",
-                owner_user_id="user-1",
+                owner_user_id=TEST_OWNER_USER_ID,
                 state="running",
                 created_at=datetime.now(tz=UTC),
                 started_at=datetime.now(tz=UTC),
@@ -54,7 +70,7 @@ def test_job_progress_property_parses_result_json():
         kind="tag",
         job_key="pipeline:tag",
         label="Tag job",
-        owner_user_id="user-1",
+        owner_user_id=TEST_OWNER_USER_ID,
         result_json='{"processed": 10, "total": 25, "summary": "10/25 processed"}',
     )
 
@@ -65,17 +81,20 @@ def test_job_progress_property_parses_result_json():
     }
 
 
-def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
+def test_cancel_running_job_marks_it_cancelled(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        db_path = str(tmp_path / "jobs-cancel.db")
-        db = create_database(db_path)
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            await _create_test_user(db, user_id=TEST_OWNER_USER_ID, email="jobs-owner@example.com")
             job = Job(
                 kind="tag",
                 job_key="pipeline:tag",
                 label="Tag job",
-                owner_user_id="user-1",
+                owner_user_id=TEST_OWNER_USER_ID,
                 state="running",
             )
             await db.create_job(job)
@@ -85,9 +104,13 @@ def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
         import src.web.jobs as jobs_module
         from src.web.jobs import job_registry
 
-        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
+        monkeypatch.setattr(
+            jobs_module,
+            "Database",
+            lambda: create_database(database_url=isolated_postgres_database_url),
+        )
 
-        updated = await job_registry.cancel(job_id=job.id, owner_user_id="user-1")
+        updated = await job_registry.cancel(job_id=job.id, owner_user_id=TEST_OWNER_USER_ID)
         assert updated is not None
         assert updated.state == "cancelled"
         assert updated.detail == "Cancelled"
@@ -99,22 +122,23 @@ def test_cancel_running_job_marks_it_cancelled(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
-def test_list_jobs_supports_system_owned_records(tmp_path):
+def test_list_jobs_supports_system_owned_records(isolated_postgres_database_url: str):
     async def scenario() -> None:
-        db = create_database(str(tmp_path / "jobs-system.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            await _create_test_user(db, user_id=TEST_SYSTEM_USER_ID, email="jobs-system@example.com")
             system_job = Job(
                 kind="pipeline",
                 job_key="scheduled:pipeline:scrape-tag",
                 label="Scheduled scrape + tag job",
-                owner_user_id="system-user",
+                owner_user_id=TEST_SYSTEM_USER_ID,
                 state="succeeded",
             )
             await db.create_job(system_job)
 
-            jobs = await db.list_jobs(owner_user_id="system-user", limit=10)
-            kinds = await db.list_job_kinds(owner_user_id="system-user")
+            jobs = await db.list_jobs(owner_user_id=TEST_SYSTEM_USER_ID, limit=10)
+            kinds = await db.list_job_kinds(owner_user_id=TEST_SYSTEM_USER_ID)
 
             assert len(jobs) == 1
             assert jobs[0].label == "Scheduled scrape + tag job"
@@ -127,17 +151,20 @@ def test_list_jobs_supports_system_owned_records(tmp_path):
     asyncio.run(scenario())
 
 
-def test_recover_stale_jobs_marks_old_running_jobs_failed(tmp_path, monkeypatch):
+def test_recover_stale_jobs_marks_old_running_jobs_failed(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        db_path = str(tmp_path / "jobs-recover.db")
-        db = create_database(db_path)
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            await _create_test_user(db, user_id=TEST_OWNER_USER_ID, email="jobs-owner@example.com")
             stale_job = Job(
                 kind="pipeline",
                 job_key="pipeline:scrape-tag",
                 label="Scrape + tag job",
-                owner_user_id="user-1",
+                owner_user_id=TEST_OWNER_USER_ID,
                 state="running",
                 created_at=datetime.now(tz=UTC) - timedelta(hours=2),
                 started_at=datetime.now(tz=UTC) - timedelta(hours=2),
@@ -149,13 +176,17 @@ def test_recover_stale_jobs_marks_old_running_jobs_failed(tmp_path, monkeypatch)
         import src.web.jobs as jobs_module
         from src.web.jobs import JobRegistry
 
-        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
+        monkeypatch.setattr(
+            jobs_module,
+            "Database",
+            lambda: create_database(database_url=isolated_postgres_database_url),
+        )
         registry = JobRegistry()
 
         updated = await registry.recover_stale_jobs()
         assert updated == 1
 
-        async with create_database(db_path) as check_db:
+        async with create_database(database_url=isolated_postgres_database_url) as check_db:
             recovered = await check_db.get_job(stale_job.id)
             assert recovered is not None
             assert recovered.state == "failed"
@@ -166,17 +197,20 @@ def test_recover_stale_jobs_marks_old_running_jobs_failed(tmp_path, monkeypatch)
     asyncio.run(scenario())
 
 
-def test_start_unique_reuses_existing_running_job_without_creating_duplicate(tmp_path, monkeypatch):
+def test_start_unique_reuses_existing_running_job_without_creating_duplicate(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        db_path = str(tmp_path / "jobs-duplicate.db")
-        db = create_database(db_path)
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            await _create_test_user(db, user_id=TEST_OWNER_USER_ID, email="jobs-owner@example.com")
             existing_job = Job(
                 kind="pipeline",
                 job_key="pipeline:scrape-tag",
                 label="Scrape + tag job",
-                owner_user_id="user-1",
+                owner_user_id=TEST_OWNER_USER_ID,
                 state="running",
                 detail="Running…",
             )
@@ -187,7 +221,11 @@ def test_start_unique_reuses_existing_running_job_without_creating_duplicate(tmp
         import src.web.jobs as jobs_module
         from src.web.jobs import JobRegistry
 
-        monkeypatch.setattr(jobs_module, "Database", lambda: create_database(db_path))
+        monkeypatch.setattr(
+            jobs_module,
+            "Database",
+            lambda: create_database(database_url=isolated_postgres_database_url),
+        )
         registry = JobRegistry()
 
         async def runner(_job):
@@ -197,7 +235,7 @@ def test_start_unique_reuses_existing_running_job_without_creating_duplicate(tmp
             kind="pipeline",
             job_key="pipeline:scrape-tag",
             label="Scrape + tag job",
-            owner_user_id="user-1",
+            owner_user_id=TEST_OWNER_USER_ID,
             source_id=None,
             runner=runner,
         )
@@ -205,8 +243,8 @@ def test_start_unique_reuses_existing_running_job_without_creating_duplicate(tmp
         assert created is False
         assert job.id == existing_job.id
 
-        async with create_database(db_path) as check_db:
-            jobs = await check_db.list_jobs(owner_user_id="user-1", limit=10)
+        async with create_database(database_url=isolated_postgres_database_url) as check_db:
+            jobs = await check_db.list_jobs(owner_user_id=TEST_OWNER_USER_ID, limit=10)
             assert len(jobs) == 1
             assert jobs[0].id == existing_job.id
             assert jobs[0].state == "running"

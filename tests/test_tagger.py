@@ -125,13 +125,15 @@ def test_rule_based_tagger_rewards_toddler_event_high_score():
     assert "learning" in tags.categories
 
 
-def test_get_untagged_events_includes_stale_tagging_versions(tmp_path):
+def test_get_untagged_events_includes_stale_tagging_versions(
+    isolated_postgres_database_url: str,
+):
     async def scenario() -> None:
         from src.db.database import create_database
         from src.db.models import Event, EventTags
         from src.tagger.taxonomy import TAGGING_VERSION
 
-        db = create_database(str(tmp_path / "tagging-version.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
             stale = Event(
@@ -177,13 +179,13 @@ def test_get_untagged_events_includes_stale_tagging_versions(tmp_path):
     asyncio.run(scenario())
 
 
-def test_count_stale_tagged_events(tmp_path):
+def test_count_stale_tagged_events(isolated_postgres_database_url: str):
     async def scenario() -> None:
         from src.db.database import create_database
         from src.db.models import Event, EventTags
         from src.tagger.taxonomy import TAGGING_VERSION
 
-        db = create_database(str(tmp_path / "stale-count.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
             await db.upsert_event(

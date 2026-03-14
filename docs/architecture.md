@@ -3,9 +3,8 @@
 ## Overview
 
 Family Events is a FastAPI app plus an APScheduler worker sharing one database.
-The project now targets **PostgreSQL first** for local and deployed environments,
-with SQLite retained only as a compatibility/testing path through the
-`create_database(...)` factory.
+The supported app, CLI, and scheduler runtime targets **PostgreSQL only** for
+local and deployed environments.
 
 Primary entry points:
 
@@ -93,12 +92,8 @@ Feature routers live in:
 
 ## Backend selection
 
-`src/db/database.py` exposes a backend-agnostic factory:
-
-- Postgres when `DATABASE_URL` is a Postgres URL
-- SQLite when explicitly passed a SQLite path/URL
-
-This preserves simple SQLite-backed tests while letting app/runtime use Postgres.
+`src/db/database.py` still centralizes database construction, but the supported
+runtime path is PostgreSQL via `DATABASE_URL`.
 
 ## Postgres schema
 
@@ -211,14 +206,13 @@ normalized domain.
 
 ## Search behavior
 
-Search is implemented in the DB layer:
+Search is implemented in the DB layer with Postgres operators and indexes:
 
-- SQLite uses `LIKE`
-- Postgres uses `ILIKE`
-- Postgres also has trigram indexes to support better title/description lookup
+- `ILIKE` matching for text search
+- trigram indexes to support title/description lookup
 
 The repository still merits additional end-to-end validation of search ranking
-and results behavior, but the storage/indexing side is now Postgres-native.
+and results behavior, but the supported storage/indexing side is Postgres-native.
 
 ## Jobs and background work
 

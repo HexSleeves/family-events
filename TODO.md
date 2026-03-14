@@ -61,13 +61,18 @@ A prioritized engineering plan based on the current codebase audit.
   - [x] Extract sources routes
   - [x] Extract pipeline/action routes
   - [x] Extract shared response helpers and middleware
-- [ ] Break up `src/db/database.py`
-  - [ ] Extract connection/bootstrap code
+- [x] Remove SQLite support and standardize on Postgres
+  - [x] Collapse runtime DB selection to Postgres-only
+  - [x] Remove SQLite-specific config and dependency paths
+  - [x] Move local dev and tests onto Docker Postgres
+  - [x] Update docs/tooling away from SQLite-era guidance
+- [ ] Break up `src/db/postgres.py`
   - [ ] Extract event repository methods
   - [ ] Extract user repository methods
   - [ ] Extract source repository methods
-  - [ ] Extract migration helpers
+  - [ ] Extract jobs repository methods
   - [ ] Extract dedupe logic into dedicated module
+  - [ ] Keep the public database facade thin and obvious
 - [ ] Introduce a service layer between routes and repositories
   - [ ] Event service
   - [ ] Profile service
@@ -107,7 +112,7 @@ A prioritized engineering plan based on the current codebase audit.
 ## P4 — Performance and scaling
 
 - [ ] Improve event search performance
-  - [ ] Consider SQLite FTS5 for title/description search
+  - [ ] Benchmark Postgres trigram/full-text search for title/description queries
   - [ ] Evaluate denormalizing `toddler_score` into a dedicated column
   - [ ] Review sort/filter queries that rely on JSON extraction
 - [ ] Add/adjust indexes
@@ -148,16 +153,17 @@ A prioritized engineering plan based on the current codebase audit.
 
 - [ ] Fix docs/runtime drift
   - [x] Update README to match current build/runtime behavior
+  - [x] Document Postgres-only local/dev support and remove SQLite migration guidance
   - [ ] Document testing expectations accurately
   - [ ] Clarify library/source support status
-- [ ] Separate runtime data from repo root
-  - [ ] Move SQLite DB files under `data/` or `var/`
-  - [ ] Update config/docs/service files accordingly
+- [ ] Clarify local database artifact ownership
+  - [x] Remove repo-root SQLite DB expectations from docs/tooling
+  - [ ] Decide where local backup/dump files should live outside the repo root
 - [x] Split dev vs prod server behavior
   - [x] Disable `reload=True` outside development
   - [x] Add explicit dev/prod serve modes
 - [ ] Decide whether in-memory undo/rate-limit state should be ephemeral
-  - [ ] If not, persist them in SQLite or another shared store
+  - [ ] If not, persist them in Postgres or another shared store
 - [ ] Add browser/UI verification setup notes for this VM environment
 
 ## Suggested implementation order

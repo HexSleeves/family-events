@@ -1,7 +1,7 @@
 # Scraping, Tagging, Ranking, and Notifications
 
-This document describes the actual runtime pipeline in the repository as of the
-Postgres-native local/dev migration.
+This document describes the supported runtime pipeline in the repository after
+the Postgres-only local/dev cut.
 
 ## Pipeline summary
 
@@ -111,10 +111,7 @@ Additional cross-source dedupe:
 - title/date/city fingerprint matching
 - fuzzy title similarity around the same time window
 
-This dedupe behavior exists in both backends:
-
-- `src/db/database.py` for SQLite
-- `src/db/postgres.py` for Postgres
+The supported runtime path persists and dedupes events against Postgres.
 
 There is also a CLI/web-accessible backfill dedupe operation:
 
@@ -254,11 +251,6 @@ Important event storage choices:
 - `score_breakdown` as `JSONB`
 - trigram indexes on `lower(title)` and `lower(description)`
 - expression indexes on `tags->>'tagging_version'` and toddler score
-
-### SQLite
-
-SQLite remains available for compatibility/tests, but docs and local dev should
-assume Postgres unless explicitly stated otherwise.
 
 ## Operational caveats
 

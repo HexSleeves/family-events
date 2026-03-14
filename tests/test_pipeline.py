@@ -8,10 +8,15 @@ import src.scheduler as scheduler_module
 import src.web.jobs as jobs_module
 import src.web.routes.pages as pages_module
 from src.db.database import create_database
-from src.db.models import Event, EventTags, Source
+from src.db.models import Event, EventTags, Source, User
 from src.scheduler import run_notify, run_scheduled_scrape_then_tag
 from src.scrapers.router import extract_domain
+from src.web.auth import hash_password
 from src.web.jobs import JobRegistry
+from tests.postgres_test_helpers import run_database_method
+
+TEST_JOB_OWNER_USER_ID = "00000000-0000-0000-0000-000000000101"
+TEST_JOB_SOURCE_ID = "00000000-0000-0000-0000-000000000102"
 
 
 class DummyScraper:
@@ -22,16 +27,36 @@ class DummyScraper:
         return self._events
 
 
-def test_run_scheduled_scrape_then_tag_persists_job(tmp_path, monkeypatch):
+async def _create_test_user(db, *, user_id: str, email: str) -> None:
+    await db.create_user(
+        User(
+            id=user_id,
+            email=email,
+            display_name=email.split("@", 1)[0],
+            password_hash=hash_password("Password123"),
+        )
+    )
+
+
+def test_run_scheduled_scrape_then_tag_persists_job(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        db = create_database(str(tmp_path / "pipeline.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
+            source_user_id = str(uuid4())
+            await _create_test_user(
+                db,
+                user_id=source_user_id,
+                email="pipeline-source-owner@example.com",
+            )
             source = Source(
                 name="Example Source",
                 url="https://example.com/events",
                 domain=extract_domain("https://example.com/events"),
-                user_id=str(uuid4()),
+                user_id=source_user_id,
                 status="active",
                 builtin=False,
                 recipe_json='{"version":1,"root_selector":"body","item_selector":".event","title_selector":".title","date_selector":".date"}',
@@ -91,9 +116,12 @@ def test_run_scheduled_scrape_then_tag_persists_job(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
-def test_run_notify_uses_central_timezone_for_weekend_selection(tmp_path, monkeypatch):
+def test_run_notify_uses_central_timezone_for_weekend_selection(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        db = create_database(str(tmp_path / "notify-weekend.db"))
+        db = create_database(database_url=isolated_postgres_database_url)
         await db.connect()
         try:
             late_friday_utc = datetime(2025, 3, 8, 4, 30, tzinfo=UTC)
@@ -137,7 +165,6 @@ def test_run_notify_uses_central_timezone_for_weekend_selection(tmp_path, monkey
 
 
 def test_weekend_page_uses_central_timezone_boundary(client, monkeypatch):
-    import asyncio
 
     late_friday_utc = datetime(2025, 3, 8, 4, 30, tzinfo=UTC)
     saturday_local = datetime(2025, 3, 8, 6, 0, tzinfo=UTC)
@@ -173,8 +200,8 @@ def test_weekend_page_uses_central_timezone_boundary(client, monkeypatch):
         raw_data={},
         tags=EventTags(toddler_score=9),
     )
-    asyncio.run(client.app.state.db.upsert_event(weekend_event))
-    asyncio.run(client.app.state.db.upsert_event(weekday_event))
+    run_database_method(client.app.state.db.database_url, "upsert_event", weekend_event)
+    run_database_method(client.app.state.db.database_url, "upsert_event", weekday_event)
 
     monkeypatch.setattr(
         pages_module,
@@ -192,7 +219,10 @@ def test_weekend_page_uses_central_timezone_boundary(client, monkeypatch):
     assert "Monday Music" not in response.text
 
 
-def test_run_scrape_emits_structured_stage_logs(tmp_path, monkeypatch):
+def test_run_scrape_emits_structured_stage_logs(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
         emitted: list[tuple[int, str, dict[str, object]]] = []
         source = Source(
@@ -228,9 +258,16 @@ def test_run_scrape_emits_structured_stage_logs(tmp_path, monkeypatch):
         monkeypatch.setattr(
             scheduler_module, "_build_scraper", lambda _source: DummyScraper([event])
         )
-        monkeypatch.setattr(scheduler_module, "_runtime_log", capture)
+        monkeypatch.setattr(scheduler_module, "runtime_log", capture)
 
-        async with create_database(str(tmp_path / "pipeline-logs.db")) as db:
+        async with create_database(database_url=isolated_postgres_database_url) as db:
+            source_user_id = str(uuid4())
+            await _create_test_user(
+                db,
+                user_id=source_user_id,
+                email="pipeline-source-owner@example.com",
+            )
+            source.user_id = source_user_id
             await db.create_source(source)
             result = await scheduler_module.run_scrape(db)
 
@@ -263,9 +300,11 @@ def test_run_scrape_emits_structured_stage_logs(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
-def test_job_registry_failure_logs_include_job_context(tmp_path, monkeypatch):
+def test_job_registry_failure_logs_include_job_context(
+    isolated_postgres_database_url: str,
+    monkeypatch,
+):
     async def scenario() -> None:
-        database_url = f"sqlite+aiosqlite:///{tmp_path / 'job-logging.db'}"
         registry = JobRegistry()
         emitted: list[tuple[int, str, dict[str, object]]] = []
 
@@ -275,15 +314,33 @@ def test_job_registry_failure_logs_include_job_context(tmp_path, monkeypatch):
         def capture(level: int, event: str, **context: object) -> None:
             emitted.append((level, event, context))
 
-        monkeypatch.setattr(jobs_module, "_runtime_log", capture)
+        monkeypatch.setattr(jobs_module, "runtime_log", capture)
+        async with create_database(database_url=isolated_postgres_database_url) as db:
+            await _create_test_user(
+                db,
+                user_id=TEST_JOB_OWNER_USER_ID,
+                email="pipeline-job-owner@example.com",
+            )
+            await db.create_source(
+                Source(
+                    id=TEST_JOB_SOURCE_ID,
+                    name="Pipeline Source",
+                    url="https://example.com/pipeline-source",
+                    domain=extract_domain("https://example.com/pipeline-source"),
+                    user_id=TEST_JOB_OWNER_USER_ID,
+                    status="active",
+                    builtin=False,
+                    recipe_json='{"version":1,"root_selector":"body","item_selector":".event","title_selector":".title","date_selector":".date"}',
+                )
+            )
         job, created = await registry.start_unique(
             kind="pipeline",
             job_key="pipeline:test-failure",
             label="Pipeline failure test",
-            owner_user_id="owner-1",
-            source_id="source-123",
+            owner_user_id=TEST_JOB_OWNER_USER_ID,
+            source_id=TEST_JOB_SOURCE_ID,
             runner=failing_runner,
-            database_url=database_url,
+            database_url=isolated_postgres_database_url,
         )
 
         assert created is True
@@ -291,7 +348,7 @@ def test_job_registry_failure_logs_include_job_context(tmp_path, monkeypatch):
         task = registry._active_by_id[job.id].task
         await task
 
-        async with create_database(database_url=database_url) as db:
+        async with create_database(database_url=isolated_postgres_database_url) as db:
             persisted = await db.get_job(job.id)
 
         assert persisted is not None
@@ -304,12 +361,12 @@ def test_job_registry_failure_logs_include_job_context(tmp_path, monkeypatch):
         assert len(started) == 1
         assert started[0]["job_id"] == job.id
         assert started[0]["job_key"] == "pipeline:test-failure"
-        assert started[0]["source_id"] == "source-123"
+        assert started[0]["source_id"] == TEST_JOB_SOURCE_ID
 
         assert len(failed) == 1
         assert failed[0]["job_id"] == job.id
         assert failed[0]["job_key"] == "pipeline:test-failure"
-        assert failed[0]["source_id"] == "source-123"
+        assert failed[0]["source_id"] == TEST_JOB_SOURCE_ID
         assert failed[0]["error_type"] == "ValueError"
         assert failed[0]["error_message"] == "boom"
         assert failed[0]["duration_ms"] >= 0

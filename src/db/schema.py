@@ -1,4 +1,4 @@
-"""SQLAlchemy schema definitions for the Postgres migration path."""
+"""SQLAlchemy schema definitions for the Postgres runtime schema."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB, UUID
 
 metadata = MetaData()
-json_type = JSONB().with_variant(Text(), "sqlite")
+json_type = JSONB()
 uuid_type = UUID(as_uuid=True)
 
 

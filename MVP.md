@@ -15,7 +15,7 @@ Already completed in the codebase:
 - Dashboard/profile now show an initial-import-in-progress state with a direct link to shared pipeline job history
 - Persisted background jobs with duplicate prevention, stale-job recovery, cancellation, progress payloads, and job history UI
 - Explicit dev vs prod serve commands (`serve-dev` vs `serve`) with production `reload=False`
-- Explicit Postgres migration flow with Alembic and `make db-migrate`
+- Explicit Postgres-only runtime flow with Docker Compose local dev, Alembic, and `make db-migrate`
 - Forward-only follow-up Alembic migrations for production schema drift (`user_event_state` and `city_slug`)
 - Central `America/Chicago` timezone helpers used by weekend selection, calendar boundaries, cron, and notify flows
 - Scraper datetime parsing now defaults naive event times to `America/Chicago`, with DST/midnight regression coverage
@@ -29,6 +29,7 @@ Already completed in the codebase:
 - Alembic history regression checks now guard follow-up revision lineage and historical revision immutability
 - Repo-wide formatting/lint coverage for Python, templates, docs, config, and frontend assets via `make check`
 - Operator runbook covering deploys, migrations, scheduler checks, failed-job/source inspection, secret rotation, and Postgres backup/restore
+- Docs/tooling cleanup removing SQLite migration guidance and the old `aiosqlite` dependency from the supported path
 
 Still open before a true public MVP:
 
@@ -96,7 +97,7 @@ We should consider the app MVP-ready only when all of these are true:
 - [x] 8. Health checks expose pipeline freshness.
 - [x] 9. Notification delivery results are visible enough to debug failures.
 - [ ] 10. Search and key pages remain fast on realistic data volume.
-- [ ] 11. Deployment/docs match actual runtime behavior.
+- [x] 11. Deployment/docs match actual runtime behavior.
 
 ---
 
@@ -194,14 +195,16 @@ Scheduled runs are observable, timezone-correct, and share the same execution pa
 
 ## 1.4 Introduce explicit database migrations
 
-Current startup migration behavior in `src/db/database.py` uses best-effort `ALTER TABLE` calls with suppressed exceptions. That is too fragile for public release.
+The app now runs a Postgres-only runtime path with Alembic-managed schema changes.
+The remaining gap is stronger upgrade coverage for older schemas and continued
+discipline around forward-only migrations.
 
 ### Tasks
 
 - [x] Add a schema version table
 - [x] Create an explicit migration runner
-- [ ] Move bootstrap schema creation into a clear migration/bootstrap layer
-- [ ] Replace silent `ALTER TABLE ...` attempts with ordered versioned migrations
+- [x] Move bootstrap schema creation into a clear migration/bootstrap layer
+- [x] Replace silent `ALTER TABLE ...` attempts with ordered versioned migrations
 - [x] Add a command for running migrations explicitly
 - [x] Decide whether app startup should fail when migrations are pending or apply them automatically
 - [ ] Add tests covering migration from an older schema state
@@ -388,7 +391,7 @@ Current search uses `LIKE` and JSON extraction, which will degrade.
 
 ### Tasks
 
-- [ ] Evaluate SQLite FTS5 for title/description search
+- [ ] Benchmark Postgres search/index behavior for title/description search
 - [ ] Consider denormalizing toddler score into a dedicated column
 - [ ] Review filter/sort query patterns for indexability
 - [ ] Add indexes for common filters:
@@ -461,9 +464,11 @@ Web routes are easier to reason about and safer to change post-launch.
 
 ---
 
-## 4.2 Split `src/db/database.py`
+## 4.2 Split `src/db/postgres.py`
 
-This module currently does schema bootstrapping, row mapping, repositories, job persistence, and dedupe logic.
+`src/db/database.py` is now a thin Postgres-only facade. The remaining large
+module is `src/db/postgres.py`, which still combines row mapping, repositories,
+job persistence, and dedupe logic.
 
 ### Tasks
 
@@ -473,7 +478,7 @@ This module currently does schema bootstrapping, row mapping, repositories, job 
 - [ ] Extract source repository methods
 - [ ] Extract jobs repository methods
 - [ ] Extract dedupe helpers into a dedicated module
-- [ ] Keep the public database interface thin and obvious
+- [x] Keep the public database interface thin and obvious
 
 ### Deliverable
 
@@ -580,7 +585,7 @@ Some state is still in-memory:
 
 - [ ] Decide whether MVP is strictly single-process on one VM
 - [ ] If yes, document that clearly
-- [ ] If no, move volatile coordination state into SQLite or another shared store
+- [ ] If no, move volatile coordination state into Postgres or another shared store
 - [ ] Ensure deployment architecture matches this decision
 
 ### Deliverable
